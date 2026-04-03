@@ -1,0 +1,6 @@
+[
+    { "day": "Monday", "time": "10:00", "activity": "Quantum Lab" },
+    { "day": "Tuesday", "time": "14:00", "activity": "Teaching Assistant (ECE 238L)" },
+    { "day": "Wednesday", "time": "16:00", "activity": "IT Academic Tech Meeting" },
+    { "day": "Friday", "time": "09:00", "activity": "Astrophysics Seminar" }
+]

@@ -1,0 +1,101 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrollbars unless you want them */
+    background: transparent; /* Or none */
+    color: #eee; /* Make text readable */
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+
+.overlay, header, main, footer {
+    position: relative;
+    z-index: 1;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#terminal-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(8,11,20,0.97);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+  transition: background 0.3s;
+}
+
+#terminal-window {
+  background: #111;
+  color: #c8f7c5;
+  font-family: "Fira Mono", "Consolas", "Monaco", monospace;
+  border-radius: 14px; box-shadow: 0 2px 48px #000b;
+  min-width: 460px; width: 44vw; max-width: 680px; min-height: 270px;
+  max-height: 80vh; padding: 0.8em 1.1em; overflow: hidden; display: flex; flex-direction: column;
+}
+
+#terminal-output {
+  flex: 1 1 auto; overflow-y: auto; font-size: 1.07em; line-height: 1.5;
+  margin-bottom: 7px;
+}
+
+#terminal-input-row {
+  flex-shrink: 0; display: flex; align-items: center; font-size: 1.09em;
+  background: transparent;
+}
+
+.terminal-prompt { color: #79b8ff; margin-right: 0.3em; }
+
+#terminal-input {
+  caret-color: #c8f7c5;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #c8f7c5;
+  font-family: inherit;
+  font-size: inherit;
+  width: 68%;
+}
+
+.terminal-cursor {
+  width: 9px; height: 1.3em; margin-left: 2px; background: #c8f7c5;
+  animation: blink 1.2s steps(1) infinite;
+  display: inline-block;
+}
+@keyframes blink { 0% { opacity: 1; } 49% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
+
+#terminal-overlay.light {
+  background: rgba(242,242,242,0.97);
+}
+#terminal-window.light {
+  background: #e9ecef;
+  color: #24362f;
+}
+#terminal-window.light .terminal-prompt {
+  color: #0056c9;
+}
+#terminal-window.light .terminal-cursor {
+  background: #24362f;
+}
+
+
+body[data-theme="light"] {
+    background: #e9ecef;
+    color: #222;
+}
+body[data-theme="dark"] {
+    background: #10111c;
+    color: #eee;
+}
+/* Override main content, headers, nav, etc. using [data-theme] selectors */
+
+#matrix-rain {
+  position: fixed;
+  left: 0; top: 0; width: 100vw; height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+  display: block;
+}
+#terminal-window {
+  position: relative;
+  z-index: 2;
+}

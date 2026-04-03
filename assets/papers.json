@@ -1,0 +1,18 @@
+[
+    {
+        "title": "Quantum Confinement in Semiconductor Quantum Dots",
+        "authors": "Raman Pandey, et al.",
+        "abstract": "We investigate discrete energy levels and electronic properties in III-V semiconductor quantum dots, exploring quantum confinement effects, exciton recombination, and the impact on optoelectronic devices. Our results show strong size-dependent photoluminescence, with potential for single-photon sources in quantum information processing.",
+        "journal": "Phys. Rev. B",
+        "year": 2024,
+        "doi": "10.1103/PhysRevB.1234567"
+    },
+    {
+        "title": "Machine Learning-Assisted Quantum Dot Lithography",
+        "authors": "Raman Pandey, et al.",
+        "abstract": "We apply deep graph neural networks to atomically precise lithography with scanning probe microscopy, achieving robust feature recognition and significant speed-up in pattern transfer for silicon quantum dot devices.",
+        "journal": "Nano Letters",
+        "year": 2024,
+        "doi": "10.1021/nl9876543"
+    }
+]

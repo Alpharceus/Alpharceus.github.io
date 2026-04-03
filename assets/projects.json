@@ -1,0 +1,74 @@
+[
+  {
+    "title": "🧠 Deep Learning Assisted Scanning Probe Microscopy",
+    "desc": "Reduced lithography time for atomically precise nanofabrication using a GNN.",
+    "summary": "Used a graph neural network to analyze scanning probe microscopy data in real time, identifying fabrication paths and reducing overall writing time by ~40%.",
+    "url": "https://placeholder.link/spm-gnn"
+  },
+  {
+    "title": "📅 UNM IT Scheduling Platform",
+    "desc": "Full-stack scheduling web app for UNM IT using Django, Node.js, and REST API.",
+    "summary": "Developed a robust scheduling platform with authentication and user management, streamlining IT appointment booking for UNM staff and students.",
+    "url": "https://placeholder.link/unm-scheduler"
+  },
+  {
+    "title": "🪐 Planetary Orbit Simulator",
+    "desc": "Numerically solved and visualized N-body planetary motion using Python.",
+    "summary": "Simulated complex orbital mechanics using Runge-Kutta methods and interactive visualization with matplotlib and PyGame.",
+    "url": "https://placeholder.link/orbit-sim"
+  },
+  {
+    "title": "📡 SNSPD Single-Photon Detection FPGA Pipeline",
+    "desc": "Custom FPGA logic for SNSPD photon timestamping and comparator link-up.",
+    "summary": "Designed VHDL/Verilog modules to capture high-precision SNSPD pulses, connect amplifier → comparator → FPGA, and prepare a multi-stage counting pipeline for the senior design project.",
+    "url": "https://placeholder.link/snspd-fpga"
+  },
+  {
+    "title": "🌈 Mach–Zehnder Interferometer Control (Quantum Optics FPGA)",
+    "desc": "FPGA-based digital control of MZI phase modulators and photon-counting paths.",
+    "summary": "Integrated high-speed DAC/ADC channels, control loops, and real-time interferometer stabilization logic for QD/MZI experimental hardware.",
+    "url": "https://placeholder.link/mzi-control"
+  },
+  {
+    "title": "💡 GBS / SPAD Photon Counting Architecture",
+    "desc": "System-level FPGA design for Gaussian Boson Sampling and APD/SPAD counting.",
+    "summary": "Drafted a scalable multi-FPGA architecture using ZCU106 + FMC172 for 1–10 GHz sampling, including time-tagging, buffering, and host-PC streaming.",
+    "url": "https://placeholder.link/gbs-spad"
+  },
+  {
+    "title": "🧮 Quantum Error Correction Coursework (Google Quantum AI)",
+    "desc": "Exploration of surface codes, stabilizers, and noise models.",
+    "summary": "Completed advanced quantum error correction coursework and built custom simulators for stabilizer updates and Pauli frame tracking.",
+    "url": "https://placeholder.link/qec-google"
+  },
+  {
+    "title": "🔐 Quantum Fourier Transform & Shor’s Algorithm Demo",
+    "desc": "Small-scale Julia/Python implementation of QFT and modular exponentiation.",
+    "summary": "Created an annotated QFT implementation and applied it to small composite number factoring as a teaching/demo tool.",
+    "url": "https://placeholder.link/qft-demo"
+  },
+  {
+    "title": "🤖 Jarvis-Style Local AI Assistant",
+    "desc": "Voice-controlled offline assistant with gesture recognition and activity tracking.",
+    "summary": "Implements 20/20/20 rule reminders, Google Home delegation, persistent memory, live browser queries, gesture recognition through OpenCV, and planned TTS-synced animations.",
+    "url": "https://placeholder.link/jarvis-assistant"
+  },
+  {
+    "title": "🌌 Observatory-Themed Personal Website",
+    "desc": "Interactive star-map homepage, terminal interface, and animated projects page.",
+    "summary": "Designed a unique portfolio with Orion-based navigation, an interactive terminal, and an FPGA/microprocessor animated project browser.",
+    "url": "https://placeholder.link/website"
+  },
+  {
+    "title": "🌍 N-Body Gravitational Field Visualizer",
+    "desc": "Heatmap visualization of gravitational potentials over time.",
+    "summary": "Simulated dynamic gravitational potential fields using NumPy and rendered contour plots evolving with the system.",
+    "url": "https://placeholder.link/gravity-map"
+  },
+  {
+    "title": "🦴 Text-Based Geological Survival Game (PBS Eons Inspired)",
+    "desc": "Procedural text adventure set in different geological eras.",
+    "summary": "Built a dynamic narrative engine that integrates NLP to generate survival encounters, time-period-accurate biology, and dynamic environment changes.",
+    "url": "https://placeholder.link/eons-survival"
+  }
+]
