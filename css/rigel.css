@@ -1,0 +1,229 @@
+/* Basic page alignment with your theme */
+#bloch-intro {
+    text-align: center;
+    margin-top: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+#bloch-intro h1 {
+    margin-bottom: 0.5rem;
+}
+
+#bloch-intro .lead {
+    color: #c8d3ff;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+}
+
+#bloch-canvas {
+    max-width: 420px;
+    width: 100%;
+    background: radial-gradient(circle at 50% 20%, #1f2937, #020617);
+    border-radius: 999px;
+    box-shadow: 0 0 40px rgba(56, 189, 248, 0.25),
+                0 0 60px rgba(59, 130, 246, 0.25);
+}
+
+#bloch-intro .hint {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    margin-top: 0.6rem;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Circuit layout */
+
+#circuit-section {
+    margin-top: 1rem;
+}
+
+.qc-layout {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.qc-left,
+.qc-right {
+    flex: 1 1 280px;
+    min-width: 260px;
+}
+
+.qc-block {
+    background: rgba(20, 26, 46, 0.96);
+    border-radius: 1rem;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 6px 26px rgba(8, 13, 30, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.qc-block h3 {
+    margin-top: 0;
+    margin-bottom: 0.6rem;
+    font-size: 1rem;
+    color: #e5e7eb;
+}
+
+#qubit-basis-selects label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+}
+
+#qubit-basis-selects select,
+#num-qubits-select {
+    background: #020617;
+    color: #e5e7eb;
+    border-radius: 6px;
+    border: 1px solid #475569;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.tiny-hint {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.5rem;
+}
+
+/* Gate palette */
+
+#gate-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.gate-btn {
+    border-radius: 0.6rem;
+    border: 1px solid #4b5563;
+    background: #020617;
+    color: #e5e7eb;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: background 0.15s ease-out, border-color 0.15s ease-out, transform 0.12s ease-out;
+}
+
+.gate-btn:hover {
+    background: #111827;
+    border-color: #60a5fa;
+    transform: translateY(-1px);
+}
+
+.gate-btn.active {
+    background: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* Circuit grid */
+
+
+#circuit-grid {
+    display: grid;
+    grid-template-columns: 50px repeat(8, 52px);
+    gap: 0.15rem;
+    align-items: center;
+    font-size: 0.75rem;
+    position: relative;
+}
+
+.circuit-label-cell {
+    text-align: right;
+    padding-right: 0.3rem;
+    color: #9ca3af;
+    font-size: 0.78rem;
+}
+
+/* each qubit row gets a faint horizontal wire */
+.circuit-cell {
+    height: 32px;
+    border-radius: 0.4rem;
+    border: 1px dashed transparent; /* no heavy box look by default */
+    background:
+        linear-gradient(to right, #4b5563 50%, #4b5563 50%) center/100% 1px no-repeat,
+        rgba(15, 23, 42, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+}
+
+
+
+/* when gate present, show a “brick” on the wire */
+.circuit-cell.has-gate {
+    border-style: solid;
+    border-color: #60a5fa;
+    background:
+        linear-gradient(to right, #4b5563 50%, #4b5563 50%) center/100% 1px no-repeat,
+        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.35), rgba(15, 23, 42, 0.95));
+}
+
+.circuit-gate-label {
+    font-size: 0.78rem;
+    color: #e5e7eb;
+}
+
+.circuit-gate-ctl {
+    font-size: 0.9rem;
+    color: #f97316;
+}
+
+.circuit-wire {
+    position: absolute;
+    left: 50%;
+    width: 2px;
+    background: #4b5563;
+}
+
+/* Buttons */
+
+#run-btn,
+#clear-circuit-btn {
+    font-family: 'JetBrains Mono', monospace;
+    border-radius: 0.6rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid #4b5563;
+    background: #020617;
+    color: #e5e7eb;
+    margin-right: 0.3rem;
+}
+
+#run-btn:hover {
+    background: #16a34a;
+    border-color: #4ade80;
+}
+
+#clear-circuit-btn.secondary:hover {
+    background: #1f2937;
+}
+
+/* Output */
+
+.state-output {
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    color: #e5e7eb;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+
+
+
+
+.system-preset-row {
+    display: block;
+    margin: 0.4rem 0 0.6rem 0;
+    font-size: 0.85rem;
+}

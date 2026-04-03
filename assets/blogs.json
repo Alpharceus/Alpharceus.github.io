@@ -1,0 +1,46 @@
+[
+  {
+    "id": "astro-ethics",
+    "title": "Why Ethics Matters in Astrophysics",
+    "author": "Raman Pandey",
+    "date": "2025-06-01",
+    "content": [
+      {
+        "type": "p",
+        "text": "The universe is a vast laboratory—but does that mean anything goes? Let’s talk about the ethical frontiers of astronomy and planetary science."
+      },
+      {
+        "type": "header",
+        "text": "Introduction"
+      },
+      {
+        "type": "p",
+        "text": "In a field defined by big questions and bigger tools, it’s easy to think of astrophysics as a 'pure' science—untouched by ethical concerns. But as our telescopes, detectors, and ambitions grow, so too does our impact, both on the cosmos and on the people here at home."
+      },
+      {
+        "type": "header",
+        "text": "Astronomy’s Double-Edged Sword"
+      },
+      {
+        "type": "p",
+        "text": "From the early radio telescopes that crowded the radio spectrum to today’s plans for interstellar messaging, our quest to explore can also be a source of unintended harm: Satellite constellations now threaten dark skies for both professional astronomers and everyone who loves the stars."
+      },
+      {
+        "type": "quote",
+        "text": "Large facilities sometimes displace indigenous communities or disturb sacred land (see: Mauna Kea, Thirty Meter Telescope debates)."
+      },
+      {
+        "type": "p",
+        "text": "SETI (Search for Extraterrestrial Intelligence) has prompted serious debate about whether we should be sending signals as well as listening."
+      },
+      {
+        "type": "header",
+        "text": "Planetary Protection: More Than Sci-Fi"
+      },
+      {
+        "type": "p",
+        "text": "Every Mars lander is baked, scrubbed, and carefully controlled to prevent biological contamination. Why? Because even the tiniest microbe from Earth could erase a chapter of Mars’ own story. Some argue for more open exploration, while others urge maximum caution—how do we balance the two?"
+      }
+    ]
+  }
+]
