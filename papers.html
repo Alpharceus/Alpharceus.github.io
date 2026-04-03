@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Papers | Raman Pandey</title>
+    <link rel="stylesheet" href="css/portfolio-pages.css">
+</head>
+<body>
+    <canvas id="particles-bg"></canvas>
+    <header>
+        <nav>
+            <a href="index.html">Home</a> | Papers
+        </nav>
+    </header>
+    <main>
+        <h1>Research Papers & Publications</h1>
+        <div id="papers-list"></div>
+    </main>
+    <footer>
+        <p>&copy; 2025 Raman Pandey</p>
+    </footer>
+
+    <script>
+    // Load and render papers (including abstract)
+    fetch('assets/papers.json')
+        .then(res => res.json())
+        .then(papers => {
+            const el = document.getElementById('papers-list');
+            el.innerHTML = papers.map(paper => `
+                <div class="paper-card">
+                    <div class="paper-title">${paper.title}</div>
+                    <div class="paper-authors">${paper.authors || ""}</div>
+                    <div class="paper-journal">
+                        ${paper.journal || ""}${paper.year ? " ("+paper.year+")" : ""}
+                        ${paper.doi ? `<a href="https://doi.org/${paper.doi}" target="_blank" style="color:#f1d8b3;">[DOI]</a>` : ''}
+                        ${paper.link ? `<a href="${paper.link}" target="_blank" style="color:#80ffee;margin-left:1.1em;">[Read]</a>` : ''}
+                    </div>
+                    <div class="paper-abstract">${paper.abstract || ""}</div>
+                </div>
+            `).join('');
+        });
+    </script>
+    <script src="js/papers.js"></script>
+</body>
+</html>

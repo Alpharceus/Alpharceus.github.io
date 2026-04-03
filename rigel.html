@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rigel | Quantum Circuit Playground</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/portfolio-pages.css">
+    <link rel="stylesheet" href="css/rigel.css">
+</head>
+<body>
+<header>
+    <nav>
+        <a href="index.html">Home</a> |
+        <span>Rigel (Quantum)</span>
+    </nav>
+</header>
+
+<main>
+    <!-- Bloch sphere intro section -->
+    <section id="bloch-intro">
+        <h1>Rigel — Quantum Playground</h1>
+        <p class="lead">
+            A quick tour of the Bloch sphere, then a toy quantum circuit simulator you can play with.
+        </p>
+        <canvas id="bloch-canvas" width="420" height="420"></canvas>
+        <p class="hint">(Pure states live on the surface. The center is maximally mixed.)</p>
+    </section>
+
+    <!-- Circuit builder (initially hidden, revealed after intro) -->
+    <section id="circuit-section" class="hidden">
+        <h2>Quantum Circuit Builder</h2>
+        <div class="qc-layout">
+            <div class="qc-left">
+<div class="qc-block">
+    <h3>Qubits &amp; Input States</h3>
+    <label>
+        Number of qubits:
+        <select id="num-qubits-select">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+        </select>
+    </label>
+
+    <label class="system-preset-row">
+        System preset:
+        <select id="system-preset-select">
+            <option value="none" selected>None (product state)</option>
+            <option value="bell-phi-plus">Bell |Φ+⟩ = (|00⟩ + |11⟩)/√2</option>
+            <option value="bell-phi-minus">Bell |Φ-⟩ = (|00⟩ - |11⟩)/√2</option>
+            <option value="bell-psi-plus">Bell |Ψ+⟩ = (|01⟩ + |10⟩)/√2</option>
+            <option value="bell-psi-minus">Bell |Ψ-⟩ = (|01⟩ - |10⟩)/√2</option>
+            <option value="ghz-3">GHZ_3 = (|000⟩ + |111⟩)/√2</option>
+            <option value="ghz-4">GHZ_4 = (|0000⟩ + |1111⟩)/√2</option>
+        </select>
+    </label>
+
+    <div id="qubit-basis-selects"></div>
+    <p class="tiny-hint">
+        Local presets: |0>, |1>, |+>, |->, |+i>, |-i>. System presets override these.
+    </p>
+</div>
+
+
+                <div class="qc-block">
+                    <h3>Gate Palette</h3>
+                    <div id="gate-palette">
+                        <!-- buttons created in JS -->
+                    </div>
+                    <p class="tiny-hint">
+                        Click a gate, then click on the grid to place it.<br>
+                        For CNOT: click control, then target in the same column.
+                    </p>
+                </div>
+
+                <div class="qc-block">
+                    <button id="run-btn">Run Circuit</button>
+                    <button id="clear-circuit-btn" class="secondary">Clear Circuit</button>
+                </div>
+            </div>
+
+            <div class="qc-right">
+                <div class="qc-block">
+                    <h3>Circuit</h3>
+                    <div id="circuit-grid"></div>
+                </div>
+
+                <div class="qc-block">
+                    <h3>State &amp; Bloch Summary</h3>
+                    <pre id="state-output" class="state-output"></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <p>&copy; 2025 Raman Pandey</p>
+</footer>
+
+<script src="js/rigel.js"></script>
+</body>
+</html>
