@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   // ============================================================
   // 1. PROJECT LIST + PIPELINE LOADER
   // ============================================================
@@ -187,10 +187,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let coreOverdrive = 0; // increases with core clicks, decays slowly
   let halted = false;
 
-  let showAddrBus = true;
-  let showDataBus = true;
-  let showCtrlBus = true;
-
   // helper button
   const engChipBtn = document.createElement("button");
   engChipBtn.id = "eng-chip-toggle";
@@ -271,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:#93c5fd;margin-bottom:6px;">
       Engineering Mode
     </div>
-    <div>Core unlocked. Address, data and control buses are now under your command.</div>
+    <div>Core unlocked. Clock speed and electron flow are now under your command.</div>
   `;
   engToast.appendChild(engToastInner);
   document.body.appendChild(engToast);
@@ -323,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
       <button id="eng-close-btn" style="
         background:none;border:none;color:#9ca3af;
-        font-size:12px;cursor:pointer;">✕</button>
+        font-size:12px;cursor:pointer;">âœ•</button>
     </div>
     <div style="margin-bottom:10px;color:#9ca3af;">
       Tap the core multiple times to push it into overdrive. Clock speed, buses and arcs respond.
@@ -334,21 +330,6 @@ document.addEventListener("DOMContentLoaded", () => {
       <div style="font-size:10px;color:#6b7280;margin-top:2px;">
         Scales animation speed globally.
       </div>
-    </div>
-    <div style="margin-bottom:8px;">
-      <div style="margin-bottom:4px;color:#9ca3af;">Buses</div>
-      <label style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-        <input type="checkbox" id="bus-addr" checked>
-        <span>Address bus</span>
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-        <input type="checkbox" id="bus-data" checked>
-        <span>Data bus</span>
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;">
-        <input type="checkbox" id="bus-ctrl" checked>
-        <span>Control bus</span>
-      </label>
     </div>
     <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
       <div style="color:#9ca3af;">Core state</div>
@@ -369,9 +350,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const engCloseBtn = engPanel.querySelector("#eng-close-btn");
   const clockSlider = engPanel.querySelector("#eng-clock-slider");
-  const busAddrCheckbox = engPanel.querySelector("#bus-addr");
-  const busDataCheckbox = engPanel.querySelector("#bus-data");
-  const busCtrlCheckbox = engPanel.querySelector("#bus-ctrl");
   const haltBtn = engPanel.querySelector("#eng-halt-btn");
 
   function updateEngChipLabel() {
@@ -401,16 +379,6 @@ document.addEventListener("DOMContentLoaded", () => {
     clockSpeed = parseFloat(e.target.value) || 1.0;
   });
 
-  busAddrCheckbox.addEventListener("change", (e) => {
-    showAddrBus = e.target.checked;
-  });
-  busDataCheckbox.addEventListener("change", (e) => {
-    showDataBus = e.target.checked;
-  });
-  busCtrlCheckbox.addEventListener("change", (e) => {
-    showCtrlBus = e.target.checked;
-  });
-
   haltBtn.addEventListener("click", () => {
     halted = !halted;
     if (halted) {
@@ -424,678 +392,603 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+
   // ============================================================
-  // 3. CANVAS: CPU + FPGA CIRCUIT BACKGROUND
+  // 3. CANVAS: CINEMATIC PCB MICROPROCESSOR BACKGROUND
   // ============================================================
 
   const canvas = document.createElement("canvas");
   canvas.id = "circuit-canvas";
   Object.assign(canvas.style, {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    zIndex: 0,
-    pointerEvents: "none",
-    opacity: 0.9
+    position: "fixed", top: "0", left: "0",
+    width: "100vw", height: "100vh",
+    zIndex: "0", pointerEvents: "none"
   });
   document.body.insertBefore(canvas, document.body.firstChild);
-
   const ctx = canvas.getContext("2d");
-  let t = 0;
 
+  let t = 0;
   let cpuCenter = { x: 0, y: 0 };
   let cpuRadius = 0;
 
+  // ---- Intro animation state ----
+  const PHASE_DARK = 0, PHASE_POWERON = 1, PHASE_TRACEDRAW = 2,
+        PHASE_ZOOMOUT = 3, PHASE_IDLE = 4;
+  let introPhase = PHASE_DARK;
+  let introTime = 0;
+  let introScale = 2.8;
+  let traceDrawProgress = 0;
+  let cardsShown = false;
+
+  // ---- CPU hitbox ----
   const cpuHitbox = document.createElement("div");
   Object.assign(cpuHitbox.style, {
-    position: "fixed",
-    zIndex: "35",
-    pointerEvents: "auto",
-    background: "transparent",
-    cursor: "pointer"
+    position: "fixed", zIndex: "35", pointerEvents: "auto",
+    background: "transparent", cursor: "pointer"
   });
   document.body.appendChild(cpuHitbox);
-
   cpuHitbox.addEventListener("click", () => {
-    if (!engineeringMode) {
-      setEngineeringMode(true, true);
-    }
-    coreOverdrive = Math.min(coreOverdrive + 1, 6);
+    if (introPhase < PHASE_IDLE) return;
+    if (!engineeringMode) setEngineeringMode(true, true);
+    coreOverdrive = Math.min(coreOverdrive + 1.2, 6);
   });
 
+  // ---- Resize ----
   function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    updateCpuHitbox();
   }
-
   window.addEventListener("resize", resize);
   resize();
 
-  function updateCpuHitbox() {
-    const baseSize = Math.min(canvas.width, canvas.height) * 0.22;
-    const cx = canvas.width * 0.30;
-    const cy = canvas.height * 0.48;
-
-    const radius = baseSize * Math.SQRT1_2;
-    cpuCenter = { x: cx, y: cy };
-    cpuRadius = radius;
-
-    const boxSize = radius * 2 * 1.15;
-    cpuHitbox.style.left = `${cx - boxSize / 2}px`;
-    cpuHitbox.style.top = `${cy - boxSize / 2}px`;
-    cpuHitbox.style.width = `${boxSize}px`;
-    cpuHitbox.style.height = `${boxSize}px`;
+  function getAnimMult() {
+    let m = 1.0;
+    if (engineeringMode) m *= 1.3;
+    if (isPipelineActive) m *= 1.4;
+    m *= 1 + 0.35 * Math.min(coreOverdrive, 6);
+    m *= clockSpeed;
+    return halted ? 0 : m;
   }
 
-function getAnimMultiplier() {
-  // base < eng mode < pipeline < overdrive, then HALT can completely freeze
-  let mult = 1.0;
-  if (engineeringMode) mult *= 1.3;
-  if (isPipelineActive) mult *= 1.4;
-  mult *= 1 + 0.35 * Math.min(coreOverdrive, 6);
-  mult *= clockSpeed;
+  // ============================================================
+  // ORGANIC TRACE PATHS
+  // ============================================================
 
-  // HALT: fully freeze animation
-  if (halted) return 0;
+  let tracePaths = [];
+  let modules = [];
+  let vias = [];
+  let smds = [];
 
-  return mult;
-}
+  function buildLayout() {
+    const W = canvas.width, H = canvas.height;
+    const cx = W * 0.5, cy = H * 0.5;
+    const chipSz = Math.min(W, H) * 0.09;
+    const mw = chipSz * 1.4, mh = chipSz * 0.5;
 
-  function drawGrid() {
-    ctx.save();
-    const spacing = 48;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(15,23,42,0.5)";
-    for (let x = 0; x < canvas.width; x += spacing) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += spacing) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
+    modules = [
+      { label: "ROM",     x: cx - mw*2.8, y: cy - mh*4.2, w: mw*0.8, h: mh },
+      { label: "RAM",     x: cx - mw*0.9, y: cy - mh*4.6, w: mw*0.8, h: mh },
+      { label: "CACHE",   x: cx + mw*1.0, y: cy - mh*4.2, w: mw*0.9, h: mh },
+      { label: "MEM",     x: cx + mw*2.4, y: cy - mh*3.0, w: mw*0.8, h: mh },
+      { label: "ALU",     x: cx + mw*3.0, y: cy - mh*0.3, w: mw*0.7, h: mh*1.2 },
+      { label: "DSP",     x: cx + mw*2.6, y: cy + mh*2.2, w: mw*0.7, h: mh },
+      { label: "FPGA",    x: cx - mw*3.2, y: cy - mh*0.5, w: mw*0.9, h: mh*1.2 },
+      { label: "REGFILE", x: cx - mw*2.8, y: cy + mh*2.8, w: mw*0.9, h: mh },
+      { label: "I/O",     x: cx - mw*0.8, y: cy + mh*4.0, w: mw*0.7, h: mh },
+      { label: "CTRL",    x: cx + mw*0.6, y: cy + mh*4.2, w: mw*0.8, h: mh },
+      { label: "DEBUG",   x: cx + mw*2.2, y: cy + mh*3.6, w: mw*0.7, h: mh },
+    ];
 
-  function drawCpuDiamond(cx, cy, size) {
-    const mult = getAnimMultiplier();
-    const jBase = engineeringMode || isPipelineActive ? 2.5 : 1.2;
-    const jOver = 2.0 * coreOverdrive;
-    const jitter = (jBase + jOver) * (mult / 2.5);
-
-    const jx = Math.sin(t / 25) * jitter;
-    const jy = Math.cos(t / 23) * jitter;
-
-    const xx = cx + jx;
-    const yy = cy + jy;
-    const half = size / 2;
-
-    ctx.save();
-    ctx.translate(xx, yy);
-    ctx.rotate(Math.PI / 4);
-
-    const gradient = ctx.createLinearGradient(-half, -half, half, half);
-    gradient.addColorStop(0, "#0ea5e9");
-    gradient.addColorStop(0.4, "#38bdf8");
-    gradient.addColorStop(1, "#22c55e");
-
-    ctx.fillStyle = "rgba(5,15,35,0.98)";
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = "rgba(56,189,248,0.9)";
-    ctx.shadowBlur = 22 * (mult / 1.5);
-
-    ctx.beginPath();
-    ctx.roundRect(-half, -half, size, size, 14);
-    ctx.fill();
-    ctx.globalAlpha = 0.95;
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-    ctx.lineWidth = 1.8;
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
-    ctx.beginPath();
-    ctx.roundRect(-half * 0.7, -half * 0.7, size * 0.7, size * 0.7, 8);
-    ctx.stroke();
-
-    // vertical slits
-    ctx.strokeStyle = "rgba(56,189,248,0.5)";
-    ctx.lineWidth = 0.9;
-    for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      ctx.moveTo(-half * 0.6 + i * 6, -half * 0.45);
-      ctx.lineTo(-half * 0.6 + i * 6, half * 0.45);
-      ctx.stroke();
+    tracePaths = [];
+    for (const mod of modules) {
+      const mx = mod.x + mod.w / 2;
+      const my = mod.y + mod.h / 2;
+      const path = buildTracePath(cx, cy, mx, my, chipSz);
+      tracePaths.push({ path, module: mod, numTracks: 4 });
     }
 
-    ctx.fillStyle = "rgba(226,232,240,0.95)";
-    ctx.font = `${Math.round(size * 0.18)}px 'JetBrains Mono','Fira Mono',monospace`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("CORE", 0, 0);
-
-    ctx.restore();
-  }
-
-  function drawModule(mod) {
-    const { x, y, w, h, label } = mod;
-    const chamfer = Math.min(w, h) * 0.16;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x + chamfer, y);
-    ctx.lineTo(x + w - chamfer, y);
-    ctx.lineTo(x + w, y + chamfer);
-    ctx.lineTo(x + w, y + h - chamfer);
-    ctx.lineTo(x + w - chamfer, y + h);
-    ctx.lineTo(x + chamfer, y + h);
-    ctx.lineTo(x, y + h - chamfer);
-    ctx.lineTo(x, y + chamfer);
-    ctx.closePath();
-
-    ctx.fillStyle = "rgba(10,16,35,0.92)";
-    ctx.fill();
-
-    ctx.strokeStyle = "rgba(148,163,184,0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // internal stripes + tiny indicators
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x + 6, y + 6, w - 12, h - 12);
-    ctx.clip();
-
-    ctx.strokeStyle = "rgba(30,64,175,0.7)";
-    ctx.lineWidth = 0.7;
-    for (let yy = y + 8; yy < y + h - 8; yy += 5) {
-      ctx.beginPath();
-      ctx.moveTo(x + 10, yy);
-      ctx.lineTo(x + w - 10, yy);
-      ctx.stroke();
+    const decoEnds = [
+      { x: W * 0.05, y: H * 0.3 }, { x: W * 0.95, y: H * 0.7 },
+      { x: W * 0.08, y: H * 0.75 }, { x: W * 0.92, y: H * 0.25 },
+      { x: W * 0.15, y: H * 0.08 }, { x: W * 0.85, y: H * 0.92 },
+    ];
+    for (const end of decoEnds) {
+      tracePaths.push({ path: buildTracePath(cx, cy, end.x, end.y, chipSz), module: null, numTracks: 2 });
     }
 
-    const ledCount = 3;
-    for (let i = 0; i < ledCount; i++) {
-      const lx = x + 10 + i * ((w - 20) / Math.max(ledCount - 1, 1));
-      const ly = y + h - 10;
-      ctx.beginPath();
-      ctx.arc(lx, ly, 2, 0, 2 * Math.PI);
-      ctx.fillStyle = i === 0 ? "#22c55e" : i === 1 ? "#38bdf8" : "#facc15";
-      ctx.fill();
-    }
-    ctx.restore();
-
-    ctx.font = "11px 'JetBrains Mono','Fira Mono',monospace";
-    ctx.fillStyle = "#9ca3af";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, x + w / 2, y + h / 2 - 4);
-    ctx.restore();
-  }
-
-  function drawOscillator(x, y) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(148,163,184,0.9)";
-    ctx.lineWidth = 1.6;
-
-    ctx.beginPath();
-    ctx.moveTo(x - 22, y);
-    ctx.lineTo(x + 22, y);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.roundRect(x - 18, y - 10, 36, 20, 6);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.roundRect(x - 12, y - 4, 24, 8, 4);
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
-  function moduleCenter(mod) {
-    return { x: mod.x + mod.w / 2, y: mod.y + mod.h / 2 };
-  }
-
-  function buildModules(cpuX, cpuY, cpuSize) {
-    const modW = cpuSize * 0.7;
-    const modH = cpuSize * 0.22;
-
-    const modules = [];
-
-    // top row
-    modules.push({
-      name: "ROM",
-      label: "ROM",
-      x: canvas.width * 0.12,
-      y: canvas.height * 0.16,
-      w: modW * 0.7,
-      h: modH * 0.9
-    });
-    modules.push({
-      name: "RAM",
-      label: "RAM",
-      x: canvas.width * 0.30,
-      y: canvas.height * 0.16,
-      w: modW * 0.7,
-      h: modH * 0.9
-    });
-    modules.push({
-      name: "MEM",
-      label: "MEM",
-      x: canvas.width * 0.64,
-      y: canvas.height * 0.16,
-      w: modW * 0.75,
-      h: modH * 0.9
-    });
-    modules.push({
-      name: "CACHE",
-      label: "CACHE",
-      x: canvas.width * 0.78,
-      y: canvas.height * 0.16,
-      w: modW * 0.6,
-      h: modH * 0.9
-    });
-
-    // mid row around data bus
-    modules.push({
-      name: "ALU",
-      label: "ALU",
-      x: canvas.width * 0.68,
-      y: canvas.height * 0.40,
-      w: modW * 0.7,
-      h: modH * 1.0
-    });
-    modules.push({
-      name: "DSP",
-      label: "DSP",
-      x: canvas.width * 0.76,
-      y: canvas.height * 0.52,
-      w: modW * 0.6,
-      h: modH * 0.9
-    });
-    modules.push({
-      name: "FPGA",
-      label: "FPGA FABRIC",
-      x: canvas.width * 0.15,
-      y: canvas.height * 0.40,
-      w: modW * 0.8,
-      h: modH * 1.0
-    });
-
-    // bottom row near control bus
-    modules.push({
-      name: "REGFILE",
-      label: "REGFILE",
-      x: canvas.width * 0.12,
-      y: canvas.height * 0.68,
-      w: modW * 0.75,
-      h: modH
-    });
-    modules.push({
-      name: "IO",
-      label: "I/O",
-      x: canvas.width * 0.32,
-      y: canvas.height * 0.68,
-      w: modW * 0.65,
-      h: modH
-    });
-    modules.push({
-      name: "CTRL",
-      label: "CONTROL UNIT",
-      x: canvas.width * 0.52,
-      y: canvas.height * 0.68,
-      w: modW * 0.7,
-      h: modH
-    });
-    modules.push({
-      name: "DEBUG",
-      label: "DEBUG",
-      x: canvas.width * 0.76,
-      y: canvas.height * 0.68,
-      w: modW * 0.6,
-      h: modH
-    });
-
-    return modules;
-  }
-
-function buildBuses(cpuX, cpuY, cpuSize, modules) {
-  const buses = [];
-
-  const leftX = canvas.width * 0.10;
-  const rightX = canvas.width * 0.90;
-
-  const addrY = canvas.height * 0.24;
-  const dataY = cpuY;                // mid-level data bus
-  const ctrlY = canvas.height * 0.82; // pushed below bottom modules
-
-  // plain horizontal trunks (we’ll add bends in drawing)
-  const addrPath = [
-    { x: leftX, y: addrY },
-    { x: rightX, y: addrY }
-  ];
-  const dataPath = [
-    { x: leftX, y: dataY },
-    { x: rightX, y: dataY }
-  ];
-  const ctrlPath = [
-    { x: leftX, y: ctrlY },
-    { x: rightX, y: ctrlY }
-  ];
-
-  // All buses connect to all modules now
-  const addrModules = modules;
-  const dataModules = modules;
-  const ctrlModules = modules;
-
-  function stubToBus(module, busY) {
-    const cx = module.x + module.w / 2;
-    let yBus, yMod;
-
-    if (busY < module.y) {
-      // bus above module
-      yBus = busY;
-      yMod = module.y;
-    } else if (busY > module.y + module.h) {
-      // bus below module
-      yBus = busY;
-      yMod = module.y + module.h;
-    } else {
-      // overlapping case (rare); keep it tiny
-      yBus = busY;
-      yMod = busY;
+    vias = [];
+    for (let i = 0; i < 80; i++) {
+      vias.push({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 2.5, thermal: Math.random() > 0.7 });
     }
 
-    return {
-      x: cx,
-      yBus,
-      yMod,
-      module
-    };
-  }
-
-  function makeBus(type, path, y, modulesForBus) {
-    const bus = {
-      type,
-      path,
-      y,
-      modules: modulesForBus,
-      numTracks: 5, // bundle size = 5 traces
-      draw: () =>
-        (type === "ADDR" && showAddrBus) ||
-        (type === "DATA" && showDataBus) ||
-        (type === "CTRL" && showCtrlBus)
-    };
-    bus.stubs = modulesForBus.map((mod) => stubToBus(mod, y));
-    return bus;
-  }
-
-  buses.push(makeBus("ADDR", addrPath, addrY, addrModules));
-  buses.push(makeBus("DATA", dataPath, dataY, dataModules));
-  buses.push(makeBus("CTRL", ctrlPath, ctrlY, ctrlModules));
-
-  return buses;
-}
-
-function drawBus(bus, phase) {
-  if (!bus.draw()) return;
-
-  const mult = getAnimMultiplier();
-  const path = bus.path;
-  const tracks = bus.numTracks || 5;
-  const trackOffset = 5;   // spacing between traces
-  const stubOffset = 4;    // spacing between stub traces
-
-  let color;
-  if (bus.type === "ADDR") color = "rgba(129,140,248,0.9)";
-  else if (bus.type === "DATA") color = "rgba(56,189,248,0.9)";
-  else color = "rgba(34,197,94,0.9)";
-
-  // --- MAIN BUNDLE (5 parallel traces) ---
-  ctx.save();
-  for (let track = 0; track < tracks; track++) {
-    const offset = (track - (tracks - 1) / 2) * trackOffset;
-
-    ctx.beginPath();
-
-    // add a slight octagonal-ish bend near the center
-    const midX = (path[0].x + path[1].x) / 2;
-    const bendY = path[0].y + ((bus.type === "ADDR") ? -6 : (bus.type === "CTRL") ? 6 : 0);
-
-    ctx.moveTo(path[0].x, path[0].y + offset);
-    ctx.lineTo(midX - 40, path[0].y + offset);
-    ctx.lineTo(midX, bendY + offset);
-    ctx.lineTo(midX + 40, path[0].y + offset);
-    ctx.lineTo(path[1].x, path[1].y + offset);
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3.2; // thicker so you can see each line
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8 * (mult / 1.5);
-    ctx.globalAlpha = 0.32 + 0.05 * (mult / 2.5);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // subtle dark backing underneath bundle
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(path[0].x, path[0].y);
-  ctx.lineTo(path[1].x, path[1].y);
-  ctx.strokeStyle = "rgba(15,23,42,0.9)";
-  ctx.lineWidth = 6 + (tracks - 1) * trackOffset;
-  ctx.globalAlpha = 0.22;
-  ctx.stroke();
-  ctx.restore();
-
-  // --- STUBS TO MODULES (bundles with tiny octagonal kinks) ---
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.4;
-  ctx.globalAlpha = 0.6;
-
-  bus.stubs.forEach((stub) => {
-    for (let track = 0; track < tracks; track++) {
-      const offsetX = (track - (tracks - 1) / 2) * stubOffset;
-      const x0 = stub.x + offsetX;
-      const y0 = stub.yBus;
-      const y1 = stub.yMod;
-
-      const midY = (y0 + y1) / 2;
-      const kinkX = x0 + (y1 > y0 ? 3 : -3); // tiny _/ kink
-
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(kinkX, midY);
-      ctx.lineTo(x0, y1);
-      ctx.stroke();
+    smds = [];
+    for (let i = 0; i < 50; i++) {
+      smds.push({ x: Math.random() * W, y: Math.random() * H, w: 5 + Math.random() * 6, h: 2.5 + Math.random() * 2, rot: Math.random() > 0.5 ? 0 : Math.PI / 2, isCap: Math.random() > 0.5 });
     }
-  });
-  ctx.restore();
-
-  // --- ELECTRONS ALONG TRUNK BUNDLE ---
-  let segLens = [];
-  let totalLen = 0;
-  for (let i = 1; i < path.length; i++) {
-    const len = Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
-    segLens.push(len);
-    totalLen += len;
   }
 
-  const baseSpeed = 18;
-  const speedFactor = baseSpeed / Math.max(getAnimMultiplier(), 0.001);
+  function buildTracePath(x0, y0, x1, y1, chipEdge) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const angle = Math.atan2(dy, dx);
+    const exitDist = chipEdge * 1.3;
+    const ex = x0 + Math.cos(angle) * exitDist;
+    const ey = y0 + Math.sin(angle) * exitDist;
+    const pts = [{ x: x0, y: y0 }, { x: ex, y: ey }];
+    const remainX = x1 - ex, remainY = y1 - ey;
+    const absX = Math.abs(remainX), absY = Math.abs(remainY);
+    if (absX > 20 && absY > 20) {
+      const bendDist = Math.min(absX, absY) * 0.5;
+      const sx = Math.sign(remainX), sy = Math.sign(remainY);
+      const b1x = ex + sx * bendDist, b1y = ey + sy * bendDist;
+      pts.push({ x: b1x, y: b1y });
+      if (absX > absY) pts.push({ x: x1, y: b1y });
+      else pts.push({ x: b1x, y: y1 });
+    } else if (absX > 10) {
+      pts.push({ x: x1, y: ey });
+    }
+    pts.push({ x: x1, y: y1 });
+    return pts;
+  }
 
-  let centerPx = null;
-  let centerPy = null;
+  function pathMeta(pts) {
+    let totalLen = 0;
+    const segs = [];
+    for (let i = 1; i < pts.length; i++) {
+      const len = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+      segs.push(len);
+      totalLen += len;
+    }
+    return { segs, totalLen };
+  }
 
-  for (let track = 0; track < tracks; track++) {
-    const offset = (track - (tracks - 1) / 2) * trackOffset;
-
-    let pulsePos = ((Math.sin(t / speedFactor + phase + track * 0.5) + 1) / 2) * totalLen;
-    let px = path[0].x;
-    let py = path[0].y;
-
-    let traveled = 0;
-    for (let i = 1; i < path.length; i++) {
-      if (pulsePos <= traveled + segLens[i - 1]) {
-        const local = pulsePos - traveled;
-        const f = local / segLens[i - 1];
-        const xA = i === 1 ? path[0].x : path[i - 1].x;
-        const yA = i === 1 ? path[0].y : path[i - 1].y;
-        const xB = path[i].x;
-        const yB = path[i].y;
-        px = xA + (xB - xA) * f;
-        py = yA + (yB - yA) * f;
-        break;
+  function posOnPath(pts, segs, totalLen, f) {
+    let target = f * totalLen, traveled = 0;
+    for (let i = 0; i < segs.length; i++) {
+      if (target <= traveled + segs[i]) {
+        const local = (target - traveled) / segs[i];
+        return { x: pts[i].x + (pts[i+1].x - pts[i].x) * local, y: pts[i].y + (pts[i+1].y - pts[i].y) * local };
       }
-      traveled += segLens[i - 1];
+      traveled += segs[i];
     }
-
-    py += offset;
-
-    ctx.save();
-    const rBase = 4.5 + 0.9 * (mult / 2.5);
-    const r = rBase + 1.1 * Math.sin(t / (4 / Math.max(mult, 0.1)) + phase + track * 0.2);
-    ctx.beginPath();
-    ctx.arc(px, py, r, 0, 2 * Math.PI);
-    ctx.fillStyle = "rgba(244,244,255,0.97)";
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 18 * (mult / 1.5);
-    ctx.globalAlpha = 0.42 + 0.08 * (mult / 2.5);
-    ctx.fill();
-    ctx.restore();
-
-    if (track === Math.floor(tracks / 2)) {
-      centerPx = px;
-      centerPy = py;
-    }
+    return { x: pts[pts.length-1].x, y: pts[pts.length-1].y };
   }
 
-  // --- ELECTRONS UP & DOWN STUBS (toward modules and back) ---
-  const stubSpeed = 26;
-  const stubFactor = stubSpeed / Math.max(getAnimMultiplier(), 0.001);
+  function perpAtFrac(pts, segs, totalLen, f) {
+    let target = f * totalLen, traveled = 0;
+    for (let i = 0; i < segs.length; i++) {
+      if (target <= traveled + segs[i]) {
+        const dx = pts[i+1].x - pts[i].x, dy = pts[i+1].y - pts[i].y;
+        const len = Math.hypot(dx, dy) || 1;
+        return { x: -dy/len, y: dx/len };
+      }
+      traveled += segs[i];
+    }
+    return { x: 0, y: 1 };
+  }
 
-  bus.stubs.forEach((stub, stubIndex) => {
-    const len = Math.abs(stub.yMod - stub.yBus) || 1;
+  buildLayout();
+  window.addEventListener("resize", () => { resize(); buildLayout(); });
 
-    for (let track = 0; track < tracks; track++) {
-      const offsetX = (track - (tracks - 1) / 2) * stubOffset;
-      const phaseShift = phase + stubIndex * 0.3 + track * 0.4;
+  // ============================================================
+  // DRAWING FUNCTIONS
+  // ============================================================
 
-      // ping-pong position 0 → 1 → 0
-      const p = Math.abs(Math.sin(t / stubFactor + phaseShift));
-      const y = stub.yBus + (stub.yMod - stub.yBus) * p;
-      const x = stub.x + offsetX;
+  function drawPCBBase() {
+    ctx.fillStyle = "#080c14";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.globalAlpha = 0.025;
+    ctx.strokeStyle = "#1a3020";
+    ctx.lineWidth = 0.4;
+    for (let x = 0; x < canvas.width; x += 7) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+    for (let y = 0; y < canvas.height; y += 7) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.015;
+    ctx.strokeStyle = "#6B5010";
+    ctx.lineWidth = 0.3;
+    for (let x = -canvas.height; x < canvas.width; x += 18) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + canvas.height, canvas.height); ctx.stroke(); }
+    ctx.restore();
+  }
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, 3.8, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(248,250,252,0.97)";
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 16 * (mult / 1.5);
-      ctx.globalAlpha = 0.40 + 0.08 * (mult / 2.5);
-      ctx.fill();
+  function drawVias() {
+    ctx.save();
+    for (const v of vias) {
+      ctx.beginPath(); ctx.arc(v.x, v.y, v.r + 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(100, 80, 20, 0.12)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(v.x, v.y, v.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#060a0e"; ctx.fill();
+      ctx.strokeStyle = "rgba(120, 100, 30, 0.15)"; ctx.lineWidth = 0.5; ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSMDs() {
+    ctx.save();
+    for (const s of smds) {
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+      const pw = s.w * 0.25;
+      ctx.fillStyle = "rgba(120, 100, 30, 0.14)";
+      ctx.fillRect(-s.w/2, -s.h/2, pw, s.h); ctx.fillRect(s.w/2 - pw, -s.h/2, pw, s.h);
+      ctx.fillStyle = s.isCap ? "rgba(90, 70, 40, 0.25)" : "rgba(20, 22, 30, 0.35)";
+      ctx.fillRect(-s.w/2 + pw, -s.h/2, s.w - pw*2, s.h);
       ctx.restore();
     }
-  });
-
-  // --- LIGHTNING ARCS (disabled when HALTed) ---
-  const intensity =
-    coreOverdrive + (isPipelineActive ? 1 : 0) + (engineeringMode ? 0.5 : 0);
-  if (!halted && intensity > 1.2 && bus.modules.length > 0 && centerPx != null) {
-    const chance = 0.01 * intensity;
-    if (Math.random() < chance) {
-      const mod = bus.modules[Math.floor(Math.random() * bus.modules.length)];
-      const mc = moduleCenter(mod);
-      drawLightning(centerPx, centerPy, mc.x, mc.y, intensity, color);
-    }
-  }
-}
-
- 
-
-  function drawLightning(x1, y1, x2, y2, intensity, color) {
-    ctx.save();
-    const segments = 5 + Math.floor(intensity * 2);
-    const points = [];
-    points.push({ x: x1, y: y1 });
-
-    for (let i = 1; i < segments; i++) {
-      const tt = i / segments;
-      const mx = x1 + (x2 - x1) * tt;
-      const my = y1 + (y2 - y1) * tt;
-      const offset = (Math.random() - 0.5) * 24 * intensity;
-      points.push({ x: mx + offset, y: my - offset });
-    }
-    points.push({ x: x2, y: y2 });
-
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-
-    ctx.strokeStyle = "rgba(248,250,252,0.96)";
-    ctx.lineWidth = 1.4;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 26;
-    ctx.globalAlpha = 0.7;
-    ctx.stroke();
     ctx.restore();
   }
 
-  function drawScene() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawGrid();
-
-    const cpuSize = Math.min(canvas.width, canvas.height) * 0.22;
-    const cpuX = canvas.width * 0.30;
-    const cpuY = canvas.height * 0.48;
-
-    const modules = buildModules(cpuX, cpuY, cpuSize);
-    modules.forEach(drawModule);
-
-    const buses = buildBuses(cpuX, cpuY, cpuSize, modules);
-    buses.forEach((bus, idx) => drawBus(bus, idx * 0.7));
-
-    // oscillator under control bus, right of core
-    const oscX = cpuX + cpuSize * 0.2;
-    const oscY = canvas.height * 0.82;
-    drawOscillator(oscX, oscY);
-
-    drawCpuDiamond(cpuX, cpuY, cpuSize);
-
-    // keep hitbox synced
-    const radius = cpuSize * Math.SQRT1_2;
-    cpuCenter = { x: cpuX, y: cpuY };
-    cpuRadius = radius;
-    const boxSize = radius * 2 * 1.15;
-    cpuHitbox.style.left = `${cpuX - boxSize / 2}px`;
-    cpuHitbox.style.top = `${cpuY - boxSize / 2}px`;
-    cpuHitbox.style.width = `${boxSize}px`;
-    cpuHitbox.style.height = `${boxSize}px`;
-
-    const mult = getAnimMultiplier();
-
-    // If HALTed, keep t and overdrive fixed (full freeze)
-    if (!halted) {
-      t += 1.05 * Math.max(mult, 0.4);
-      coreOverdrive = Math.max(0, coreOverdrive - 0.003);
+  function drawModule(mod, glowFrac) {
+    const { x, y, w, h, label } = mod;
+    ctx.save();
+    const ch = Math.min(w, h) * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(x + ch, y); ctx.lineTo(x + w - ch, y); ctx.lineTo(x + w, y + ch);
+    ctx.lineTo(x + w, y + h - ch); ctx.lineTo(x + w - ch, y + h); ctx.lineTo(x + ch, y + h);
+    ctx.lineTo(x, y + h - ch); ctx.lineTo(x, y + ch); ctx.closePath();
+    ctx.fillStyle = "rgba(14, 18, 28, " + (0.7 + 0.25 * glowFrac) + ")";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(80, 100, 140, " + (0.2 + 0.4 * glowFrac) + ")";
+    ctx.lineWidth = 1; ctx.stroke();
+    if (glowFrac > 0.01) {
+      ctx.shadowColor = "rgba(56, 180, 248, 0.6)"; ctx.shadowBlur = 12 * glowFrac;
+      ctx.stroke(); ctx.shadowBlur = 0;
     }
+    ctx.fillStyle = "rgba(130, 110, 40, " + (0.12 + 0.15 * glowFrac) + ")";
+    const ps = 4.5, pl = 4, pwi = 1.5;
+    for (let px = x + ch + 5; px < x + w - ch - 5; px += ps) { ctx.fillRect(px, y - pl, pwi, pl); ctx.fillRect(px, y + h, pwi, pl); }
+    for (let py = y + ch + 5; py < y + h - ch - 5; py += ps) { ctx.fillRect(x - pl, py, pl, pwi); ctx.fillRect(x + w, py, pl, pwi); }
+    ctx.beginPath(); ctx.arc(x + ch + 4, y + ch + 4, 2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(160, 170, 200, " + (0.15 + 0.3 * glowFrac) + ")"; ctx.fill();
+    ctx.font = "bold 9px 'JetBrains Mono',monospace";
+    ctx.fillStyle = "rgba(180, 195, 220, " + (0.3 + 0.5 * glowFrac) + ")";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(label, x + w/2, y + h/2);
+    if (glowFrac > 0.5) {
+      const colors = ["#22c55e", "#38bdf8", "#facc15"];
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath(); ctx.arc(x + w - 7 - i*6, y + h - 5, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = colors[i];
+        ctx.globalAlpha = glowFrac * (0.3 + 0.25 * Math.sin(t * 0.06 + i * 2));
+        ctx.fill(); ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawCore(cx, cy, size, glowFrac) {
+    const mult = getAnimMult();
+    const jBase = engineeringMode || isPipelineActive ? 1.2 : 0.4;
+    const jOver = 1.0 * coreOverdrive;
+    const jitter = (jBase + jOver) * (mult / 2.5);
+    const xx = cx + Math.sin(t / 25) * jitter;
+    const yy = cy + Math.cos(t / 23) * jitter;
+    const half = size;
+    ctx.save();
+    const ihsSize = size * 2.3, ihsH = ihsSize / 2;
+    const ihsGrad = ctx.createLinearGradient(xx - ihsH, yy - ihsH, xx + ihsH, yy + ihsH);
+    ihsGrad.addColorStop(0, "rgba(30, 35, 50, 0.95)");
+    ihsGrad.addColorStop(0.5, "rgba(45, 50, 65, 0.97)");
+    ihsGrad.addColorStop(1, "rgba(28, 32, 48, 0.95)");
+    ctx.fillStyle = ihsGrad;
+    ctx.beginPath(); ctx.roundRect(xx - ihsH, yy - ihsH, ihsSize, ihsSize, 5); ctx.fill();
+    ctx.strokeStyle = "rgba(100, 120, 160, " + (0.25 + 0.4 * glowFrac) + ")";
+    ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.save(); ctx.globalAlpha = 0.03; ctx.strokeStyle = "#999"; ctx.lineWidth = 0.3;
+    for (let ly = yy - ihsH + 3; ly < yy + ihsH - 3; ly += 1.3) { ctx.beginPath(); ctx.moveTo(xx - ihsH + 3, ly); ctx.lineTo(xx + ihsH - 3, ly); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = "rgba(15, 20, 12, 0.9)";
+    ctx.beginPath(); ctx.roundRect(xx - half, yy - half, half*2, half*2, 3); ctx.fill();
+    ctx.strokeStyle = "rgba(80, 90, 50, " + (0.2 + 0.3 * glowFrac) + ")";
+    ctx.lineWidth = 0.8; ctx.stroke();
+    const dieSize = size * 1.05, dieH = dieSize / 2;
+    const dieGrad = ctx.createLinearGradient(xx - dieH, yy - dieH, xx + dieH, yy + dieH);
+    dieGrad.addColorStop(0, "rgba(15, 22, 42, 0.96)");
+    dieGrad.addColorStop(0.5, "rgba(25, 40, 70, 0.98)");
+    dieGrad.addColorStop(1, "rgba(12, 20, 38, 0.96)");
+    ctx.fillStyle = dieGrad;
+    ctx.beginPath(); ctx.rect(xx - dieH, yy - dieH, dieSize, dieSize); ctx.fill();
+    ctx.save(); ctx.globalAlpha = 0.06; ctx.strokeStyle = "#4080c0"; ctx.lineWidth = 0.3;
+    for (let gx = xx - dieH + 2; gx < xx + dieH; gx += 3.5) { ctx.beginPath(); ctx.moveTo(gx, yy - dieH + 2); ctx.lineTo(gx, yy + dieH - 2); ctx.stroke(); }
+    for (let gy = yy - dieH + 2; gy < yy + dieH; gy += 3.5) { ctx.beginPath(); ctx.moveTo(xx - dieH + 2, gy); ctx.lineTo(xx + dieH - 2, gy); ctx.stroke(); }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(180, 150, 40, " + (0.15 + 0.25 * glowFrac) + ")";
+    ctx.lineWidth = 1; ctx.stroke();
+    ctx.save(); ctx.globalAlpha = 0.08; ctx.fillStyle = "#8B6914";
+    for (let bx = xx - half + 5; bx < xx + half - 5; bx += 6) {
+      for (let by = yy - half + 5; by < yy + half - 5; by += 6) {
+        if (bx > xx - dieH + 3 && bx < xx + dieH - 3 && by > yy - dieH + 3 && by < yy + dieH - 3) continue;
+        ctx.beginPath(); ctx.arc(bx, by, 1.2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+    if (glowFrac > 0.01) {
+      const glowI = 0.3 * glowFrac + 0.12 * (mult / 2.5) + 0.06 * coreOverdrive;
+      ctx.save();
+      ctx.strokeStyle = "rgba(56, 180, 248, " + glowI + ")";
+      ctx.lineWidth = 2.5; ctx.shadowColor = "rgba(56, 180, 248, 0.8)"; ctx.shadowBlur = 25 * glowFrac;
+      ctx.beginPath(); ctx.roundRect(xx - ihsH, yy - ihsH, ihsSize, ihsSize, 5); ctx.stroke();
+      ctx.restore();
+      const bracketLen = ihsSize * 0.12, bracketInset = 4;
+      ctx.save();
+      ctx.strokeStyle = "rgba(200, 230, 255, " + (0.5 * glowFrac + 0.2 * Math.sin(t * 0.04)) + ")";
+      ctx.lineWidth = 2; ctx.shadowColor = "rgba(56, 180, 248, 0.9)"; ctx.shadowBlur = 10;
+      const corners = [
+        [xx - ihsH + bracketInset, yy - ihsH + bracketInset, 1, 1],
+        [xx + ihsH - bracketInset, yy - ihsH + bracketInset, -1, 1],
+        [xx - ihsH + bracketInset, yy + ihsH - bracketInset, 1, -1],
+        [xx + ihsH - bracketInset, yy + ihsH - bracketInset, -1, -1]
+      ];
+      for (const [bx, by, sx, sy] of corners) {
+        ctx.beginPath(); ctx.moveTo(bx + sx * bracketLen, by); ctx.lineTo(bx, by); ctx.lineTo(bx, by + sy * bracketLen); ctx.stroke();
+      }
+      ctx.restore();
+      const rGrad = ctx.createRadialGradient(xx, yy, 0, xx, yy, ihsSize * 1.2);
+      rGrad.addColorStop(0, "rgba(56, 180, 248, " + (glowI * 0.4) + ")");
+      rGrad.addColorStop(0.4, "rgba(100, 60, 200, " + (glowI * 0.15) + ")");
+      rGrad.addColorStop(1, "rgba(56, 180, 248, 0)");
+      ctx.fillStyle = rGrad;
+      ctx.fillRect(xx - ihsSize * 1.2, yy - ihsSize * 1.2, ihsSize * 2.4, ihsSize * 2.4);
+    }
+    ctx.font = "bold " + Math.round(size * 0.22) + "px 'JetBrains Mono',monospace";
+    ctx.fillStyle = "rgba(200, 220, 245, " + (0.4 + 0.4 * glowFrac + 0.1 * Math.sin(t * 0.03)) + ")";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("CORE", xx, yy);
+    ctx.font = "6px 'JetBrains Mono',monospace";
+    ctx.fillStyle = "rgba(140, 150, 170, " + (0.15 * glowFrac) + ")";
+    ctx.fillText("RP-2025K", xx, yy + ihsH - 8);
+    ctx.restore();
+  }
+
+  function drawTrace(tp, drawFrac, glowFrac) {
+    const { path, numTracks } = tp;
+    const { segs, totalLen } = pathMeta(path);
+    if (totalLen < 1) return;
+    const trackSpacing = 3.5;
+    const mult = getAnimMult();
+    const visibleLen = drawFrac * totalLen;
+    for (let trk = 0; trk < numTracks; trk++) {
+      const offset = (trk - (numTracks - 1) / 2) * trackSpacing;
+      ctx.save(); ctx.beginPath();
+      let segTraveled = 0;
+      for (let i = 0; i < path.length; i++) {
+        if (i === 0) {
+          const perp = perpAtFrac(path, segs, totalLen, 0);
+          ctx.moveTo(path[0].x + perp.x * offset, path[0].y + perp.y * offset);
+        } else {
+          segTraveled += segs[i-1];
+          if (segTraveled > visibleLen) {
+            const overshoot = segTraveled - visibleLen;
+            const frac = 1 - overshoot / segs[i-1];
+            const px = path[i-1].x + (path[i].x - path[i-1].x) * frac;
+            const py = path[i-1].y + (path[i].y - path[i-1].y) * frac;
+            const perp = perpAtFrac(path, segs, totalLen, drawFrac);
+            ctx.lineTo(px + perp.x * offset, py + perp.y * offset);
+            break;
+          }
+          const perp = perpAtFrac(path, segs, totalLen, segTraveled / totalLen);
+          ctx.lineTo(path[i].x + perp.x * offset, path[i].y + perp.y * offset);
+        }
+      }
+      ctx.strokeStyle = "rgba(110, 90, 25, " + (0.18 + 0.12 * glowFrac) + ")";
+      ctx.lineWidth = 2.8; ctx.stroke();
+      if (glowFrac > 0.01) {
+        ctx.strokeStyle = "rgba(56, 180, 248, " + (0.12 * glowFrac + 0.04 * (mult / 2.5)) + ")";
+        ctx.lineWidth = 1.8; ctx.shadowColor = "rgba(56, 180, 248, 0.5)"; ctx.shadowBlur = 5 * glowFrac;
+        ctx.stroke(); ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    }
+    if (glowFrac > 0.1 && !halted) {
+      const waveSpeed = 22 / Math.max(mult, 0.01);
+      const amplitude = trackSpacing * 0.8;
+      const numWaves = 2 + Math.floor(coreOverdrive * 0.5);
+      for (let w = 0; w < numWaves; w++) {
+        const basePhase = t / waveSpeed + w * 0.4;
+        const headFrac = ((basePhase % 1) + 1) % 1;
+        ctx.save(); ctx.beginPath();
+        let firstPt = true;
+        const waveSteps = 40;
+        const waveWindowLen = 0.15;
+        for (let s = 0; s <= waveSteps; s++) {
+          const sf = s / waveSteps;
+          const f = headFrac - waveWindowLen + sf * waveWindowLen;
+          if (f < 0 || f > drawFrac) continue;
+          const pos = posOnPath(path, segs, totalLen, f);
+          const perp = perpAtFrac(path, segs, totalLen, f);
+          const wavePhase = sf * Math.PI * 4;
+          const sinVal = Math.sin(wavePhase) * amplitude;
+          const fadeEdge = Math.sin(sf * Math.PI);
+          const px = pos.x + perp.x * sinVal * fadeEdge;
+          const py = pos.y + perp.y * sinVal * fadeEdge;
+          if (firstPt) { ctx.moveTo(px, py); firstPt = false; }
+          else ctx.lineTo(px, py);
+        }
+        ctx.strokeStyle = "rgba(180, 220, 255, " + (0.5 * glowFrac) + ")";
+        ctx.lineWidth = 1.5; ctx.shadowColor = "rgba(56, 200, 248, 0.8)"; ctx.shadowBlur = 10 * glowFrac;
+        ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+
+  function generateBolt(x1, y1, x2, y2, jag) {
+    const pts = [{ x: x1, y: y1 }];
+    const segments = 6 + Math.floor(Math.random() * 4);
+    for (let i = 1; i < segments; i++) {
+      const f = i / segments;
+      pts.push({ x: x1 + (x2 - x1) * f + (Math.random() - 0.5) * jag, y: y1 + (y2 - y1) * f + (Math.random() - 0.5) * jag });
+    }
+    pts.push({ x: x2, y: y2 });
+    return pts;
+  }
+
+  function drawLightning(x1, y1, x2, y2, intensity) {
+    const mainPts = generateBolt(x1, y1, x2, y2, intensity * 18);
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(mainPts[0].x, mainPts[0].y);
+    for (let i = 1; i < mainPts.length; i++) ctx.lineTo(mainPts[i].x, mainPts[i].y);
+    ctx.strokeStyle = "rgba(220, 235, 255, 0.9)"; ctx.lineWidth = 1.8;
+    ctx.shadowColor = "rgba(100, 160, 255, 0.9)"; ctx.shadowBlur = 20; ctx.stroke();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)"; ctx.lineWidth = 0.6; ctx.shadowBlur = 8; ctx.stroke();
+    ctx.restore();
+    const numBranches = 2 + Math.floor(Math.random() * 3);
+    for (let b = 0; b < numBranches; b++) {
+      const srcIdx = Math.floor(Math.random() * (mainPts.length - 2)) + 1;
+      const src = mainPts[srcIdx];
+      const angle = Math.atan2(y2 - y1, x2 - x1) + (Math.random() - 0.5) * 1.5;
+      const branchLen = 20 + Math.random() * 40 * intensity;
+      const branchPts = generateBolt(src.x, src.y, src.x + Math.cos(angle) * branchLen, src.y + Math.sin(angle) * branchLen, intensity * 8);
+      ctx.save(); ctx.beginPath(); ctx.moveTo(branchPts[0].x, branchPts[0].y);
+      for (let i = 1; i < branchPts.length; i++) ctx.lineTo(branchPts[i].x, branchPts[i].y);
+      ctx.strokeStyle = "rgba(180, 210, 255, " + (0.4 + Math.random() * 0.3) + ")";
+      ctx.lineWidth = 0.8; ctx.shadowColor = "rgba(80, 140, 255, 0.6)"; ctx.shadowBlur = 12; ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawPCBEdge() {
+    const m = 10;
+    ctx.save();
+    ctx.strokeStyle = "rgba(80, 100, 60, 0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(m, m, canvas.width - m*2, canvas.height - m*2, 5); ctx.stroke();
+    const fc = 28, fw = 5, fh = 12, fg = 3;
+    const totalW = fc * (fw + fg), startX = (canvas.width - totalW) / 2, fY = canvas.height - m - fh;
+    for (let i = 0; i < fc; i++) {
+      const fx = startX + i * (fw + fg);
+      const grad = ctx.createLinearGradient(fx, fY, fx, fY + fh);
+      grad.addColorStop(0, "rgba(170, 140, 35, 0.3)"); grad.addColorStop(1, "rgba(140, 110, 25, 0.25)");
+      ctx.fillStyle = grad; ctx.fillRect(fx, fY, fw, fh);
+    }
+    ctx.font = "8px 'JetBrains Mono',monospace";
+    ctx.fillStyle = "rgba(180, 190, 160, 0.1)"; ctx.textAlign = "left";
+    ctx.fillText("PCB-RP2025-REV.C", m + 60, m + 14);
+    ctx.restore();
+  }
+
+  // ============================================================
+  // INTRO ANIMATION STATE MACHINE
+  // ============================================================
+
+  const INTRO_TIMINGS = { DARK_END: 0.6, POWERON_END: 1.8, TRACEDRAW_END: 4.5, ZOOMOUT_END: 6.0 };
+
+  function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+  function updateIntro(dt) {
+    introTime += dt;
+    if (introPhase === PHASE_DARK && introTime >= INTRO_TIMINGS.DARK_END) introPhase = PHASE_POWERON;
+    if (introPhase === PHASE_POWERON && introTime >= INTRO_TIMINGS.POWERON_END) introPhase = PHASE_TRACEDRAW;
+    if (introPhase === PHASE_TRACEDRAW && introTime >= INTRO_TIMINGS.TRACEDRAW_END) introPhase = PHASE_ZOOMOUT;
+    if (introPhase === PHASE_ZOOMOUT && introTime >= INTRO_TIMINGS.ZOOMOUT_END) introPhase = PHASE_IDLE;
+
+    if (introPhase <= PHASE_POWERON) introScale = 2.8;
+    else if (introPhase === PHASE_TRACEDRAW) {
+      const f = (introTime - INTRO_TIMINGS.POWERON_END) / (INTRO_TIMINGS.TRACEDRAW_END - INTRO_TIMINGS.POWERON_END);
+      introScale = 2.8 - f * 0.8;
+    } else if (introPhase === PHASE_ZOOMOUT) {
+      const f = (introTime - INTRO_TIMINGS.TRACEDRAW_END) / (INTRO_TIMINGS.ZOOMOUT_END - INTRO_TIMINGS.TRACEDRAW_END);
+      introScale = 2.0 - f * 1.0;
+    } else introScale = 1.0;
+
+    if (introPhase >= PHASE_TRACEDRAW) {
+      const f = Math.min(1, (introTime - INTRO_TIMINGS.POWERON_END) / (INTRO_TIMINGS.ZOOMOUT_END - INTRO_TIMINGS.POWERON_END));
+      traceDrawProgress = easeOutCubic(f);
+    }
+
+    if (introPhase === PHASE_IDLE && !cardsShown) { cardsShown = true; showProjectCards(); }
+  }
+
+  function getCoreGlow() {
+    if (introPhase === PHASE_DARK) return 0;
+    if (introPhase === PHASE_POWERON) {
+      return easeOutCubic(Math.min(1, (introTime - INTRO_TIMINGS.DARK_END) / (INTRO_TIMINGS.POWERON_END - INTRO_TIMINGS.DARK_END)));
+    }
+    return 1;
+  }
+
+  function getModuleGlow(mod) {
+    if (introPhase < PHASE_TRACEDRAW) return 0;
+    const cx = canvas.width * 0.5, cy = canvas.height * 0.5;
+    const mx = mod.x + mod.w/2, my = mod.y + mod.h/2;
+    const dist = Math.hypot(mx - cx, my - cy);
+    const maxDist = Math.hypot(canvas.width, canvas.height) * 0.5;
+    return Math.max(0, Math.min(1, (traceDrawProgress - (dist / maxDist) * 0.6) / 0.3));
+  }
+
+  function showProjectCards() {
+    const main = document.querySelector("main");
+    const header = document.querySelector("header");
+    if (main) {
+      main.style.transition = "opacity 0.8s ease-out, transform 0.8s ease-out";
+      main.style.opacity = "0"; main.style.transform = "translateY(30px)";
+      requestAnimationFrame(() => { main.style.opacity = "1"; main.style.transform = "translateY(0)"; });
+    }
+    if (header) {
+      header.style.transition = "opacity 0.6s ease-out"; header.style.opacity = "0";
+      requestAnimationFrame(() => { header.style.opacity = "1"; });
+    }
+    const engBtn = document.getElementById("eng-chip-toggle");
+    if (engBtn) {
+      engBtn.style.transition = "opacity 0.6s ease-out 0.5s"; engBtn.style.opacity = "0";
+      requestAnimationFrame(() => { engBtn.style.opacity = "1"; });
+    }
+  }
+
+  // ============================================================
+  // MAIN DRAW LOOP
+  // ============================================================
+
+  let lastFrameTime = performance.now();
+
+  function drawScene(now) {
+    const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+    lastFrameTime = now;
+    if (!halted || introPhase < PHASE_IDLE) updateIntro(dt);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const W = canvas.width, H = canvas.height;
+    const cx = W * 0.5, cy = H * 0.5;
+    const chipSz = Math.min(W, H) * 0.09;
+
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(introScale, introScale); ctx.translate(-cx, -cy);
+
+    drawPCBBase(); drawPCBEdge(); drawVias(); drawSMDs();
+
+    const coreGlow = getCoreGlow();
+    for (const mod of modules) drawModule(mod, getModuleGlow(mod));
+    for (const tp of tracePaths) {
+      const tpGlow = tp.module ? getModuleGlow(tp.module) : traceDrawProgress;
+      drawTrace(tp, traceDrawProgress, coreGlow * Math.max(0.2, tpGlow));
+    }
+
+    drawCore(cx, cy, chipSz, coreGlow);
+
+    if (introPhase === PHASE_IDLE && !halted) {
+      const intensity = coreOverdrive + (isPipelineActive ? 1 : 0) + (engineeringMode ? 0.5 : 0);
+      if (intensity > 0.8 && Math.random() < 0.015 * intensity) {
+        const mod = modules[Math.floor(Math.random() * modules.length)];
+        drawLightning(cx, cy, mod.x + mod.w/2, mod.y + mod.h/2, intensity);
+      }
+    }
+
+    ctx.restore();
+
+    cpuCenter = { x: cx, y: cy }; cpuRadius = chipSz;
+    const boxSize = chipSz * 2.5 * introScale;
+    cpuHitbox.style.left = (cx - boxSize/2) + "px"; cpuHitbox.style.top = (cy - boxSize/2) + "px";
+    cpuHitbox.style.width = boxSize + "px"; cpuHitbox.style.height = boxSize + "px";
+
+    const mult = getAnimMult();
+    if (!halted) { t += 1.05 * Math.max(mult, 0.4); coreOverdrive = Math.max(0, coreOverdrive - 0.004); }
 
     requestAnimationFrame(drawScene);
   }
 
+  const mainEl = document.querySelector("main");
+  const headerEl = document.querySelector("header");
+  const engBtnEl = document.getElementById("eng-chip-toggle");
+  if (mainEl) { mainEl.style.opacity = "0"; mainEl.style.transform = "translateY(30px)"; }
+  if (headerEl) { headerEl.style.opacity = "0"; }
+  if (engBtnEl) { engBtnEl.style.opacity = "0"; }
 
-  drawScene();
+  requestAnimationFrame(drawScene);
 });

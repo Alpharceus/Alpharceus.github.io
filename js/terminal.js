@@ -55,7 +55,7 @@ function drawMatrixRain() {
     for (let i = 0; i < matrixRain.columns.length; i++) {
         let x = i * matrixRain.fontSize + matrixRain.fontSize / 2;
         let y = matrixRain.columns[i] * matrixRain.fontSize;
-        let char = matrixChars[Math.floor(Math.random()*matrixChars.length)];
+        let char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
 
         ctx.fillStyle = matrixRain.theme === "dark" ? "#2aff2a" : "#1c3e60";
         ctx.shadowColor = matrixRain.theme === "dark" ? "#11f911" : "#fff";
@@ -132,29 +132,30 @@ function echoRandomMotd(term) {
 const terminalCommands = {
     "help": {
         desc: "List all commands",
-        action: function(term) {
+        action: function (term) {
             term.echo(
                 "Available commands:\n" +
-                " about, resume, contact, github, linkedin, twitter, email, theme, schedule, admin, logout, clear, exit\n" +
+                " about, resume, contact, github, linkedin, twitter, email, theme, schedule, admin\n" +
+                " logout,clear, exit\n" +
                 " [Also try: projects, papers, blog, motd, whoami]"
             );
         }
     },
     "about": {
         desc: "Show about info",
-        action: function(term) {
+        action: function (term) {
             term.echo("Raman Pandey, ECE & Astrophysics @ UNM. Quantum/ML nerd, Linux fan.\nType 'resume' for credentials or visit my GitHub.");
         }
     },
     "projects": {
         desc: "Open projects page",
-        action: function(term) {
+        action: function (term) {
             window.location.href = "projects.html";
         }
     },
     "papers": {
         desc: "Open papers page",
-        action: function(term) {
+        action: function (term) {
             window.location.href = "papers.html";
         }
     },
@@ -162,75 +163,75 @@ const terminalCommands = {
 
     "blog": {
         desc: "Visit my blog (from file)",
-        action: function(term) {
+        action: function (term) {
             fetch('assets/blogs.json')
-              .then(res => res.json())
-              .then(blogs => {
-                  blogs.forEach(blog =>
-                      term.echo(`- ${blog.title}: ${blog.link || "Coming soon!"}`)
-                  );
-              })
-              .catch(() => term.echo("No blog posts available."));
+                .then(res => res.json())
+                .then(blogs => {
+                    blogs.forEach(blog =>
+                        term.echo(`- ${blog.title}: ${blog.link || "Coming soon!"}`)
+                    );
+                })
+                .catch(() => term.echo("No blog posts available."));
         }
     },
     "motd": {
         desc: "Message of the day",
-        action: function(term) {
+        action: function (term) {
             echoRandomMotd(term);
         }
     },
 
     "email": {
         desc: "Show email addresses",
-        action: function(term) {
+        action: function (term) {
             term.echo(
-              "Institutional: ramanpandey01@unm.edu\nPersonal: alpharceus@gmail.com"
+                "Institutional: ramanpandey01@unm.edu\nPersonal: alpharceus@gmail.com"
             );
         }
     },
     "whoami": {
         desc: "Identify user",
-        action: function(term) {
+        action: function (term) {
             term.echo("raman@portfolio:~$ " + "human (or are you?)");
         }
     },
     "resume": {
         desc: "Show/download resume",
-        action: function(term) {
+        action: function (term) {
             term.echo("Opening resume...");
             window.open("assets/resume.pdf", "_blank");
         }
     },
     "contact": {
         desc: "Contact me (send a message via terminal form)",
-        action: function(term) {
+        action: function (term) {
             term.startContactForm();
         }
     },
     "github": {
         desc: "Open GitHub",
-        action: function(term) {
+        action: function (term) {
             window.open("https://github.com/Alpharceus", "_blank");
             term.echo("Opening GitHub...");
         }
     },
     "linkedin": {
         desc: "Open LinkedIn",
-        action: function(term) {
+        action: function (term) {
             window.open("https://linkedin.com/in/alpha-arceus", "_blank");
             term.echo("Opening LinkedIn...");
         }
     },
     "twitter": {
         desc: "Open Twitter/X",
-        action: function(term) {
+        action: function (term) {
             window.open("https://twitter.com/alpha_arceus", "_blank");
             term.echo("Opening Twitter/X...");
         }
     },
     "theme": {
         desc: "theme [0|1] — dark(0) or light(1)",
-        action: function(term, arg) {
+        action: function (term, arg) {
             if (arg === "0") {
                 term.setTheme("dark");
             } else if (arg === "1") {
@@ -242,17 +243,17 @@ const terminalCommands = {
     },
     "schedule": {
         desc: "Show your schedule (admin only)",
-        action: function(term) {
+        action: function (term) {
             if (localStorage.getItem("admin") === "true") {
                 fetch('assets/schedule.json')
-                  .then(res => res.json())
-                  .then(schedule => {
-                      term.echo("Your Private Schedule:");
-                      schedule.forEach(ev =>
-                        term.echo(`- ${ev.day} ${ev.time}: ${ev.activity}`)
-                      );
-                  })
-                  .catch(() => term.echo("Could not load schedule."));
+                    .then(res => res.json())
+                    .then(schedule => {
+                        term.echo("Your Private Schedule:");
+                        schedule.forEach(ev =>
+                            term.echo(`- ${ev.day} ${ev.time}: ${ev.activity}`)
+                        );
+                    })
+                    .catch(() => term.echo("Could not load schedule."));
             } else {
                 term.echo("Admin only.");
             }
@@ -260,25 +261,25 @@ const terminalCommands = {
     },
     "admin": {
         desc: "Login as admin to view private data",
-        action: function(term) {
+        action: function (term) {
             term.echo("Enter admin password:");
             term.awaitAdminLogin = true;
         }
     },
     "logout": {
         desc: "Logout admin",
-        action: function(term) {
+        action: function (term) {
             localStorage.removeItem("admin");
             term.echo("Logged out.");
         }
     },
     "clear": {
         desc: "Clear terminal",
-        action: function(term) { term.clear(); }
+        action: function (term) { term.clear(); }
     },
     "exit": {
         desc: "Close terminal",
-        action: function(term) { term.close(); }
+        action: function (term) { term.close(); }
     }
 };
 
@@ -297,7 +298,7 @@ class Terminal {
     }
     open() {
         if (this.opened) return;
-        this.overlay.classList.remove("hidden");
+        this.overlay.classList.add("active");
         this.theme = "dark";
         this.setTheme(this.theme);
         this.clear();
@@ -308,8 +309,9 @@ class Terminal {
         startMatrixRain();
         this.opened = true;
     }
+
     close() {
-        this.overlay.classList.add("hidden");
+        this.overlay.classList.remove("active");
         stopMatrixRain();
         this.opened = false;
     }
@@ -344,15 +346,11 @@ class Terminal {
         });
         this.input.addEventListener("keydown", e => this.onKey(e));
         document.addEventListener("keydown", e => {
-            if (!this.overlay.classList.contains("hidden") && e.key === "Escape") {
+            if (this.overlay.classList.contains("active") && e.key === "Escape") {
                 this.close();
             }
         });
-        this.input.addEventListener("focus", () => {
-            if (this.overlay.classList.contains("hidden")) {
-                this.open();
-            }
-        });
+
     }
     onKey(e) {
         if (e.key === "Enter") {

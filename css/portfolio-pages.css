@@ -6,7 +6,7 @@
 }
 
 body {
-    background: #181c2e;
+    background: #070a10;
     color: #f2f3f7;
     font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', 'Consolas', 'monospace', 'Arial';
     margin: 0;
@@ -15,23 +15,28 @@ body {
     flex-direction: column;
     overflow-x: hidden;
 }
+
 header {
     background: #232749;
     padding: 0.6em 2em;
     display: flex;
     align-items: center;
-    box-shadow: 0 2px 16px rgba(32,40,90,0.10);
+    box-shadow: 0 2px 16px rgba(32, 40, 90, 0.10);
 }
-nav a, nav {
+
+nav a,
+nav {
     color: #70bfff;
     text-decoration: none;
     margin-right: 1.3em;
     font-size: 1.1em;
 }
+
 nav a:hover {
     color: #e2cfff;
     text-shadow: 0 0 6px #79c3ff55;
 }
+
 main {
     flex: 1;
     padding: 2em max(10vw, 2em) 1.5em max(10vw, 2em);
@@ -40,6 +45,7 @@ main {
     position: relative;
     z-index: 2;
 }
+
 h1 {
     font-size: 2.1em;
     margin-bottom: 1.2em;
@@ -136,29 +142,33 @@ h1 {
 
 #circuit-canvas {
     position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: 0;
     pointer-events: none;
-    opacity: 0.18;
+    opacity: 0.88;
 }
-main, header, footer { position: relative; z-index: 2; }
 
-
-
-
-body {
-    background: #12181f;
-    color: #f0f2ff;
-    font-family: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
-    margin: 0;
-    padding: 0;
+main,
+header,
+footer {
+    position: relative;
+    z-index: 2;
 }
+
+
+
+
+/* papers page body styling inherits from above */
+
 main {
     position: relative;
     z-index: 2;
     padding: 3rem 5vw 1rem 5vw;
 }
+
 #papers-list {
     max-width: 860px;
     margin: 0 auto;
@@ -167,38 +177,55 @@ main {
     box-shadow: 0 3px 20px #0002;
     padding: 2rem 2.5rem;
 }
+
 .paper-card {
     margin-bottom: 2.5rem;
     padding: 1.2rem 1.5rem;
-    background: rgba(38,40,52,0.89);
+    background: rgba(38, 40, 52, 0.89);
     border-left: 4px solid #70e8ff;
     border-radius: 10px;
 }
+
 .paper-title {
     font-size: 1.28rem;
     font-weight: bold;
     color: #63fcf4;
 }
-.paper-authors, .paper-journal {
+
+.paper-authors,
+.paper-journal {
     font-size: 1rem;
     color: #c0d2ff;
     margin-bottom: 0.2rem;
 }
+
 .paper-abstract {
     margin-top: 0.6rem;
     margin-bottom: 0.2rem;
     font-size: 1.07rem;
     color: #f3eaff;
 }
+
 @media (max-width: 600px) {
-    main { padding: 1.2rem 0.5rem 1rem 0.5rem; }
-    #papers-list { padding: 1rem 0.3rem; }
-    .paper-card { padding: 0.5rem 0.7rem; }
+    main {
+        padding: 1.2rem 0.5rem 1rem 0.5rem;
+    }
+
+    #papers-list {
+        padding: 1rem 0.3rem;
+    }
+
+    .paper-card {
+        padding: 0.5rem 0.7rem;
+    }
 }
+
 #particles-bg {
     position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: 0;
     pointer-events: none;
 }
