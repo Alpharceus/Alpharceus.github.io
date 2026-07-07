@@ -27,6 +27,17 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build blog pages + sitemap
+        run: |
+          npm install --no-audit --no-fund
+          node build/build.js
+          rm -rf node_modules
+
 # Please do not touch the following action
       - name: Store deployment content
         uses: ionos-deploy-now/artifact-action@v1

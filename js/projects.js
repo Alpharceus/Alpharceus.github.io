@@ -146,6 +146,21 @@
     pipelineTimeouts.push(finishId);
   }
 
+  // Artifact key → badge label
+  const ARTIFACT_LABELS = {
+    code: "Code",
+    paper: "Paper",
+    poster: "Poster",
+    nsf: "NSF Award",
+    org: "GitHub Org"
+  };
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
   // Fetch & render projects
   fetch("assets/projects.json")
     .then((res) => res.json())
@@ -158,19 +173,41 @@
       projects.forEach((proj) => {
         const div = document.createElement("div");
         div.className = "project";
+        if (proj.id) div.id = proj.id;
+
+        const badges = Object.entries(proj.artifacts || {})
+          .filter(([, url]) => url)
+          .map(
+            ([key, url]) =>
+              `<a class="artifact-badge" href="${escapeHtml(url)}" data-title="${escapeHtml(proj.title)}">${ARTIFACT_LABELS[key] || key}</a>`
+          )
+          .join("");
+
+        const status = proj.status === "in-progress"
+          ? `<span class="status-chip in-progress">In&nbsp;progress</span>`
+          : `<span class="status-chip done">Done</span>`;
+
         div.innerHTML = `
-          <h2>${proj.title}</h2>
-          <p>${proj.desc || ""}</p>
+          <h2>${escapeHtml(proj.title)} ${status}</h2>
+          <p>${escapeHtml(proj.desc || "")}</p>
           ${
             proj.summary
-              ? `<details><summary>Show Summary</summary><div>${proj.summary}</div></details>`
+              ? `<details><summary>Show Summary</summary><div>${escapeHtml(proj.summary)}</div></details>`
               : ""
           }
+          ${proj.note ? `<p class="project-note">${escapeHtml(proj.note)}</p>` : ""}
+          ${badges ? `<div class="artifact-row">${badges}</div>` : ""}
         `;
-        div.addEventListener("click", (e) => {
-          if (e.target.closest("details")) return;
-          startPipelineLoad(proj);
+
+        // Badge clicks play the pipeline animation, then navigate
+        div.querySelectorAll(".artifact-badge").forEach((a) => {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startPipelineLoad({ title: proj.title, url: a.getAttribute("href") });
+          });
         });
+
         projectListEl.appendChild(div);
       });
     })

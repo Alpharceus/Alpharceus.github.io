@@ -116,6 +116,64 @@ h1 {
     line-height: 1.45;
 }
 
+/* --- STATUS CHIP + ARTIFACT BADGES + NOTE --- */
+.status-chip {
+    font-size: 0.55em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.35em 0.9em;
+    border-radius: 999px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.status-chip.done {
+    color: #80ffb9;
+    border: 1px solid rgba(35, 255, 148, 0.45);
+    background: rgba(35, 255, 148, 0.08);
+}
+
+.status-chip.in-progress {
+    color: #ffd580;
+    border: 1px solid rgba(255, 190, 80, 0.45);
+    background: rgba(255, 190, 80, 0.08);
+}
+
+.project-note {
+    margin-top: 0.8em !important;
+    font-size: 0.82em !important;
+    color: #9aa3c0 !important;
+    font-style: italic;
+}
+
+.artifact-row {
+    margin-top: 1em;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+}
+
+.artifact-badge {
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #9fd7ff;
+    text-decoration: none;
+    padding: 0.4em 1em;
+    border-radius: 999px;
+    border: 1px solid rgba(112, 191, 255, 0.4);
+    background: rgba(112, 191, 255, 0.08);
+    transition: all 0.2s ease;
+}
+
+.artifact-badge:hover {
+    color: #e2f4ff;
+    border-color: rgba(160, 220, 255, 0.9);
+    background: rgba(112, 191, 255, 0.18);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
 /* --- DETAILS / SUMMARY --- */
 
 .project details {

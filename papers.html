@@ -2,7 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Papers | Raman Pandey</title>
+    <meta name="description" content="Journal publications by Raman Pandey — quantum computing and photonics researcher at UNM. Journal papers forthcoming; conference papers and posters are on the projects page.">
+    <link rel="canonical" href="https://ramanpandey.com/papers.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Papers — Raman Pandey",
+      "url": "https://ramanpandey.com/papers.html",
+      "description": "Publications page with a particle-physics theme, reflecting the author's physics pillar. Journal publications forthcoming.",
+      "about": "Physics publications",
+      "isPartOf": { "@type": "WebSite", "name": "Raman Pandey — Portfolio", "url": "https://ramanpandey.com/" },
+      "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
+    }
+    </script>
     <link rel="stylesheet" href="css/portfolio-pages.css">
 </head>
 <body>
@@ -21,11 +37,23 @@
     </footer>
 
     <script>
-    // Load and render papers (including abstract)
+    // Load and render papers (journal papers only; graceful empty state)
+    const EMPTY_STATE = `
+        <div class="paper-card">
+            <div class="paper-title">Journal publications forthcoming.</div>
+            <div class="paper-abstract">
+                Conference papers and presentations are listed with their projects:
+                <a href="projects.html" style="color:#80ffee;">Projects &rarr;</a>
+            </div>
+        </div>`;
     fetch('assets/papers.json')
         .then(res => res.json())
         .then(papers => {
             const el = document.getElementById('papers-list');
+            if (!Array.isArray(papers) || papers.length === 0) {
+                el.innerHTML = EMPTY_STATE;
+                return;
+            }
             el.innerHTML = papers.map(paper => `
                 <div class="paper-card">
                     <div class="paper-title">${paper.title}</div>
@@ -38,8 +66,17 @@
                     <div class="paper-abstract">${paper.abstract || ""}</div>
                 </div>
             `).join('');
+        })
+        .catch(() => {
+            document.getElementById('papers-list').innerHTML = EMPTY_STATE;
         });
     </script>
+    <noscript>
+        <p style="position:relative;z-index:2;text-align:center;">
+            Journal publications forthcoming. Conference papers and presentations:
+            <a href="projects.html">projects page</a>.
+        </p>
+    </noscript>
     <script src="js/papers.js"></script>
 </body>
 </html>
