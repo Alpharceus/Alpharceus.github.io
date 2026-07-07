@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skills | Raman Pandey</title>
+    <meta name="description" content="Skills of Raman Pandey rendered as a photonic MZI splitter tree — route light through 31 tunable Mach-Zehnder interferometers to any of 32 skills: FPGA design, photonic quantum computing, machine learning, and software.">
+    <link rel="canonical" href="https://ramanpandey.com/skills.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Skills — Raman Pandey",
+      "url": "https://ramanpandey.com/skills.html",
+      "description": "Skills page rendered as a binary tree of 31 tunable Mach-Zehnder interferometers, reflecting the author's photonics research on electrically tuned MZI networks — each of the 32 output ports is one skill, and the phase shifters route light to it.",
+      "about": "Photonics and technical skills",
+      "isPartOf": { "@type": "WebSite", "name": "Raman Pandey — Portfolio", "url": "https://ramanpandey.com/" },
+      "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/portfolio-pages.css">
+    <style>
+        body { background: #060a12; }
+
+        .mesh-intro {
+            color: #9aa8c8;
+            font-size: 0.92em;
+            max-width: 760px;
+            line-height: 1.55;
+            margin-bottom: 1.2em;
+        }
+
+        .mesh-hint {
+            color: #6fd8e8;
+            font-size: 0.78em;
+            letter-spacing: 0.06em;
+            margin-bottom: 1em;
+        }
+
+        #mesh-scroll {
+            overflow-x: auto;
+            background: rgba(10, 16, 30, 0.85);
+            border: 1px solid rgba(70, 200, 220, 0.22);
+            border-radius: 16px;
+            padding: 10px;
+            box-shadow: 0 0 40px rgba(30, 170, 200, 0.08) inset;
+        }
+
+        #mzi-canvas {
+            display: block;
+            min-width: 680px;
+            width: 100%;
+            height: auto;
+            touch-action: none;
+        }
+
+        #skill-list { margin-top: 2.6em; }
+
+        .skill-group {
+            background: rgba(16, 24, 44, 0.85);
+            border: 1px solid rgba(90, 140, 220, 0.22);
+            border-left: 4px solid var(--group-color, #4fd0e0);
+            border-radius: 12px;
+            padding: 1.1em 1.5em;
+            margin-bottom: 1.3em;
+        }
+
+        .skill-group h3 {
+            margin: 0 0 0.6em;
+            color: #a8ecf8;
+            letter-spacing: 0.06em;
+            font-size: 1.02em;
+        }
+
+        .skill-group ul {
+            margin: 0;
+            padding-left: 1.2em;
+            columns: 2;
+            column-gap: 2.5em;
+        }
+
+        .skill-group li {
+            margin-bottom: 0.45em;
+            color: #ccd6ee;
+            font-size: 0.9em;
+            line-height: 1.45;
+            break-inside: avoid;
+        }
+
+        @media (max-width: 560px) {
+            .skill-group ul { columns: 1; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="index.html">Home</a> | <span>Skills</span>
+        </nav>
+    </header>
+    <main>
+        <h1>Skills — a photonic routing tree</h1>
+        <p class="mesh-intro">
+            One beam of light enters on the left and meets a binary tree of 31
+            Mach&ndash;Zehnder interferometers &mdash; the same tunable building block
+            as the electrically tuned MZI networks I work on. Each interferometer's
+            phase shifter sets how much light continues up or down, and the 32 output
+            ports are my skills.
+        </p>
+        <p class="mesh-hint">
+            ⚙ DRAG a phase shifter to tune its split &nbsp;·&nbsp; CLICK it to cycle
+            ↑ / 50:50 / ↓ &nbsp;·&nbsp; CLICK a skill to watch the mesh reconfigure
+            and route all the light to it
+        </p>
+
+        <div id="mesh-scroll">
+            <canvas id="mzi-canvas" aria-label="Interactive binary tree of Mach-Zehnder interferometers routing light to 32 skill output ports"></canvas>
+        </div>
+
+        <!-- Machine-readable skill list (mirrors the 32 output ports above) -->
+        <section id="skill-list">
+            <h2>All skills</h2>
+
+            <div class="skill-group" style="--group-color:#ffbe4d;">
+                <h3>Hardware</h3>
+                <ul>
+                    <li>FPGA design (VHDL)</li>
+                    <li>Verilog &amp; RTL design</li>
+                    <li>Embedded systems &amp; microcontrollers</li>
+                    <li>Digital electronics</li>
+                    <li>Analog electronics</li>
+                    <li>Lab instrumentation &amp; test</li>
+                    <li>LabVIEW</li>
+                    <li>PCB design &amp; prototyping</li>
+                </ul>
+            </div>
+
+            <div class="skill-group" style="--group-color:#5fd8e8;">
+                <h3>Quantum</h3>
+                <ul>
+                    <li>Photonic quantum computing</li>
+                    <li>Gaussian boson sampling systems</li>
+                    <li>MZI interferometry &amp; photonic unitaries</li>
+                    <li>Single-photon detection (SNSPD / SPAD)</li>
+                    <li>Qiskit &amp; quantum programming</li>
+                    <li>Quantum error correction</li>
+                    <li>Quantum circuit simulation</li>
+                    <li>Quantum optics</li>
+                </ul>
+            </div>
+
+            <div class="skill-group" style="--group-color:#7ee39a;">
+                <h3>Software</h3>
+                <ul>
+                    <li>Python</li>
+                    <li>C &amp; low-level programming</li>
+                    <li>JavaScript &amp; creative coding</li>
+                    <li>Django &amp; REST APIs</li>
+                    <li>Node.js</li>
+                    <li>MATLAB</li>
+                    <li>R &amp; statistical computing</li>
+                    <li>Linux &amp; shell tooling</li>
+                </ul>
+            </div>
+
+            <div class="skill-group" style="--group-color:#b49aff;">
+                <h3>Machine Learning &amp; Data</h3>
+                <ul>
+                    <li>TensorFlow &amp; deep learning</li>
+                    <li>Graph neural networks</li>
+                    <li>Computer vision (OpenCV)</li>
+                    <li>NLP &amp; language modeling</li>
+                    <li>Local LLMs &amp; AI agents</li>
+                    <li>Signal processing</li>
+                    <li>Scientific computing (NumPy / SciPy)</li>
+                    <li>Data visualization &amp; dashboards</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 Raman Pandey</p>
+    </footer>
+    <script src="js/skills.js"></script>
+</body>
+</html>

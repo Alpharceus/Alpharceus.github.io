@@ -4,8 +4,25 @@
     <meta charset="UTF-8">
     <title>Rigel | Quantum Circuit Playground</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An interactive quantum circuit simulator with a live Bloch sphere — build circuits with H, S, T, CNOT and Toffoli gates and watch single-qubit states (and entanglement) on the sphere.">
+    <link rel="canonical" href="https://ramanpandey.com/rigel.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Rigel — Quantum Circuit Playground",
+      "url": "https://ramanpandey.com/rigel.html",
+      "description": "Quantum-information page: an interactive circuit simulator wired to a live Bloch sphere, where entangled qubits visibly shrink toward the maximally mixed center.",
+      "about": "Quantum information",
+      "isPartOf": { "@type": "WebSite", "name": "Raman Pandey — Portfolio", "url": "https://ramanpandey.com/" },
+      "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
+    }
+    </script>
     <link rel="stylesheet" href="css/portfolio-pages.css">
     <link rel="stylesheet" href="css/rigel.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 </head>
 <body>
 <header>
@@ -23,7 +40,15 @@
             A quick tour of the Bloch sphere, then a toy quantum circuit simulator you can play with.
         </p>
         <canvas id="bloch-canvas" width="420" height="420"></canvas>
-        <p class="hint">(Pure states live on the surface. The center is maximally mixed.)</p>
+        <p class="hint">Drag the sphere to rotate it. Pure states live on the surface; the center is maximally mixed.</p>
+        <label id="bloch-qubit-row" class="hidden" style="display:block;margin-top:0.6em;">
+            Show qubit on sphere:
+            <select id="bloch-qubit-select"></select>
+        </label>
+        <p class="tiny-hint">
+            The arrow is the live (reduced) state of the selected qubit from the circuit
+            below — entangle it and watch the arrow shrink toward the center.
+        </p>
     </section>
 
     <!-- Circuit builder (initially hidden, revealed after intro) -->
@@ -83,12 +108,14 @@
             <div class="qc-right">
                 <div class="qc-block">
                     <h3>Circuit</h3>
-                    <div id="circuit-grid"></div>
+                    <div class="circuit-grid-scroll">
+                        <div id="circuit-grid"></div>
+                    </div>
                 </div>
 
                 <div class="qc-block">
                     <h3>State &amp; Bloch Summary</h3>
-                    <pre id="state-output" class="state-output"></pre>
+                    <div id="state-output" class="state-output"></div>
                 </div>
             </div>
         </div>

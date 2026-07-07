@@ -10,11 +10,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initBlochSphere();
     initCircuitUI();
+
+    // KaTeX loads with `defer`, i.e. after this script runs — re-render the
+    // state panel once everything (including KaTeX) is ready
+    window.addEventListener("load", () => updateQuantumState());
 });
 
 // ================== BLOCH SPHERE ==================
 
 let blochAnimId = null;
+
+// Live Bloch state shared between the circuit engine and the sphere renderer.
+// vectors[q] = { x, y, z } — the (reduced) Bloch vector of qubit q.
+const blochState = {
+    vectors: [{ x: 0, y: 0, z: 1 }], // |0⟩ before anything runs
+    selected: 0
+};
 
 function initBlochSphere() {
     const canvas = document.getElementById("bloch-canvas");
@@ -33,7 +44,31 @@ function initBlochSphere() {
     resize();
     window.addEventListener("resize", resize);
 
-    let t = 0;
+    // User-controlled view (drag to rotate — no auto-spin)
+    let viewTilt = 0.7;
+    let viewPhi = 0.55;
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+
+    canvas.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.classList.add("dragging");
+        canvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    canvas.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        viewPhi += (e.clientX - lastX) * 0.008;
+        viewTilt += (e.clientY - lastY) * 0.008;
+        viewTilt = Math.max(-1.45, Math.min(1.45, viewTilt));
+        lastX = e.clientX;
+        lastY = e.clientY;
+    });
+    const endDrag = () => { dragging = false; canvas.classList.remove("dragging"); };
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
 
     function project3D(x, y, z, cx, cy, R, tilt, phi) {
         // Rotate around x-axis (tilt) then around z by phi
@@ -68,8 +103,8 @@ function initBlochSphere() {
         ctx.fillStyle = "#020617";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const tilt = 0.7;
-        const phi = t * 0.004; // slower rotation
+        const tilt = viewTilt;
+        const phi = viewPhi;
 
         // Sphere outline
         ctx.beginPath();
@@ -137,7 +172,51 @@ function initBlochSphere() {
         ctx.fillStyle = "#a5b4fc";
         ctx.fill();
 
-        t++;
+        // ---- Live state arrow (reduced Bloch vector of the selected qubit) ----
+        const vec = blochState.vectors[blochState.selected];
+        if (vec) {
+            const tip = project3D(vec.x, vec.y, vec.z, cx, cy, R, tilt, phi);
+            const len = Math.hypot(tip.x - pCenter.x, tip.y - pCenter.y);
+
+            ctx.beginPath();
+            ctx.moveTo(pCenter.x, pCenter.y);
+            ctx.lineTo(tip.x, tip.y);
+            ctx.strokeStyle = "#fbbf24";
+            ctx.lineWidth = 2.6;
+            ctx.shadowColor = "#f59e0b";
+            ctx.shadowBlur = 10;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // arrowhead (screen-space)
+            if (len > 6) {
+                const ux = (tip.x - pCenter.x) / len;
+                const uy = (tip.y - pCenter.y) / len;
+                const ah = 10; // arrowhead size
+                ctx.beginPath();
+                ctx.moveTo(tip.x, tip.y);
+                ctx.lineTo(tip.x - ux * ah - uy * ah * 0.5, tip.y - uy * ah + ux * ah * 0.5);
+                ctx.lineTo(tip.x - ux * ah + uy * ah * 0.5, tip.y - uy * ah - ux * ah * 0.5);
+                ctx.closePath();
+                ctx.fillStyle = "#fbbf24";
+                ctx.fill();
+            } else {
+                // vector at/near origin: highlight the maximally-mixed dot
+                ctx.beginPath();
+                ctx.arc(pCenter.x, pCenter.y, 5.5, 0, 2 * Math.PI);
+                ctx.strokeStyle = "#fbbf24";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            // |r| readout
+            const r = Math.sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+            ctx.fillStyle = "#fbbf24";
+            ctx.font = "12px 'JetBrains Mono', monospace";
+            ctx.textAlign = "left";
+            ctx.fillText(`q${blochState.selected}  |r| = ${r.toFixed(2)}`, 10, canvas.height - 12);
+        }
+
         blochAnimId = requestAnimationFrame(drawFrame);
     }
 
@@ -216,6 +295,18 @@ function initCircuitUI() {
         renderCircuitGrid();
     });
     renderBasisSelectors();
+
+    // state-affecting inputs outside the grid
+    if (systemPresetSelect) {
+        systemPresetSelect.addEventListener("change", updateQuantumState);
+    }
+    basisContainer.addEventListener("change", updateQuantumState);
+    const blochQubitSelect = document.getElementById("bloch-qubit-select");
+    if (blochQubitSelect) {
+        blochQubitSelect.addEventListener("change", () => {
+            blochState.selected = parseInt(blochQubitSelect.value, 10) || 0;
+        });
+    }
 
     // ---------- gate palette ----------
     GATE_DEFS.forEach(g => {
@@ -397,6 +488,9 @@ function initCircuitUI() {
                 }
             });
         }
+
+        // every grid re-render corresponds to a circuit edit → refresh the sphere
+        updateQuantumState();
     }
 
     function renderSingleGate(g, col) {
@@ -423,16 +517,22 @@ function initCircuitUI() {
         }
 
         if (tCell && cCell) {
-            const rows = [g.control, g.target].sort((a, b) => a - b);
-            const rowHeight = 32;
-            const rowGap    = 2;
-            const wire = document.createElement("div");
-            wire.className = "circuit-wire";
-            wire.style.left   = `calc(50px + ${col} * 52px + 26px)`;
-            wire.style.top    = `${(rows[0] + 1) * (rowHeight + rowGap) + 6}px`;
-            wire.style.height = `${(rows[1] - rows[0]) * (rowHeight + rowGap) - 10}px`;
-            circuitGrid.appendChild(wire);
+            appendWire([cCell, tCell]);
         }
+    }
+
+    // Vertical control wire positioned from the actual cell geometry
+    // (offsetLeft/offsetTop are relative to #circuit-grid, its offsetParent)
+    function appendWire(cells) {
+        const centersY = cells.map(c => c.offsetTop + c.offsetHeight / 2);
+        const top = Math.min(...centersY);
+        const bottom = Math.max(...centersY);
+        const wire = document.createElement("div");
+        wire.className = "circuit-wire";
+        wire.style.left   = `${cells[0].offsetLeft + cells[0].offsetWidth / 2 - 1}px`;
+        wire.style.top    = `${top}px`;
+        wire.style.height = `${bottom - top}px`;
+        circuitGrid.appendChild(wire);
     }
 
     function renderCCXGate(g, col) {
@@ -455,14 +555,12 @@ function initCircuitUI() {
             }
         });
 
-        const rowHeight = 32;
-        const rowGap    = 2;
-        const wire = document.createElement("div");
-        wire.className = "circuit-wire";
-        wire.style.left   = `calc(50px + ${col} * 52px + 26px)`;
-        wire.style.top    = `${(rows[0] + 1) * (rowHeight + rowGap) + 6}px`;
-        wire.style.height = `${(rows[2] - rows[0]) * (rowHeight + rowGap) - 10}px`;
-        circuitGrid.appendChild(wire);
+        const endCells = [rows[0], rows[2]]
+            .map(r => circuitGrid.querySelector(`.circuit-cell[data-row="${r}"][data-col="${col}"]`))
+            .filter(Boolean);
+        if (endCells.length === 2) {
+            appendWire(endCells);
+        }
     }
 
     renderCircuitGrid();
@@ -476,9 +574,7 @@ function initCircuitUI() {
     if (clearBtn) {
         clearBtn.addEventListener("click", () => {
             circuit = Array.from({ length: MAX_COLS }, () => []);
-            renderCircuitGrid();
-            const out = document.getElementById("state-output");
-            if (out) out.textContent = "";
+            renderCircuitGrid(); // re-render also refreshes state output + sphere
         });
     }
 }
@@ -596,7 +692,16 @@ function buildInitialState() {
     return state;
 }
 
-// Apply single-qubit gate (2x2 unitary) to qubit q
+// Bit-ordering convention: tensorProduct() builds the state with q0 as the
+// MOST significant bit (so printed bitstrings read |q0 q1 …⟩), while the
+// bit-manipulation gate kernels below index bits little-endian. All gate and
+// expectation entry points therefore convert logical qubit → bit index here.
+function bitOf(n, q) {
+    return n - 1 - q;
+}
+
+// Apply single-qubit gate (2x2 unitary) to BIT q (little-endian; callers
+// convert logical qubit → bit via bitOf)
 function applySingleQubitGate(state, n, q, U) {
     const dim = state.length;
     const step = 1 << q;
@@ -702,33 +807,35 @@ function applyCCX(state, n, c1, c2, target) {
     }
 }
 
-// Apply all gates, column by column, left to right
+// Apply all gates, column by column, left to right.
+// Logical qubit rows are converted to state bits here (see bitOf).
 function applyCircuit(state, n) {
+    const b = (q) => bitOf(n, q);
     for (let col = 0; col < MAX_COLS; col++) {
         const gates = circuit[col];
         for (const g of gates) {
             switch (g.id) {
                 case "X":
-                    applySingleQubitGate(state, n, g.target, U_X); break;
+                    applySingleQubitGate(state, n, b(g.target), U_X); break;
                 case "Y":
-                    applySingleQubitGate(state, n, g.target, U_Y); break;
+                    applySingleQubitGate(state, n, b(g.target), U_Y); break;
                 case "Z":
-                    applySingleQubitGate(state, n, g.target, U_Z); break;
+                    applySingleQubitGate(state, n, b(g.target), U_Z); break;
                 case "H":
-                    applySingleQubitGate(state, n, g.target, U_H); break;
+                    applySingleQubitGate(state, n, b(g.target), U_H); break;
                 case "S":
-                    applySingleQubitGate(state, n, g.target, U_S); break;
+                    applySingleQubitGate(state, n, b(g.target), U_S); break;
                 case "T":
-                    applySingleQubitGate(state, n, g.target, U_T); break;
+                    applySingleQubitGate(state, n, b(g.target), U_T); break;
                 case "CX":
-                    applyCX(state, n, g.control, g.target); break;
+                    applyCX(state, n, b(g.control), b(g.target)); break;
                 case "CZ":
-                    applyCZ(state, n, g.control, g.target); break;
+                    applyCZ(state, n, b(g.control), b(g.target)); break;
                 case "CY":
-                    applyCY(state, n, g.control, g.target); break;
+                    applyCY(state, n, b(g.control), b(g.target)); break;
                 case "CCX":
                     if (g.controls && g.controls.length === 2) {
-                        applyCCX(state, n, g.controls[0], g.controls[1], g.target);
+                        applyCCX(state, n, b(g.controls[0]), b(g.controls[1]), b(g.target));
                     }
                     break;
                 default:
@@ -739,12 +846,13 @@ function applyCircuit(state, n) {
     return state;
 }
 
-// Expectation <ψ|O_q|ψ> by applying O and taking inner product
+// Expectation <ψ|O_q|ψ> by applying O and taking inner product.
+// q is a LOGICAL qubit index (converted to a bit index internally).
 function expectationPauli(state, n, q, U) {
     const dim = state.length;
     // apply single-qubit U to copy
     const tmp = state.map(a => ({ re: a.re, im: a.im }));
-    applySingleQubitGate(tmp, n, q, U);
+    applySingleQubitGate(tmp, n, bitOf(n, q), U);
     // inner product <ψ|tmp>
     let acc = c(0,0);
     for (let i = 0; i < dim; i++) {
@@ -753,7 +861,109 @@ function expectationPauli(state, n, q, U) {
     return acc;
 }
 
-// Pretty print final state and Bloch vectors per qubit
+// ---------- LaTeX (KaTeX) state rendering ----------
+
+function fmtNum(x) {
+    let s = x.toFixed(3).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    if (s === "-0") s = "0";
+    return s;
+}
+
+function fmtAmpLatex(a) {
+    const re = Math.abs(a.re) < 1e-9 ? 0 : a.re;
+    const im = Math.abs(a.im) < 1e-9 ? 0 : a.im;
+    if (im === 0) return fmtNum(re);
+    if (re === 0) {
+        if (Math.abs(im - 1) < 1e-9) return "i";
+        if (Math.abs(im + 1) < 1e-9) return "-i";
+        return fmtNum(im) + "i";
+    }
+    return `(${fmtNum(re)} ${im > 0 ? "+" : "-"} ${fmtNum(Math.abs(im))}i)`;
+}
+
+function stateToLatex(state, n) {
+    const terms = [];
+    for (let i = 0; i < state.length; i++) {
+        if (cAbs2(state[i]) < 1e-9) continue;
+        const bits = i.toString(2).padStart(n, "0");
+        let amp = fmtAmpLatex(state[i]);
+        let sign = "+";
+        if (amp.startsWith("-") && !amp.startsWith("(")) {
+            sign = "-";
+            amp = amp.slice(1);
+        }
+        if (amp === "1") amp = "";
+        terms.push({ sign, tex: `${amp}${amp ? "\\," : ""}|${bits}\\rangle` });
+    }
+    if (!terms.length) return "|\\psi\\rangle = 0";
+    let out = "|\\psi\\rangle = ";
+    terms.forEach((term, i) => {
+        if (i === 0) out += (term.sign === "-" ? "-" : "") + term.tex;
+        else out += ` ${term.sign} ` + term.tex;
+    });
+    return out;
+}
+
+function gateSequenceText() {
+    const lines = [];
+    for (let col = 0; col < MAX_COLS; col++) {
+        if (!circuit[col] || circuit[col].length === 0) continue;
+        const parts = circuit[col].map(g => {
+            if (g.id === "CX" || g.id === "CZ" || g.id === "CY") {
+                return `${g.id}(control=q${g.control}, target=q${g.target})`;
+            } else if (g.id === "CCX") {
+                return `CCX(controls=q${g.controls[0]},q${g.controls[1]}, target=q${g.target})`;
+            }
+            return `${g.id}(q${g.target})`;
+        });
+        lines.push(`col ${col}: ${parts.join(", ")}`);
+    }
+    return lines.join("\n");
+}
+
+// Render the state panel with KaTeX (falls back to plain text if KaTeX
+// hasn't loaded — e.g. CDN blocked)
+function renderStateOutput(state, n) {
+    const outEl = document.getElementById("state-output");
+    if (!outEl) return;
+    if (typeof katex === "undefined") {
+        outEl.textContent = summarizeState(state, n);
+        return;
+    }
+    outEl.innerHTML = "";
+    const addLabel = (txt) => {
+        const d = document.createElement("div");
+        d.className = "section-label";
+        d.textContent = txt;
+        outEl.appendChild(d);
+    };
+    const addMath = (tex) => {
+        const d = document.createElement("div");
+        d.className = "math-line";
+        katex.render(tex, d, { throwOnError: false });
+        outEl.appendChild(d);
+    };
+
+    addLabel("Final state");
+    addMath(stateToLatex(state, n));
+
+    addLabel("Reduced Bloch vectors");
+    blochState.vectors.forEach((v, q) => {
+        const r = Math.hypot(v.x, v.y, v.z);
+        addMath(`\\vec{r}_{q_{${q}}} = (${fmtNum(v.x)},\\ ${fmtNum(v.y)},\\ ${fmtNum(v.z)}), \\quad \\lVert\\vec{r}\\rVert = ${fmtNum(r)}`);
+    });
+
+    const seq = gateSequenceText();
+    if (seq) {
+        addLabel("Gate sequence");
+        const pre = document.createElement("pre");
+        pre.className = "gate-seq";
+        pre.textContent = seq;
+        outEl.appendChild(pre);
+    }
+}
+
+// Plain-text fallback: final state and Bloch vectors per qubit
 function summarizeState(state, n) {
     const dim = state.length;
     let lines = [];
@@ -809,14 +1019,55 @@ function summarizeState(state, n) {
     return lines.join("\n");
 }
 
-function runCircuit() {
+// Reduced Bloch vector of every qubit: (⟨X⟩, ⟨Y⟩, ⟨Z⟩) — identical to the
+// partial-trace formulas x = 2Re(ρ01), y = −2Im(ρ01), z = ρ00 − ρ11.
+function computeBlochVectors(state, n) {
+    const vectors = [];
+    for (let q = 0; q < n; q++) {
+        vectors.push({
+            x: expectationPauli(state, n, q, U_X).re,
+            y: expectationPauli(state, n, q, U_Y).re,
+            z: expectationPauli(state, n, q, U_Z).re
+        });
+    }
+    return vectors;
+}
+
+// Recompute state + Bloch vectors and refresh sphere/output.
+// Hooked into every circuit edit (grid renders, basis/preset changes, run).
+function updateQuantumState() {
+    if (!numQubitsSelect || !basisContainer) return;
     const n = parseInt(numQubitsSelect.value, 10);
-    const state0 = buildInitialState();
-    const state = state0.map(a => ({ re: a.re, im: a.im })); // copy
+    const state = buildInitialState();
     applyCircuit(state, n);
 
-    const outEl = document.getElementById("state-output");
-    if (outEl) {
-        outEl.textContent = summarizeState(state, n);
+    blochState.vectors = computeBlochVectors(state, n);
+    if (blochState.selected >= n) blochState.selected = 0;
+
+    // qubit selector (visible only for n > 1)
+    const row = document.getElementById("bloch-qubit-row");
+    const sel = document.getElementById("bloch-qubit-select");
+    if (row && sel) {
+        if (n > 1) {
+            row.classList.remove("hidden");
+            if (sel.options.length !== n) {
+                sel.innerHTML = "";
+                for (let q = 0; q < n; q++) {
+                    const opt = document.createElement("option");
+                    opt.value = String(q);
+                    opt.textContent = "q" + q;
+                    sel.appendChild(opt);
+                }
+                sel.value = String(blochState.selected);
+            }
+        } else {
+            row.classList.add("hidden");
+        }
     }
+
+    renderStateOutput(state, n);
+}
+
+function runCircuit() {
+    updateQuantumState();
 }

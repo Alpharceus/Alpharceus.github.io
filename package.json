@@ -1,0 +1,12 @@
+{
+  "name": "alpharceus.github.io",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build tooling for ramanpandey.com (blog static generation + sitemap)",
+  "scripts": {
+    "build": "node build/build.js"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  }
+}

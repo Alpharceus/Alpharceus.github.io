@@ -95,8 +95,13 @@ function setup() {
 
     introStartTime = millis();
 
-    // Check for returning visitor
-    if (sessionStorage.getItem('introPlayed')) {
+    // Safety net: reveal nav/footer even if the intro stalls (e.g. tab
+    // backgrounded mid-animation) — full intro runs ~8.2s
+    setTimeout(function () { document.body.classList.add('intro-done'); }, 9000);
+
+    // Check for returning visitor; respect OS reduced-motion preference
+    if (sessionStorage.getItem('introPlayed') ||
+        (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
         skipIntro();
     }
 
@@ -261,6 +266,8 @@ function drawConstellationDrawPhase() {
     if (t >= 1 && !ctaVisible) {
         ctaVisible = true;
         ctaStartTime = millis();
+        // constellation fully drawn → reveal nav/footer
+        document.body.classList.add('intro-done');
     }
 
     // Full starfield
@@ -875,13 +882,13 @@ function handleStarClick(idx) {
         case 2: openPapers(); break;
         case 3: openSkills(); break;
         case 4: openBlog(); break;
-        case 5: placeholderAction(); break;
+        case 5: openNow(); break;
         case 6: openRigel(); break;
     }
 }
 
-function openSkills() { alert("Skills/Tech Stack section coming soon!"); }
-function placeholderAction() { alert("This feature will be available soon!"); }
+function openSkills() { window.location.href = "skills.html"; }
+function openNow() { window.location.href = "now/"; }
 
 function openProjects() { window.location.href = "projects.html"; }
 function openPapers() { window.location.href = "papers.html"; }

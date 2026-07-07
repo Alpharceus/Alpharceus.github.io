@@ -162,13 +162,14 @@ const terminalCommands = {
 
 
     "blog": {
-        desc: "Visit my blog (from file)",
+        desc: "List blog posts (or open the blog page)",
         action: function (term) {
             fetch('assets/blogs.json')
                 .then(res => res.json())
                 .then(blogs => {
+                    term.echo("Posts (full index at blogs.html):");
                     blogs.forEach(blog =>
-                        term.echo(`- ${blog.title}: ${blog.link || "Coming soon!"}`)
+                        term.echo(`- [${blog.date}] ${blog.title} → articles/${blog.id}.html`)
                     );
                 })
                 .catch(() => term.echo("No blog posts available."));

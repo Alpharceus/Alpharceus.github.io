@@ -1,3 +1,122 @@
+/* ====== SITE HEADER / FOOTER (float above the star-map canvas, z-index 100) ======
+   Hidden (opacity 0) while the intro animation plays, revealed via body.intro-done.
+   The links remain in the DOM throughout (mirrored in <noscript>), so this is a
+   progressive reveal, not cloaked content. */
+.site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.9s ease;
+}
+
+body.intro-done .site-header {
+    opacity: 1;
+}
+
+body:not(.intro-done) .site-header .logo,
+body:not(.intro-done) ul.site-nav {
+    pointer-events: none;
+}
+
+.site-header nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+}
+
+.site-header .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.05rem;
+    letter-spacing: 0.14em;
+    color: rgba(220, 228, 250, 0.85);
+    text-shadow: 0 0 14px rgba(120, 160, 255, 0.35);
+    pointer-events: all;
+}
+
+ul.site-nav {
+    display: flex;
+    gap: 26px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    pointer-events: all;
+}
+
+ul.site-nav a {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: 0.88rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(200, 210, 240, 0.65);
+    text-decoration: none;
+    transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+ul.site-nav a:hover {
+    color: rgba(235, 240, 255, 1);
+    text-shadow: 0 0 12px rgba(140, 180, 255, 0.6);
+}
+
+.site-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 200;
+    pointer-events: none;
+    text-align: center;
+    padding: 10px 0 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    color: rgba(180, 190, 220, 0.55);
+    opacity: 0;
+    transition: opacity 0.9s ease;
+}
+
+body.intro-done .site-footer {
+    opacity: 1;
+}
+
+body:not(.intro-done) .site-footer .social-links {
+    pointer-events: none;
+}
+
+.site-footer .social-links {
+    pointer-events: all;
+    margin-bottom: 2px;
+}
+
+.site-footer a {
+    color: rgba(200, 210, 240, 0.7);
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    color: rgba(235, 240, 255, 1);
+}
+
+.site-footer p {
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .site-header nav {
+        padding: 14px 18px;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    ul.site-nav {
+        gap: 18px;
+    }
+}
+
 /* ====== INTRO OVERLAY ====== */
 #intro-overlay {
     position: fixed;

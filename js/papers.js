@@ -1,23 +1,5 @@
-// --- Load and render papers
-fetch('assets/papers.json')
-    .then(resp => resp.json())
-    .then(papers => {
-        const list = document.getElementById('papers-list');
-        list.innerHTML = papers.map(p =>
-            `<div class="paper-card">
-                <div class="paper-title">${p.title}</div>
-                <div class="paper-authors">${p.authors || ""}</div>
-                <div class="paper-journal">
-                    ${p.journal || ""}${p.year ? " ("+p.year+")" : ""}
-                    ${p.doi ? `<a href="https://doi.org/${p.doi}" target="_blank" style="color:#f1d8b3;">[DOI]</a>` : ''}
-                    ${p.link ? `<a href="${p.link}" target="_blank" style="color:#80ffee;margin-left:1.1em;">[Read]</a>` : ''}
-                </div>
-                <div class="paper-abstract">${p.abstract || ""}</div>
-            </div>`
-        ).join('');
-    });
-
-// --- Load and render papers as before (keep your previous code) ---
+// Papers list rendering lives inline in papers.html (single renderer with a
+// graceful empty state) — this file only draws the particle background.
 
 const canvas = document.getElementById('particles-bg');
 const ctx = canvas.getContext('2d');
