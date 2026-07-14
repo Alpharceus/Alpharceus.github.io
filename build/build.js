@@ -312,10 +312,23 @@ ${cards}
     if (veil && !docEl.classList.contains('no-veil')) {
       veil.addEventListener('click', endVeil);
       window.addEventListener('keydown', endVeil, { once: true });
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () { docEl.classList.add('veil-open'); });
-      });
-      setTimeout(endVeil, 1500);
+      // don't burn the animation while the tab is still hidden (fresh window
+      // spawning, background tab) — wait until the reader can actually see it
+      var startVeil = function () {
+        if (docEl.classList.contains('no-veil')) return;
+        setTimeout(function () { docEl.classList.add('veil-open'); }, 250);
+        setTimeout(endVeil, 1500);
+      };
+      if (document.visibilityState === 'hidden') {
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'visible') {
+            document.removeEventListener('visibilitychange', onVis);
+            startVeil();
+          }
+        });
+      } else {
+        startVeil();
+      }
     } else {
       endVeil();
     }
@@ -354,7 +367,7 @@ ${cards}
       slot.classList.add('show');
       holdTimer = setTimeout(function () {
         hideQuotes(false);
-        nextTimer = setTimeout(showQuote, 9000); // keep surfacing while idle
+        nextTimer = setTimeout(showQuote, 2500); // keep surfacing while idle
       }, 8000);
     }
 
