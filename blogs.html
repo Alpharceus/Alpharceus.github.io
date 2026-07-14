@@ -29,9 +29,12 @@
   </script>
   <script>
   // veil guard: repeat visitors and reduced-motion users never see the overlay
+  // TESTING PHASE: once-per-session is OFF (veil replays every load) — set
+  // VEIL_ONCE_PER_SESSION back to true before launch
+  window.VEIL_ONCE_PER_SESSION = false;
   (function () {
     try {
-      if (sessionStorage.getItem('blogVeilPlayed') ||
+      if ((window.VEIL_ONCE_PER_SESSION && sessionStorage.getItem('blogVeilPlayed')) ||
           window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         document.documentElement.classList.add('no-veil');
       }
@@ -187,7 +190,9 @@
     var veil = document.getElementById('book-veil');
     function endVeil() {
       docEl.classList.add('no-veil');
-      try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
+      if (window.VEIL_ONCE_PER_SESSION) {
+        try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
+      }
     }
     if (veil && !docEl.classList.contains('no-veil')) {
       veil.addEventListener('click', endVeil);
@@ -217,7 +222,12 @@
     var QUOTES = [{"text":"Ethics in astrophysics isn't a limitation; it's an opportunity to make our exploration more just, more inclusive, and more meaningful.","title":"Why Ethics Matters in Astrophysics"},{"text":"Even the tiniest microbe from Earth could erase a chapter of Mars' own story.","title":"Why Ethics Matters in Astrophysics"},{"text":"By questioning not just how we study the cosmos, but why and for whom, we ensure that our journey benefits all of humanity—not just those with the biggest telescopes.","title":"Why Ethics Matters in Astrophysics"},{"text":"What if our universe is not \"real\" in the usual sense, but an incredibly complex simulation run by an advanced intelligence?","title":"Is the Universe a Simulation?"},{"text":"So far, all we've found is more mystery.","title":"Is the Universe a Simulation?"},{"text":"The simulation hypothesis is less a theory and more a provocation: a reminder that reality is stranger—and more contingent—than we often realize.","title":"Is the Universe a Simulation?"},{"text":"That's not detoxing—that's dehydration with branding.","title":"The Media Skeptic's Guide to Health BS"},{"text":"Because fear spreads faster than science. Because \"natural\" sounds safe.","title":"The Media Skeptic's Guide to Health BS"},{"text":"The dose makes the poison—even water, sugar, or oxygen can kill you at the wrong dose.","title":"The Media Skeptic's Guide to Health BS"},{"text":"Updating facts isn't a sign of weakness—it's how knowledge works.","title":"The Media Skeptic's Guide to Health BS"},{"text":"You don't need a PhD to spot nonsense. Just a bit of logic, a little healthy skepticism, and the courage to say \"uh, that doesn't sound right.\"","title":"The Media Skeptic's Guide to Health BS"},{"text":"Stay sharp. Stay curious. And stay out of the clickbait.","title":"The Media Skeptic's Guide to Health BS"}];
     var slots = [document.getElementById('quote-left'), document.getElementById('quote-right')];
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) return;
+    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) {
+      console.log('[idle-quotes] disabled: ' + (reduced ? 'prefers-reduced-motion' : 'no slots or empty quote pool'));
+      return;
+    }
+    console.log('[idle-quotes] armed: ' + QUOTES.length + ' quotes; viewport ' +
+      window.innerWidth + 'px (needs >=1320); first quote after 5.2s idle');
 
     var idleTimer = null, holdTimer = null, nextTimer = null;
     var lastIdx = -1, slotFlip = 0;
@@ -231,7 +241,11 @@
     }
 
     function showQuote() {
-      if (window.innerWidth < 1320) { idleTimer = setTimeout(showQuote, 5200); return; }
+      if (window.innerWidth < 1320) {
+        console.log('[idle-quotes] blocked: viewport ' + window.innerWidth + 'px < 1320px — widen/maximize the window');
+        idleTimer = setTimeout(showQuote, 5200);
+        return;
+      }
       var idx;
       do { idx = Math.floor(Math.random() * QUOTES.length); }
       while (QUOTES.length > 1 && idx === lastIdx);
@@ -245,6 +259,7 @@
       src.textContent = '\u2014 ' + q.title;
       slot.appendChild(src);
       slot.classList.add('show');
+      console.log('[idle-quotes] showing #' + idx + ' in ' + slot.id + ' (holds 8s, next 2.5s after fade)');
       holdTimer = setTimeout(function () {
         hideQuotes(false);
         nextTimer = setTimeout(showQuote, 2500); // keep surfacing while idle
