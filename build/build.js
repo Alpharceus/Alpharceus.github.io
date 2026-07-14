@@ -241,13 +241,18 @@ ${JSON.stringify(jsonld, null, 2)}
       position: relative;
       width: min(300px, 56vw); aspect-ratio: 5 / 7;
       transform-style: preserve-3d;
-      transform: rotateX(12deg) translateX(-50%);
+      transform: rotateX(12deg); /* closed book sits dead center; shifts right as it opens so the spread stays centered */
     }
     .book::before { /* spine */
-      content: ""; position: absolute; top: -2px; bottom: -2px; left: -9px; width: 11px;
+      content: ""; position: absolute; top: -2px; bottom: -2px; left: -12px; width: 14px;
       background: linear-gradient(90deg, #170d04 0%, #3a2510 60%, #241505 100%);
-      border-radius: 5px 0 0 5px;
+      border-radius: 6px 0 0 6px;
       box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+    }
+    .book::after { /* page-block edge peeking past the cover */
+      content: ""; position: absolute; top: 7px; bottom: 7px; right: -3px; width: 6px;
+      background: repeating-linear-gradient(90deg, #e2d3ab 0 1px, #b3a074 1px 2px);
+      border-radius: 0 2px 2px 0;
     }
     .book-back, .book-cover {
       position: absolute; inset: 0;
@@ -259,22 +264,30 @@ ${JSON.stringify(jsonld, null, 2)}
       box-shadow: 0 18px 50px rgba(0,0,0,0.65), inset 0 0 40px rgba(0,0,0,0.5);
     }
     .book-back { inset: -3px -4px; border-radius: 3px 11px 11px 3px; }
-    .book-cover { transform: translateZ(7px); }
+    .book-cover { transform: translateZ(12px); }
     .book-cover::before { /* embossed gold frame */
       content: ""; position: absolute; inset: 11px;
       border: 3px double rgba(212, 175, 95, 0.55);
       border-radius: 2px 7px 7px 2px;
     }
     .cover-mark {
-      position: absolute; top: 38%; left: 0; right: 0; text-align: center;
-      color: rgba(224, 188, 112, 0.9); font-family: Georgia, serif; font-size: 2.1rem;
+      position: absolute; top: 17%; left: 0; right: 0; text-align: center;
+      color: rgba(224, 188, 112, 0.9); font-family: Georgia, serif; font-size: 1.7rem;
       text-shadow: 0 0 14px rgba(224, 188, 112, 0.35);
     }
     .cover-title {
-      position: absolute; top: 55%; left: 0; right: 0; text-align: center;
-      color: rgba(212, 175, 95, 0.7); font-family: Georgia, serif;
-      font-size: 0.66rem; letter-spacing: 0.42em; text-transform: uppercase;
-      text-indent: 0.42em; /* recenter: letter-spacing pads only the right side */
+      position: absolute; top: 32%; left: 0; right: 0; padding: 0 16%;
+      text-align: center;
+      color: rgba(224, 188, 112, 0.88); font-family: Georgia, serif;
+      font-size: 1.02rem; letter-spacing: 0.14em; line-height: 1.7;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(224, 188, 112, 0.25);
+    }
+    .cover-author {
+      position: absolute; bottom: 13%; left: 0; right: 0; text-align: center;
+      color: rgba(212, 175, 95, 0.65); font-family: Georgia, serif;
+      font-size: 0.64rem; letter-spacing: 0.34em; text-transform: uppercase;
+      text-indent: 0.34em; /* recenter: letter-spacing pads only the right side */
     }
     .leaf {
       position: absolute; inset: 5px 7px 5px 0;
@@ -288,24 +301,32 @@ ${JSON.stringify(jsonld, null, 2)}
       background: repeating-linear-gradient(180deg, rgba(90, 70, 45, 0.3) 0 1px, transparent 1px 9px);
       opacity: 0.45;
     }
-    .leaf-1 { transform: translateZ(5.5px); }
-    .leaf-2 { transform: translateZ(4px); }
-    .leaf-3 { transform: translateZ(2.8px); }
-    .leaf-4 { transform: translateZ(1.6px); }
+    .leaf-1 { transform: translateZ(10px); }
+    .leaf-2 { transform: translateZ(9px); }
+    .leaf-3 { transform: translateZ(8px); }
+    .leaf-4 { transform: translateZ(7px); }
+    .leaf-5 { transform: translateZ(6px); }
+    .leaf-6 { transform: translateZ(5px); }
+    .leaf-7 { transform: translateZ(4px); }
+    .leaf-8 { transform: translateZ(3px); }
+    .leaf-9 { transform: translateZ(2px); }
+    .leaf-10 { transform: translateZ(1px); }
     .veil-hint {
       position: absolute; bottom: 26px; left: 26px;
       font-size: 0.7rem; letter-spacing: 0.14em;
       color: rgba(170, 185, 220, 0.55); text-transform: uppercase;
     }
     /* timeline (runs when html.veil-open lands): camera zooms the whole time,
-       cover opens at 0.45s, leaves flip 1.5s→3s, veil lifts at 3.15s */
+       cover opens at 0.45s, five leaves flip 1.4s→3s (five stay — the book
+       lands on a middle spread), veil lifts at 3.15s */
     html.veil-open .book-scene { animation: veilCamera 3.4s cubic-bezier(0.4, 0.1, 0.3, 1) forwards; }
     html.veil-open .book { animation: bookCenter 1.3s 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
     html.veil-open .book-cover { animation: coverOpen 1.3s 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
-    html.veil-open .leaf-1 { animation: leafFlip1 0.75s 1.5s ease-in-out forwards; }
-    html.veil-open .leaf-2 { animation: leafFlip2 0.75s 1.78s ease-in-out forwards; }
-    html.veil-open .leaf-3 { animation: leafFlip3 0.75s 2.06s ease-in-out forwards; }
-    html.veil-open .leaf-4 { animation: leafFlip4 0.75s 2.34s ease-in-out forwards; }
+    html.veil-open .leaf-1 { animation: leafFlip1 0.7s 1.4s ease-in-out forwards; }
+    html.veil-open .leaf-2 { animation: leafFlip2 0.7s 1.62s ease-in-out forwards; }
+    html.veil-open .leaf-3 { animation: leafFlip3 0.7s 1.84s ease-in-out forwards; }
+    html.veil-open .leaf-4 { animation: leafFlip4 0.7s 2.06s ease-in-out forwards; }
+    html.veil-open .leaf-5 { animation: leafFlip5 0.7s 2.28s ease-in-out forwards; }
     html.veil-open #book-veil { animation: veilLift 0.75s 3.15s ease forwards; }
     @keyframes veilCamera {
       0% { transform: scale(0.85); }
@@ -313,14 +334,15 @@ ${JSON.stringify(jsonld, null, 2)}
       100% { transform: scale(1.85) translateY(4vh); }
     }
     @keyframes bookCenter {
-      from { transform: rotateX(12deg) translateX(-50%); }
-      to { transform: rotateX(8deg) translateX(0); }
+      from { transform: rotateX(12deg) translateX(0); }
+      to { transform: rotateX(8deg) translateX(50%); }
     }
-    @keyframes coverOpen { to { transform: translateZ(7px) rotateY(-178deg); } }
-    @keyframes leafFlip1 { to { transform: translateZ(5.5px) rotateY(-174deg); } }
-    @keyframes leafFlip2 { to { transform: translateZ(4px) rotateY(-171deg); } }
-    @keyframes leafFlip3 { to { transform: translateZ(2.8px) rotateY(-168deg); } }
-    @keyframes leafFlip4 { to { transform: translateZ(1.6px) rotateY(-165deg); } }
+    @keyframes coverOpen { to { transform: translateZ(12px) rotateY(-178deg); } }
+    @keyframes leafFlip1 { to { transform: translateZ(10px) rotateY(-176deg); } }
+    @keyframes leafFlip2 { to { transform: translateZ(9px) rotateY(-173.5deg); } }
+    @keyframes leafFlip3 { to { transform: translateZ(8px) rotateY(-171deg); } }
+    @keyframes leafFlip4 { to { transform: translateZ(7px) rotateY(-168.5deg); } }
+    @keyframes leafFlip5 { to { transform: translateZ(6px) rotateY(-166deg); } }
     @keyframes veilLift { to { opacity: 0; } }
     html.no-veil #book-veil { display: none; }
 
@@ -371,11 +393,21 @@ ${JSON.stringify(jsonld, null, 2)}
       <div class="book-scene">
         <div class="book">
           <div class="book-back"></div>
+          <div class="leaf leaf-10"></div>
+          <div class="leaf leaf-9"></div>
+          <div class="leaf leaf-8"></div>
+          <div class="leaf leaf-7"></div>
+          <div class="leaf leaf-6"></div>
+          <div class="leaf leaf-5"></div>
           <div class="leaf leaf-4"></div>
           <div class="leaf leaf-3"></div>
           <div class="leaf leaf-2"></div>
           <div class="leaf leaf-1"></div>
-          <div class="book-cover"><span class="cover-mark">&#10022;</span><span class="cover-title">Essays</span></div>
+          <div class="book-cover">
+            <span class="cover-mark">&#10022;</span>
+            <span class="cover-title">Essays on Science, Skepticism &amp; Philosophy</span>
+            <span class="cover-author">R &middot; Pandey</span>
+          </div>
         </div>
       </div>
     </div>

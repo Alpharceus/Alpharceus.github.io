@@ -1,5 +1,29 @@
 [
   {
+    "id": "quantum-hype",
+    "title": "The Quantum Hype Problem",
+    "date": "2026-07-14",
+    "summary": "I work in quantum tech, and I'm asking you to be more skeptical of it. On marketing adjectives, timeline inflation, and why honesty is a survival strategy for the field."
+  },
+  {
+    "id": "does-the-machine-understand",
+    "title": "Does the Machine Understand?",
+    "date": "2026-07-05",
+    "summary": "Large language models write essays, prove lemmas, and pass exams. Whether they \"understand\" anything is a different question — and probably the wrong one."
+  },
+  {
+    "id": "shut-up-and-calculate",
+    "title": "Shut Up and Calculate?",
+    "date": "2026-06-20",
+    "summary": "Physicists are told not to worry about what quantum mechanics means. But the history of the field suggests that worrying about it is exactly how progress gets made."
+  },
+  {
+    "id": "great-silence",
+    "title": "The Great Silence Is Data",
+    "date": "2026-05-30",
+    "summary": "The Fermi paradox isn't a paradox — it's an observation we keep refusing to take seriously. On filters, boring explanations, and what the silence says about us."
+  },
+  {
     "id": "media-skeptics-guide",
     "title": "The Media Skeptic's Guide to Health BS",
     "date": "2026-04-03",
