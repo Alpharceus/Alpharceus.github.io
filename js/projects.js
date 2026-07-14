@@ -451,10 +451,17 @@
   // ---- Intro animation state ----
   const PHASE_DARK = 0, PHASE_POWERON = 1, PHASE_TRACEDRAW = 2,
         PHASE_ZOOMOUT = 3, PHASE_IDLE = 4;
-  let introPhase = PHASE_DARK;
-  let introTime = 0;
-  let introScale = 2.8;
-  let traceDrawProgress = 0;
+  // boot sequence plays once per session (repeat visits and reduced-motion
+  // users land straight on the idle board)
+  let skipIntro = false;
+  try {
+    skipIntro = !!sessionStorage.getItem("projectsIntroPlayed") ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch (e) { skipIntro = true; }
+  let introPhase = skipIntro ? PHASE_IDLE : PHASE_DARK;
+  let introTime = skipIntro ? 9999 : 0; // past every timing threshold
+  let introScale = skipIntro ? 1.0 : 2.8;
+  let traceDrawProgress = skipIntro ? 1 : 0;
   let cardsShown = false;
 
   // ---- CPU hitbox ----
@@ -914,7 +921,10 @@
     if (introPhase === PHASE_DARK && introTime >= INTRO_TIMINGS.DARK_END) introPhase = PHASE_POWERON;
     if (introPhase === PHASE_POWERON && introTime >= INTRO_TIMINGS.POWERON_END) introPhase = PHASE_TRACEDRAW;
     if (introPhase === PHASE_TRACEDRAW && introTime >= INTRO_TIMINGS.TRACEDRAW_END) introPhase = PHASE_ZOOMOUT;
-    if (introPhase === PHASE_ZOOMOUT && introTime >= INTRO_TIMINGS.ZOOMOUT_END) introPhase = PHASE_IDLE;
+    if (introPhase === PHASE_ZOOMOUT && introTime >= INTRO_TIMINGS.ZOOMOUT_END) {
+      introPhase = PHASE_IDLE;
+      try { sessionStorage.setItem("projectsIntroPlayed", "1"); } catch (e) {}
+    }
 
     if (introPhase <= PHASE_POWERON) introScale = 2.8;
     else if (introPhase === PHASE_TRACEDRAW) {

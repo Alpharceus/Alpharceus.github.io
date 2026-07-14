@@ -166,9 +166,8 @@ ${JSON.stringify(jsonld, null, 2)}
   </script>
   <script>
   // veil guard: repeat visitors and reduced-motion users never see the overlay
-  // TESTING PHASE: once-per-session is OFF (veil replays every load) — set
-  // VEIL_ONCE_PER_SESSION back to true before launch
-  window.VEIL_ONCE_PER_SESSION = false;
+  // (set to false to replay the veil on every load while testing)
+  window.VEIL_ONCE_PER_SESSION = true;
   (function () {
     var d = document.documentElement;
     try {
@@ -475,21 +474,12 @@ ${cards}
     var QUOTES = __QUOTES_JSON__;
     var slots = [document.getElementById('quote-left'), document.getElementById('quote-right')];
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) {
-      console.log('[margin-quotes] disabled: ' + (reduced ? 'prefers-reduced-motion' : 'no slots or empty quote pool'));
-      return;
-    }
-    console.log('[margin-quotes] armed: ' + QUOTES.length + ' quotes; viewport ' +
-      window.innerWidth + 'px (needs >=1320)');
+    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) return;
 
     var lastIdx = -1, slotFlip = 0;
 
     function nextQuote() {
-      if (window.innerWidth < 1320) {
-        console.log('[margin-quotes] paused: viewport ' + window.innerWidth + 'px < 1320px — widen/maximize the window');
-        setTimeout(nextQuote, 4000);
-        return;
-      }
+      if (window.innerWidth < 1320) { setTimeout(nextQuote, 4000); return; }
       var idx;
       do { idx = Math.floor(Math.random() * QUOTES.length); }
       while (QUOTES.length > 1 && idx === lastIdx);
@@ -503,7 +493,6 @@ ${cards}
       src.textContent = '\\u2014 ' + q.title;
       slot.appendChild(src);
       slot.classList.add('show');
-      console.log('[margin-quotes] showing #' + idx + ' in ' + slot.id + ' (holds 8s, next 2.5s after fade)');
       setTimeout(function () {
         slot.classList.remove('show');
         setTimeout(nextQuote, 2500);
