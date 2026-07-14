@@ -3,6 +3,7 @@ id: media-skeptics-guide
 title: The Media Skeptic's Guide to Health BS
 date: 2026-04-03
 summary: How to spot myths, misinformation, and marketing fluff in modern wellness culture — twelve persistent health myths, debunked.
+about: Health misinformation and scientific skepticism
 ---
 
 How to spot myths, misinformation, and marketing fluff in modern wellness culture.

@@ -27,6 +27,17 @@
   }
 }
   </script>
+  <script>
+  // veil guard: repeat visitors and reduced-motion users never see the overlay
+  (function () {
+    try {
+      if (sessionStorage.getItem('blogVeilPlayed') ||
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.documentElement.classList.add('no-veil');
+      }
+    } catch (e) { document.documentElement.classList.add('no-veil'); }
+  }());
+  </script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -71,9 +82,76 @@
     .post-card p { color: #b8c1dd; font-size: 0.95rem; line-height: 1.6; margin: 10px 0 8px; }
     .read-more { font-size: 0.85rem; color: #8fb8ff; }
     footer { text-align: center; color: #6b7494; font-size: 0.8rem; padding: 20px; }
+
+    /* ---- book-open veil (index only; pure overlay above real content) ---- */
+    #book-veil {
+      position: fixed; inset: 0; z-index: 60;
+      display: flex; cursor: pointer;
+      perspective: 1600px;
+    }
+    .veil-half {
+      flex: 1; position: relative;
+      transition: transform 1.25s cubic-bezier(0.65, 0, 0.35, 1), opacity 1.25s ease;
+    }
+    .veil-left {
+      background: linear-gradient(105deg, #0c1024 0%, #131a38 70%, #1d2750 100%);
+      transform-origin: right center;
+      border-right: 1px solid rgba(230, 200, 140, 0.35);
+    }
+    .veil-right {
+      background: linear-gradient(255deg, #0c1024 0%, #131a38 70%, #1d2750 100%);
+      transform-origin: left center;
+      border-left: 1px solid rgba(230, 200, 140, 0.35);
+    }
+    .veil-mark {
+      position: absolute; top: 50%; right: 26px;
+      transform: translateY(-50%);
+      color: rgba(230, 200, 140, 0.75); font-size: 1.5rem;
+    }
+    .veil-hint {
+      position: absolute; bottom: 26px; left: 26px;
+      font-size: 0.7rem; letter-spacing: 0.14em;
+      color: rgba(170, 185, 220, 0.55); text-transform: uppercase;
+    }
+    html.veil-open .veil-left { transform: rotateY(78deg); opacity: 0; }
+    html.veil-open .veil-right { transform: rotateY(-78deg); opacity: 0; }
+    html.no-veil #book-veil { display: none; }
+
+    /* ---- quotes on idle (page margins only — never over the cards) ---- */
+    .idle-quote {
+      position: fixed; z-index: 5;
+      width: min(280px, calc((100vw - 900px) / 2 - 40px));
+      opacity: 0; pointer-events: none;
+      transition: opacity 1.4s ease;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-style: italic; font-size: 1.02rem; line-height: 1.7;
+      color: rgba(196, 208, 238, 0.88);
+    }
+    .idle-quote.fast { transition-duration: 0.25s; }
+    .idle-quote.show { opacity: 1; }
+    .idle-quote .q-src {
+      display: block; margin-top: 0.7em;
+      font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-style: normal; font-size: 0.7rem; letter-spacing: 0.08em;
+      color: rgba(130, 145, 185, 0.85);
+    }
+    #quote-left { left: 30px; top: 24vh; }
+    #quote-right { right: 30px; top: 50vh; text-align: right; }
+    /* margins too narrow → no quotes at all (text-over-text is forbidden) */
+    @media (max-width: 1319px) { .idle-quote { display: none; } }
+    @media (prefers-reduced-motion: reduce) { .idle-quote { display: none; } }
   </style>
 </head>
 <body>
+  <div id="book-veil" aria-hidden="true">
+    <div class="veil-half veil-left"><span class="veil-mark">&#10022;</span><span class="veil-hint">click to open</span></div>
+    <div class="veil-half veil-right"></div>
+  </div>
+  <noscript><style>#book-veil { display: none; }</style></noscript>
+
+  <div id="quote-left" class="idle-quote" aria-hidden="true"></div>
+  <div id="quote-right" class="idle-quote" aria-hidden="true"></div>
+
   <header>
     <nav><a href="index.html">&larr; Home</a></nav>
   </header>
@@ -100,5 +178,76 @@
       </a>
   </main>
   <footer>&copy; 2026 Raman Pandey</footer>
+
+  <script>
+  (function () {
+    var docEl = document.documentElement;
+
+    // ---- book-open veil: ≤1.5s, click/key to skip, once per session ----
+    var veil = document.getElementById('book-veil');
+    function endVeil() {
+      docEl.classList.add('no-veil');
+      try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
+    }
+    if (veil && !docEl.classList.contains('no-veil')) {
+      veil.addEventListener('click', endVeil);
+      window.addEventListener('keydown', endVeil, { once: true });
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { docEl.classList.add('veil-open'); });
+      });
+      setTimeout(endVeil, 1500);
+    } else {
+      endVeil();
+    }
+
+    // ---- quotes on idle: my own sentences, margins only ----
+    var QUOTES = [{"text":"Ethics in astrophysics isn't a limitation; it's an opportunity to make our exploration more just, more inclusive, and more meaningful.","title":"Why Ethics Matters in Astrophysics"},{"text":"Even the tiniest microbe from Earth could erase a chapter of Mars' own story.","title":"Why Ethics Matters in Astrophysics"},{"text":"By questioning not just how we study the cosmos, but why and for whom, we ensure that our journey benefits all of humanity—not just those with the biggest telescopes.","title":"Why Ethics Matters in Astrophysics"},{"text":"What if our universe is not \"real\" in the usual sense, but an incredibly complex simulation run by an advanced intelligence?","title":"Is the Universe a Simulation?"},{"text":"So far, all we've found is more mystery.","title":"Is the Universe a Simulation?"},{"text":"The simulation hypothesis is less a theory and more a provocation: a reminder that reality is stranger—and more contingent—than we often realize.","title":"Is the Universe a Simulation?"},{"text":"That's not detoxing—that's dehydration with branding.","title":"The Media Skeptic's Guide to Health BS"},{"text":"Because fear spreads faster than science. Because \"natural\" sounds safe.","title":"The Media Skeptic's Guide to Health BS"},{"text":"The dose makes the poison—even water, sugar, or oxygen can kill you at the wrong dose.","title":"The Media Skeptic's Guide to Health BS"},{"text":"Updating facts isn't a sign of weakness—it's how knowledge works.","title":"The Media Skeptic's Guide to Health BS"},{"text":"You don't need a PhD to spot nonsense. Just a bit of logic, a little healthy skepticism, and the courage to say \"uh, that doesn't sound right.\"","title":"The Media Skeptic's Guide to Health BS"},{"text":"Stay sharp. Stay curious. And stay out of the clickbait.","title":"The Media Skeptic's Guide to Health BS"}];
+    var slots = [document.getElementById('quote-left'), document.getElementById('quote-right')];
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) return;
+
+    var idleTimer = null, holdTimer = null, nextTimer = null;
+    var lastIdx = -1, slotFlip = 0;
+
+    function hideQuotes(fast) {
+      slots.forEach(function (s) {
+        if (fast) s.classList.add('fast');
+        s.classList.remove('show');
+        if (fast) setTimeout(function () { s.classList.remove('fast'); }, 300);
+      });
+    }
+
+    function showQuote() {
+      if (window.innerWidth < 1320) { idleTimer = setTimeout(showQuote, 5200); return; }
+      var idx;
+      do { idx = Math.floor(Math.random() * QUOTES.length); }
+      while (QUOTES.length > 1 && idx === lastIdx);
+      lastIdx = idx;
+      var q = QUOTES[idx];
+      var slot = slots[slotFlip % 2];
+      slotFlip++;
+      slot.textContent = '\u201C' + q.text + '\u201D';
+      var src = document.createElement('span');
+      src.className = 'q-src';
+      src.textContent = '\u2014 ' + q.title;
+      slot.appendChild(src);
+      slot.classList.add('show');
+      holdTimer = setTimeout(function () {
+        hideQuotes(false);
+        nextTimer = setTimeout(showQuote, 9000); // keep surfacing while idle
+      }, 8000);
+    }
+
+    function onActivity() {
+      clearTimeout(idleTimer); clearTimeout(holdTimer); clearTimeout(nextTimer);
+      hideQuotes(true); // any interaction fades quotes immediately
+      idleTimer = setTimeout(showQuote, 5200);
+    }
+
+    ['scroll', 'wheel', 'pointermove', 'pointerdown', 'keydown', 'touchstart']
+      .forEach(function (ev) { window.addEventListener(ev, onActivity, { passive: true }); });
+    idleTimer = setTimeout(showQuote, 5200);
+  }());
+  </script>
 </body>
 </html>
