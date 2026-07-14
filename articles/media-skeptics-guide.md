@@ -8,7 +8,7 @@ about: Health misinformation and scientific skepticism
 
 How to spot myths, misinformation, and marketing fluff in modern wellness culture.
 
-In a time when articles are written for algorithms and headlines are crafted for rage-clicks, separating fact from fiction in health and wellness has never been harder. This isn’t because the public is dumb—far from it. It’s because fear, controversy, and magical thinking drive traffic, while nuance and scientific accuracy tend to get buried. This guide is for people who are tired of pseudoscience, health influencers with zero credentials, and "natural living" fads that are anything but natural.
+In a time when articles are written for algorithms and headlines are crafted for rage-clicks, separating fact from fiction in health and wellness has never been harder. The public isn’t dumb. The problem is that fear, controversy, and magical thinking drive traffic, while nuance and scientific accuracy tend to get buried. This guide is for people who are tired of pseudoscience, health influencers with zero credentials, and "natural living" fads that are anything but natural.
 
 Let's break down some of the most common myths that persist online, in conversations, and even in some supposedly well-meaning documentaries. You might be surprised how much of what you've heard is, well, total BS.
 
@@ -90,7 +90,7 @@ Frozen fruits and veggies are often more nutritious than fresh ones, because the
 
 ## Why these myths persist
 
-Because fear spreads faster than science. Because "natural" sounds safe. Because corporations have earned some mistrust. Because it's easier to believe in miracle fixes than to do boring things like eat more fiber and sleep. And because journalists need something to write about that will get shares, likes, and ad revenue.
+Fear spreads faster than science, "natural" sounds safer than it is, and corporations have earned enough mistrust to make suspicion feel reasonable. Miracle fixes are also easier to believe in than boring advice about fiber and sleep. Add journalists who need shares, likes, and ad revenue, and the myths mostly write themselves.
 
 ---
 
@@ -99,7 +99,7 @@ Because fear spreads faster than science. Because "natural" sounds safe. Because
 1. Ask who benefits. Are they selling something? Is it a supplement, a course, a book, a lifestyle brand?
 2. Look for evidence, not vibes. Prefer peer-reviewed studies over TikTok testimonials.
 3. Watch out for vague words like "boost," "cleanse," or "toxins."
-4. Accept that science evolves. Updating facts isn’t a sign of weakness—it’s how knowledge works.
+4. Accept that science evolves. Studies get superseded; that’s the system working, not failing.
 5. Be curious. Ask questions. But don’t check your brain at the door of a health food store.
 
 ---
@@ -110,4 +110,4 @@ You don’t need a PhD to spot nonsense. Just a bit of logic, a little healthy s
 
 And next time someone tells you microwaves are dangerous, just smile and say, "Not unless you're standing inside one."
 
-Stay sharp. Stay curious. And stay out of the clickbait.
+Stay curious, and stay out of the clickbait.

@@ -22,7 +22,7 @@ From the early radio telescopes that crowded the radio spectrum to today's plans
 
 ## Planetary Protection: More Than Sci-Fi
 
-Every Mars lander is baked, scrubbed, and carefully controlled to prevent biological contamination. Why? Because even the tiniest microbe from Earth could erase a chapter of Mars' own story. Some argue for more open exploration, while others urge maximum caution—how do we balance the two?
+Every Mars lander is baked, scrubbed, and carefully controlled to prevent biological contamination. Why? Because if an Earth microbe hitches a ride and we later find life on Mars, we may never be sure it wasn't ours. Some argue for more open exploration, while others urge maximum caution—how do we balance the two?
 
 ## Big Data, Big Responsibility
 
@@ -34,4 +34,4 @@ Modern astronomy is drowning in data. AI now finds patterns humans might miss—
 
 ## Conclusion
 
-Ethics in astrophysics isn't a limitation; it's an opportunity to make our exploration more just, more inclusive, and more meaningful. By questioning not just how we study the cosmos, but why and for whom, we ensure that our journey benefits all of humanity—not just those with the biggest telescopes.
+Taking ethics seriously doesn't hold astronomy back. Asking why we study the cosmos, and for whom, keeps the field honest and keeps the sky something that belongs to everyone, not just to whoever owns the biggest telescope.

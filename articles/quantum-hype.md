@@ -12,7 +12,7 @@ I work in quantum technology. Which is exactly why I'm asking you to be more ske
 
 Somewhere along the way, "quantum" stopped being a description of physics and became a marketing adjective. Quantum finance. Quantum wellness. Quantum AI. If a press release uses the word more than three times without mentioning decoherence, error rates, or what problem is actually being solved, treat it the way you'd treat "detox" on a tea box.
 
-The frustrating part is that the real thing underneath is genuinely remarkable. Superposition and entanglement are not metaphors; they are experimentally verified features of nature that we can now engineer with, photon by photon. The hype isn't wrong because quantum mechanics is boring. It's wrong because it skips the hard parts.
+The frustrating part is that the real thing underneath is remarkable. Superposition and entanglement are not metaphors; they are experimentally verified features of nature that we can now engineer with, photon by photon. The trouble with the hype is that it skips the hard parts.
 
 ## What Quantum Computers Are Not
 
@@ -22,9 +22,9 @@ The honest state of the field: we have noisy devices with impressive qubit count
 
 ## Why Hype Actually Hurts
 
-You might think hype is harmless—it brings funding, attention, students. But fields that overpromise get punished on a delay. AI went through two winters when reality failed to match the press releases. Every "quantum computers will cure cancer by 2027" headline is a loan taken out against the field's future credibility, and the interest rate is steep.
+You might think hype is harmless—it brings funding, attention, students. But fields that overpromise get punished on a delay. AI went through two winters when reality failed to match the press releases. Every "quantum computers will cure cancer by 2027" headline is borrowed credibility, and the field will eventually have to pay it back.
 
-There's also a subtler cost: hype flattens the field into one product (the universal quantum computer) when the nearer-term wins are elsewhere—quantum sensing, quantum networking, single-photon sources, metrology. These are less cinematic and more real.
+There's also a subtler cost: hype flattens the field into one product (the universal quantum computer) when the nearer-term wins are elsewhere—quantum sensing, quantum networking, single-photon sources, metrology. These make worse headlines but better near-term bets.
 
 ## How to Read a Quantum Headline
 
@@ -35,6 +35,6 @@ There's also a subtler cost: hype flattens the field into one product (the unive
 
 ## The Case for Boring Honesty
 
-The most compelling thing about quantum technology is not that it will change everything next year. It's that a century after the theory was written down, we are learning to build with it—slowly, expensively, and for real. That story doesn't need inflation. Fields, like people, are more trustworthy when they can say "we don't know yet" out loud.
+The most compelling thing about quantum technology is not that it will change everything next year. It's that a century after the theory was written down, we are learning to build with it—slowly and expensively, but for real. That story doesn't need inflation. A field that can say "we don't know yet" out loud is easier to trust.
 
-Stay skeptical. Especially of us.
+So stay skeptical, especially of us.
