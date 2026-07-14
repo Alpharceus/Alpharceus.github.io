@@ -24,7 +24,7 @@ If #3 is true, statistically speaking, we might well be in one.
 
 ## Is There Evidence?
 
-Some physicists have proposed ways to "test" the simulation hypothesis, like looking for pixelation in the cosmic microwave background, or strange quantum effects that might hint at underlying code. So far, all we've found is more mystery.
+Some physicists have proposed ways to "test" the simulation hypothesis, like looking for pixelation in the cosmic microwave background, or strange quantum effects that might hint at underlying code. So far, nothing conclusive has turned up.
 
 ## Quantum Weirdness: Feature, Not Bug?
 
@@ -32,4 +32,4 @@ Quantum mechanics already tells us reality is "probabilistic," and that observat
 
 ## So, Are We Living in The Matrix?
 
-Maybe. Maybe not. But as simulation tech advances, it gets harder to rule out the possibility. For now, the simulation hypothesis is less a theory and more a provocation: a reminder that reality is stranger—and more contingent—than we often realize.
+Maybe. Maybe not. But as simulation tech advances, it gets harder to rule out the possibility. For now the simulation hypothesis is more of a provocation than a theory. It's a useful one, though: it makes you ask what evidence for "base reality" would even look like.

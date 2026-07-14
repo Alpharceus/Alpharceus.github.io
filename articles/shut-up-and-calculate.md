@@ -6,7 +6,7 @@ summary: Physicists are told not to worry about what quantum mechanics means. Bu
 about: Interpretations of quantum mechanics and philosophy of physics
 ---
 
-There's an old joke that the dominant interpretation of quantum mechanics is "shut up and calculate." It's less a philosophy than a productivity hack: the math works, the predictions land to eleven decimal places, so stop asking what it *means* and get back to work.
+There's an old joke that the dominant interpretation of quantum mechanics is "shut up and calculate." It's really a productivity hack: the math works, the predictions land to eleven decimal places, so stop asking what it *means* and get back to work.
 
 I want to push back on that—not because the calculating is wrong, but because the shutting up has a bad track record.
 
@@ -14,7 +14,7 @@ I want to push back on that—not because the calculating is wrong, but because 
 
 Quick tour. Copenhagen says the wavefunction collapses on measurement and asking what happens "underneath" is meaningless. Many-Worlds says nothing ever collapses; every outcome happens, and you're one branch of an endlessly splitting multiverse. Pilot-wave (de Broglie–Bohm) says particles have definite positions all along, guided by a wave. QBism says the wavefunction isn't about the world at all—it's about an observer's beliefs. And there are more.
 
-Here's the uncomfortable part: they all reproduce the same experimental predictions. Which is why "shut up and calculate" feels reasonable. If no experiment can tell them apart, isn't the debate just taste?
+The awkward part: they all reproduce the same experimental predictions. Which is why "shut up and calculate" feels reasonable. If no experiment can tell them apart, isn't the debate just taste?
 
 ## Interpretation Has Cashed Out Before
 
@@ -30,6 +30,6 @@ The interpretations that worry me are the ones engineered to be forever untestab
 
 ## Calculate, But Don't Shut Up
 
-So: calculate, absolutely. The formalism is the most successful predictive structure humans have built. But the history of the field says the meaning-questions aren't decoration—they're where the next formalism comes from. The people who asked "but what is entanglement, really?" didn't slow physics down. They built the twenty-first century's quantum industry.
+So: calculate, absolutely. The formalism is the most successful predictive structure humans have built. But the history of the field says the meaning-questions are where the next formalism tends to come from. The people who asked "but what is entanglement, really?" ended up building the twenty-first century's quantum industry.
 
-The universe doesn't owe us interpretability. But we've profited every time we demanded it anyway.
+The universe doesn't owe us interpretability, but demanding it anyway has paid off every time so far.

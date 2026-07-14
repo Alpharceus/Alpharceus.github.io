@@ -1,14 +1,10 @@
 [
   {
-    "text": "Ethics in astrophysics isn't a limitation; it's an opportunity to make our exploration more just, more inclusive, and more meaningful.",
+    "text": "Asking why we study the cosmos, and for whom, keeps the field honest and keeps the sky something that belongs to everyone, not just to whoever owns the biggest telescope.",
     "source": "astro-ethics"
   },
   {
-    "text": "Even the tiniest microbe from Earth could erase a chapter of Mars' own story.",
-    "source": "astro-ethics"
-  },
-  {
-    "text": "By questioning not just how we study the cosmos, but why and for whom, we ensure that our journey benefits all of humanity—not just those with the biggest telescopes.",
+    "text": "Because if an Earth microbe hitches a ride and we later find life on Mars, we may never be sure it wasn't ours.",
     "source": "astro-ethics"
   },
   {
@@ -16,19 +12,7 @@
     "source": "simulated-universe"
   },
   {
-    "text": "So far, all we've found is more mystery.",
-    "source": "simulated-universe"
-  },
-  {
-    "text": "The simulation hypothesis is less a theory and more a provocation: a reminder that reality is stranger—and more contingent—than we often realize.",
-    "source": "simulated-universe"
-  },
-  {
     "text": "That's not detoxing—that's dehydration with branding.",
-    "source": "media-skeptics-guide"
-  },
-  {
-    "text": "Because fear spreads faster than science. Because \"natural\" sounds safe.",
     "source": "media-skeptics-guide"
   },
   {
@@ -36,39 +20,31 @@
     "source": "media-skeptics-guide"
   },
   {
-    "text": "Updating facts isn't a sign of weakness—it's how knowledge works.",
-    "source": "media-skeptics-guide"
-  },
-  {
     "text": "You don't need a PhD to spot nonsense. Just a bit of logic, a little healthy skepticism, and the courage to say \"uh, that doesn't sound right.\"",
     "source": "media-skeptics-guide"
   },
   {
-    "text": "Stay sharp. Stay curious. And stay out of the clickbait.",
-    "source": "media-skeptics-guide"
-  },
-  {
-    "text": "A definition that updates itself to exclude every counterexample isn't a definition—it's a defense mechanism.",
+    "text": "A definition that keeps updating to exclude every counterexample has stopped being a definition.",
     "source": "does-the-machine-understand"
   },
   {
-    "text": "You infer that I understand things from my behavior. That's all you've ever had.",
+    "text": "You infer that I understand things from my behavior, and that's the only evidence anyone has ever had about another mind.",
     "source": "does-the-machine-understand"
   },
   {
-    "text": "We built a thing that talks before we agreed on what talking means. The machines aren't confused about understanding. We are.",
+    "text": "We built machines that talk before we agreed on what talking means.",
     "source": "does-the-machine-understand"
   },
   {
-    "text": "A galaxy could host millions of civilizations serially and still be silent at any given moment. Loneliness may be less about rarity and more about scheduling.",
+    "text": "A galaxy could host millions of civilizations serially and still be silent at any given moment.",
     "source": "great-silence"
   },
   {
-    "text": "If we're alone—or first—then this planet is carrying the entire observable universe's known supply of meaning, and we are being astonishingly careless with it.",
+    "text": "Loneliness might be a scheduling problem as much as a rarity problem.",
     "source": "great-silence"
   },
   {
-    "text": "The silence is data. We should treat it with the respect we give any measurement: no panic, no mythology, and a much bigger telescope.",
+    "text": "The silence is data. The sensible response is to treat it like any other measurement, and to build a much bigger telescope.",
     "source": "great-silence"
   },
   {
@@ -80,7 +56,7 @@
     "source": "shut-up-and-calculate"
   },
   {
-    "text": "The universe doesn't owe us interpretability. But we've profited every time we demanded it anyway.",
+    "text": "The universe doesn't owe us interpretability, but demanding it anyway has paid off every time so far.",
     "source": "shut-up-and-calculate"
   },
   {
@@ -88,15 +64,11 @@
     "source": "quantum-hype"
   },
   {
-    "text": "Every \"quantum computers will cure cancer by 2027\" headline is a loan taken out against the field's future credibility, and the interest rate is steep.",
+    "text": "\"Within five years\" has been true for twenty years.",
     "source": "quantum-hype"
   },
   {
-    "text": "Fields, like people, are more trustworthy when they can say \"we don't know yet\" out loud.",
-    "source": "quantum-hype"
-  },
-  {
-    "text": "Stay skeptical. Especially of us.",
+    "text": "A field that can say \"we don't know yet\" out loud is easier to trust.",
     "source": "quantum-hype"
   }
 ]
