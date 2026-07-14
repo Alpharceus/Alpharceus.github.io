@@ -3,6 +3,7 @@ id: astro-ethics
 title: Why Ethics Matters in Astrophysics
 date: 2025-06-01
 summary: The universe is a vast laboratory — but does that mean anything goes? On satellite constellations, sacred land, planetary protection, and who astronomy is for.
+about: Ethics in astronomy and space science
 ---
 
 The universe is a vast laboratory—but does that mean anything goes? Let's talk about the ethical frontiers of astronomy and planetary science.

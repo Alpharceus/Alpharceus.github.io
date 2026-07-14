@@ -53,7 +53,7 @@ function formatDate(iso) {
 }
 
 // ---------- article page template ----------
-function articleTemplate({ id, title, date, summary, html }) {
+function articleTemplate({ id, title, date, summary, about, html }) {
   const url = `${SITE}/articles/${id}.html`;
   const jsonld = {
     '@context': 'https://schema.org',
@@ -61,6 +61,7 @@ function articleTemplate({ id, title, date, summary, html }) {
     headline: title,
     datePublished: date,
     description: summary,
+    ...(about ? { about } : {}),
     url,
     author: {
       '@type': 'Person',
@@ -119,7 +120,15 @@ ${html}
 }
 
 // ---------- blog index template ----------
-function blogsIndexTemplate(posts) {
+// Alnitak (philosophy & scicomm pillar):
+//  • Book-open veil — pure overlay on top of fully-rendered content (crawlers
+//    and curl see everything from the first byte); ≤1.5s, click-to-skip,
+//    once per session, auto-skipped under prefers-reduced-motion.
+//  • Quotes on idle — sentences from Raman's own essays surface in the page
+//    MARGINS (never over or adjacent to the cards) after ~5s without any
+//    scroll/pointer/key activity; any interaction fades them immediately.
+//    Wide viewports only (margins must exist). Pool: assets/blog-quotes.json.
+function blogsIndexTemplate(posts, quotes) {
   const cards = posts
     .map(
       (p) => `      <a class="post-card" href="articles/${p.id}.html">
@@ -154,6 +163,17 @@ function blogsIndexTemplate(posts) {
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script type="application/ld+json">
 ${JSON.stringify(jsonld, null, 2)}
+  </script>
+  <script>
+  // veil guard: repeat visitors and reduced-motion users never see the overlay
+  (function () {
+    try {
+      if (sessionStorage.getItem('blogVeilPlayed') ||
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.documentElement.classList.add('no-veil');
+      }
+    } catch (e) { document.documentElement.classList.add('no-veil'); }
+  }());
   </script>
   <style>
     :root { color-scheme: dark; }
@@ -199,9 +219,76 @@ ${JSON.stringify(jsonld, null, 2)}
     .post-card p { color: #b8c1dd; font-size: 0.95rem; line-height: 1.6; margin: 10px 0 8px; }
     .read-more { font-size: 0.85rem; color: #8fb8ff; }
     footer { text-align: center; color: #6b7494; font-size: 0.8rem; padding: 20px; }
+
+    /* ---- book-open veil (index only; pure overlay above real content) ---- */
+    #book-veil {
+      position: fixed; inset: 0; z-index: 60;
+      display: flex; cursor: pointer;
+      perspective: 1600px;
+    }
+    .veil-half {
+      flex: 1; position: relative;
+      transition: transform 1.25s cubic-bezier(0.65, 0, 0.35, 1), opacity 1.25s ease;
+    }
+    .veil-left {
+      background: linear-gradient(105deg, #0c1024 0%, #131a38 70%, #1d2750 100%);
+      transform-origin: right center;
+      border-right: 1px solid rgba(230, 200, 140, 0.35);
+    }
+    .veil-right {
+      background: linear-gradient(255deg, #0c1024 0%, #131a38 70%, #1d2750 100%);
+      transform-origin: left center;
+      border-left: 1px solid rgba(230, 200, 140, 0.35);
+    }
+    .veil-mark {
+      position: absolute; top: 50%; right: 26px;
+      transform: translateY(-50%);
+      color: rgba(230, 200, 140, 0.75); font-size: 1.5rem;
+    }
+    .veil-hint {
+      position: absolute; bottom: 26px; left: 26px;
+      font-size: 0.7rem; letter-spacing: 0.14em;
+      color: rgba(170, 185, 220, 0.55); text-transform: uppercase;
+    }
+    html.veil-open .veil-left { transform: rotateY(78deg); opacity: 0; }
+    html.veil-open .veil-right { transform: rotateY(-78deg); opacity: 0; }
+    html.no-veil #book-veil { display: none; }
+
+    /* ---- quotes on idle (page margins only — never over the cards) ---- */
+    .idle-quote {
+      position: fixed; z-index: 5;
+      width: min(280px, calc((100vw - 900px) / 2 - 40px));
+      opacity: 0; pointer-events: none;
+      transition: opacity 1.4s ease;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-style: italic; font-size: 1.02rem; line-height: 1.7;
+      color: rgba(196, 208, 238, 0.88);
+    }
+    .idle-quote.fast { transition-duration: 0.25s; }
+    .idle-quote.show { opacity: 1; }
+    .idle-quote .q-src {
+      display: block; margin-top: 0.7em;
+      font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-style: normal; font-size: 0.7rem; letter-spacing: 0.08em;
+      color: rgba(130, 145, 185, 0.85);
+    }
+    #quote-left { left: 30px; top: 24vh; }
+    #quote-right { right: 30px; top: 50vh; text-align: right; }
+    /* margins too narrow → no quotes at all (text-over-text is forbidden) */
+    @media (max-width: 1319px) { .idle-quote { display: none; } }
+    @media (prefers-reduced-motion: reduce) { .idle-quote { display: none; } }
   </style>
 </head>
 <body>
+  <div id="book-veil" aria-hidden="true">
+    <div class="veil-half veil-left"><span class="veil-mark">&#10022;</span><span class="veil-hint">click to open</span></div>
+    <div class="veil-half veil-right"></div>
+  </div>
+  <noscript><style>#book-veil { display: none; }</style></noscript>
+
+  <div id="quote-left" class="idle-quote" aria-hidden="true"></div>
+  <div id="quote-right" class="idle-quote" aria-hidden="true"></div>
+
   <header>
     <nav><a href="index.html">&larr; Home</a></nav>
   </header>
@@ -211,9 +298,80 @@ ${JSON.stringify(jsonld, null, 2)}
 ${cards}
   </main>
   <footer>&copy; 2026 Raman Pandey</footer>
+
+  <script>
+  (function () {
+    var docEl = document.documentElement;
+
+    // ---- book-open veil: ≤1.5s, click/key to skip, once per session ----
+    var veil = document.getElementById('book-veil');
+    function endVeil() {
+      docEl.classList.add('no-veil');
+      try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
+    }
+    if (veil && !docEl.classList.contains('no-veil')) {
+      veil.addEventListener('click', endVeil);
+      window.addEventListener('keydown', endVeil, { once: true });
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { docEl.classList.add('veil-open'); });
+      });
+      setTimeout(endVeil, 1500);
+    } else {
+      endVeil();
+    }
+
+    // ---- quotes on idle: my own sentences, margins only ----
+    var QUOTES = __QUOTES_JSON__;
+    var slots = [document.getElementById('quote-left'), document.getElementById('quote-right')];
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) return;
+
+    var idleTimer = null, holdTimer = null, nextTimer = null;
+    var lastIdx = -1, slotFlip = 0;
+
+    function hideQuotes(fast) {
+      slots.forEach(function (s) {
+        if (fast) s.classList.add('fast');
+        s.classList.remove('show');
+        if (fast) setTimeout(function () { s.classList.remove('fast'); }, 300);
+      });
+    }
+
+    function showQuote() {
+      if (window.innerWidth < 1320) { idleTimer = setTimeout(showQuote, 5200); return; }
+      var idx;
+      do { idx = Math.floor(Math.random() * QUOTES.length); }
+      while (QUOTES.length > 1 && idx === lastIdx);
+      lastIdx = idx;
+      var q = QUOTES[idx];
+      var slot = slots[slotFlip % 2];
+      slotFlip++;
+      slot.textContent = '\\u201C' + q.text + '\\u201D';
+      var src = document.createElement('span');
+      src.className = 'q-src';
+      src.textContent = '\\u2014 ' + q.title;
+      slot.appendChild(src);
+      slot.classList.add('show');
+      holdTimer = setTimeout(function () {
+        hideQuotes(false);
+        nextTimer = setTimeout(showQuote, 9000); // keep surfacing while idle
+      }, 8000);
+    }
+
+    function onActivity() {
+      clearTimeout(idleTimer); clearTimeout(holdTimer); clearTimeout(nextTimer);
+      hideQuotes(true); // any interaction fades quotes immediately
+      idleTimer = setTimeout(showQuote, 5200);
+    }
+
+    ['scroll', 'wheel', 'pointermove', 'pointerdown', 'keydown', 'touchstart']
+      .forEach(function (ev) { window.addEventListener(ev, onActivity, { passive: true }); });
+    idleTimer = setTimeout(showQuote, 5200);
+  }());
+  </script>
 </body>
 </html>
-`;
+`.replace('__QUOTES_JSON__', () => JSON.stringify(quotes || []));
 }
 
 // ---------- sitemap ----------
@@ -252,7 +410,7 @@ function main() {
       console.error(`SKIP ${file}: missing title/date front matter`);
       continue;
     }
-    const post = { id, title: meta.title, date: meta.date, summary: meta.summary || '' };
+    const post = { id, title: meta.title, date: meta.date, summary: meta.summary || '', about: meta.about || '' };
     posts.push(post);
     const html = md.render(body);
     fs.writeFileSync(path.join(ARTICLES_DIR, `${id}.html`), articleTemplate({ ...post, html }));
@@ -261,10 +419,24 @@ function main() {
 
   posts.sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  fs.writeFileSync(path.join(ROOT, 'assets', 'blogs.json'), JSON.stringify(posts, null, 2) + '\n');
+  // blogs.json stays a slim index: { id, title, date, summary }
+  const index = posts.map(({ id, title, date, summary }) => ({ id, title, date, summary }));
+  fs.writeFileSync(path.join(ROOT, 'assets', 'blogs.json'), JSON.stringify(index, null, 2) + '\n');
   console.log('built assets/blogs.json');
 
-  fs.writeFileSync(path.join(ROOT, 'blogs.html'), blogsIndexTemplate(posts));
+  // curated idle-quote pool (skipped gracefully if the file is absent)
+  let quotes = [];
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'blog-quotes.json'), 'utf8'));
+    const titleById = Object.fromEntries(posts.map((p) => [p.id, p.title]));
+    quotes = raw
+      .filter((q) => q && q.text)
+      .map((q) => ({ text: q.text, title: titleById[q.source] || 'from the essays' }));
+  } catch (e) {
+    console.warn('no assets/blog-quotes.json — building blogs.html without idle quotes');
+  }
+
+  fs.writeFileSync(path.join(ROOT, 'blogs.html'), blogsIndexTemplate(posts, quotes));
   console.log('built blogs.html');
 
   fs.writeFileSync(path.join(ROOT, 'sitemap.xml'), sitemapTemplate(posts));

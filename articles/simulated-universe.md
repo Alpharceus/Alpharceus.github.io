@@ -3,6 +3,7 @@ id: simulated-universe
 title: Is the Universe a Simulation?
 date: 2025-05-11
 summary: From Nick Bostrom's simulation argument to the limits of physical law — could reality be code?
+about: The simulation hypothesis and philosophy of physics
 ---
 
 From Nick Bostrom's simulation argument to the limits of physical law, we ask: could reality be code?

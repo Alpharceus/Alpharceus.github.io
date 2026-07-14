@@ -1,3 +1,23 @@
+# Changes
+
+## 2026-07-08 — Blog index treatment (Alnitak final)
+
+- **Book-open veil** on `blogs.html` only: the page content is fully in the
+  DOM from the first byte (crawlers see everything); the animation is a pure
+  overlay — two deep-blue "covers" that swing open like a book in ≤1.5s.
+  Click or any key skips it; it plays once per session (sessionStorage) and
+  is auto-skipped under `prefers-reduced-motion` or without JavaScript.
+- **Quotes on idle**: sentences from my own essays (curated pool in
+  `assets/blog-quotes.json`, inlined at build time with essay attribution)
+  surface in the page margins after ~5s without scroll/pointer/key activity,
+  hold, and dissolve. Any interaction fades them immediately. They render
+  only on wide viewports where real margins exist — never over or adjacent
+  to the post cards — and not at all under reduced motion.
+- Article JSON-LD now carries `about` (essay topic) from new front-matter
+  fields on all three essays.
+
+---
+
 # Changes — 2026-07-07
 
 Major overhaul: GEO/SEO baseline, static blog generation, two new pages
