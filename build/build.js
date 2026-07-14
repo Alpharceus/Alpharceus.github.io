@@ -166,9 +166,12 @@ ${JSON.stringify(jsonld, null, 2)}
   </script>
   <script>
   // veil guard: repeat visitors and reduced-motion users never see the overlay
+  // TESTING PHASE: once-per-session is OFF (veil replays every load) — set
+  // VEIL_ONCE_PER_SESSION back to true before launch
+  window.VEIL_ONCE_PER_SESSION = false;
   (function () {
     try {
-      if (sessionStorage.getItem('blogVeilPlayed') ||
+      if ((window.VEIL_ONCE_PER_SESSION && sessionStorage.getItem('blogVeilPlayed')) ||
           window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         document.documentElement.classList.add('no-veil');
       }
@@ -307,7 +310,9 @@ ${cards}
     var veil = document.getElementById('book-veil');
     function endVeil() {
       docEl.classList.add('no-veil');
-      try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
+      if (window.VEIL_ONCE_PER_SESSION) {
+        try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
+      }
     }
     if (veil && !docEl.classList.contains('no-veil')) {
       veil.addEventListener('click', endVeil);
@@ -337,7 +342,12 @@ ${cards}
     var QUOTES = __QUOTES_JSON__;
     var slots = [document.getElementById('quote-left'), document.getElementById('quote-right')];
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) return;
+    if (reduced || !slots[0] || !slots[1] || !QUOTES.length) {
+      console.log('[idle-quotes] disabled: ' + (reduced ? 'prefers-reduced-motion' : 'no slots or empty quote pool'));
+      return;
+    }
+    console.log('[idle-quotes] armed: ' + QUOTES.length + ' quotes; viewport ' +
+      window.innerWidth + 'px (needs >=1320); first quote after 5.2s idle');
 
     var idleTimer = null, holdTimer = null, nextTimer = null;
     var lastIdx = -1, slotFlip = 0;
@@ -351,7 +361,11 @@ ${cards}
     }
 
     function showQuote() {
-      if (window.innerWidth < 1320) { idleTimer = setTimeout(showQuote, 5200); return; }
+      if (window.innerWidth < 1320) {
+        console.log('[idle-quotes] blocked: viewport ' + window.innerWidth + 'px < 1320px — widen/maximize the window');
+        idleTimer = setTimeout(showQuote, 5200);
+        return;
+      }
       var idx;
       do { idx = Math.floor(Math.random() * QUOTES.length); }
       while (QUOTES.length > 1 && idx === lastIdx);
@@ -365,6 +379,7 @@ ${cards}
       src.textContent = '\\u2014 ' + q.title;
       slot.appendChild(src);
       slot.classList.add('show');
+      console.log('[idle-quotes] showing #' + idx + ' in ' + slot.id + ' (holds 8s, next 2.5s after fade)');
       holdTimer = setTimeout(function () {
         hideQuotes(false);
         nextTimer = setTimeout(showQuote, 2500); // keep surfacing while idle
