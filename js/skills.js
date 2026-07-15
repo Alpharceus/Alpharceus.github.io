@@ -1,423 +1,298 @@
 // ============================================================
-// MINTAKA — Skills as a binary MZI splitter tree (photonics pillar)
+// MINTAKA — Skills as an 8-mode rectangular MZI mesh (Clements)
 //
-// One input beam, 5 levels of tunable Mach–Zehnder interferometers
-// (1+2+4+8+16 = 31 nodes), 32 output ports = 32 skills.
-//
-// Each node is an MZI (two 50:50 couplers around an internal phase
-// shifter θ). Its top-output fraction is |U00|² = sin²(θ/2):
-//   θ = π  → 100% up,  θ = π/2 → 50:50,  θ = 0 → 100% down.
-// So dragging the phase shifter physically re-routes the light.
+// Four input channels — one per skill group — feed an 8-mode
+// Mach–Zehnder mesh: 6 columns of couplers with fixed splitting
+// ratios and a phase shifter on each top arm. Light pulses enter
+// on the selected channel's two rails, interfere their way across
+// the lattice, and land on the output ports — each port carries
+// four skills.
 //
 // Interactions:
-//   • drag a node vertically — continuously tune its split
-//   • click a node — cycle 100%↑ / 50:50 / 100%↓
-//   • click a skill (leaf) — animate the phase shifters level by
-//     level so ALL the light routes to that one port
+//   • click a channel button — inject light on that input
+//   • otherwise the mesh auto-cycles through the channels
 // ============================================================
 
 (function () {
     "use strict";
 
-    // ---------- skills (32 leaves, in tree order) ----------
+    // ---------- skill groups (channel order = input rail pairs) ----------
     var GROUPS = [
-        { name: "Hardware", color: [255, 190, 77] },
-        { name: "Quantum", color: [95, 216, 232] },
-        { name: "Software", color: [126, 227, 154] },
-        { name: "ML & Data", color: [180, 154, 255] }
+        { name: "Hardware", rgb: [255, 190, 77] },
+        { name: "Quantum", rgb: [95, 216, 232] },
+        { name: "Software", rgb: [126, 227, 154] },
+        { name: "ML & Data", rgb: [180, 154, 255] }
     ];
 
+    // rail r carries SKILLS[r*4 .. r*4+3]; group of rail r = r >> 1
     var SKILLS = [
-        // Hardware (0–7)
+        // Hardware (rails 0–1)
         "FPGA design (VHDL)", "Verilog & RTL", "Embedded & microcontrollers", "Digital electronics",
         "Analog electronics", "Lab instrumentation", "LabVIEW", "PCB & prototyping",
-        // Quantum (8–15)
+        // Quantum (rails 2–3)
         "Photonic quantum computing", "GBS systems", "MZI interferometry", "Single-photon detection",
         "Qiskit", "Quantum error correction", "Quantum simulation", "Quantum optics",
-        // Software (16–23)
+        // Software (rails 4–5)
         "Python", "C & low-level", "JavaScript & creative coding", "Django & REST APIs",
         "Node.js", "MATLAB", "R & statistics", "Linux & shell",
-        // ML & Data (24–31)
+        // ML & Data (rails 6–7)
         "TensorFlow & deep learning", "Graph neural networks", "Computer vision (OpenCV)", "NLP & language modeling",
         "Local LLMs & agents", "Signal processing", "Scientific computing", "Data viz & dashboards"
     ];
 
-    var LEVELS = 5;               // tree depth
-    var N_LEAVES = 32;            // 2^LEVELS
-    var HALF_PI = Math.PI / 2;
+    // ---------- geometry (logical px; canvas backing store is 2x) ----------
+    var W = 1040, RAILS = 8, COLS = 6;
+    var TOP_PAD = 46, RAIL_GAP = 54;
+    var H = TOP_PAD * 2 + (RAILS - 1) * RAIL_GAP; // 470 — matches height=940 (2x)
+    var IN_X = 34;        // input markers / rail start
+    var MESH_L = 64;      // first coupler column offset base
+    var MESH_R = 776;     // output ports
+    var LABEL_X = 806;    // skill labels
 
-    function groupOf(leaf) { return GROUPS[Math.floor(leaf / 8)]; }
+    var railY0 = [];
+    for (var i = 0; i < RAILS; i++) railY0.push(TOP_PAD + i * RAIL_GAP);
 
-    // ---------- nodes ----------
-    // nodes[level][k], level 0..4, k 0..2^level-1
-    var nodes = [];
-    for (var L = 0; L < LEVELS; L++) {
-        nodes.push([]);
-        for (var k = 0; k < (1 << L); k++) {
-            nodes[L].push({ theta: HALF_PI, level: L, k: k, x: 0, y: 0 });
+    // Clements arrangement: alternating even/odd coupler pairings,
+    // fixed pseudo-random splitting ratios
+    var cols = [];
+    var colSpan = (MESH_R - MESH_L - 140) / (COLS - 1);
+    for (var j = 0; j < COLS; j++) {
+        var pairs = (j % 2 === 0)
+            ? [[0, 1], [2, 3], [4, 5], [6, 7]]
+            : [[1, 2], [3, 4], [5, 6]];
+        var ratios = [];
+        for (var q = 0; q < pairs.length; q++) {
+            ratios.push(0.5 + 0.42 * Math.sin(j * 2.7 + pairs[q][0] * 1.9 + 0.6));
         }
+        cols.push({ xc: MESH_L + 70 + j * colSpan, pairs: pairs, ratios: ratios });
     }
 
-    function topFrac(theta) {
-        var s = Math.sin(theta / 2);
-        return s * s; // |U00|² of BS·P(θ)·BS
-    }
+    // waveguides converge toward each coupler they take part in
+    var CONV_HALF = 40, CONV_FLAT = 22, CONV_OFF = 20;
 
-    // intensity arriving AT node (L,k); root gets 1
-    function nodeIntensity(L, k) {
-        var I = 1;
-        for (var lev = 0; lev < L; lev++) {
-            var parentK = k >> (L - lev);
-            var childDir = (k >> (L - lev - 1)) & 1; // 0 = top branch
-            var f = topFrac(nodes[lev][parentK].theta);
-            I *= (childDir === 0) ? f : (1 - f);
+    function railY(rail, x) {
+        var y = railY0[rail];
+        for (var c = 0; c < cols.length; c++) {
+            var col = cols[c];
+            var dx = Math.abs(x - col.xc);
+            if (dx >= CONV_HALF) continue;
+            for (var k = 0; k < col.pairs.length; k++) {
+                var a = col.pairs[k][0], b = col.pairs[k][1];
+                if (rail !== a && rail !== b) continue;
+                var t = dx <= CONV_FLAT ? 1 : (CONV_HALF - dx) / (CONV_HALF - CONV_FLAT);
+                y += (rail === a) ? CONV_OFF * t : -CONV_OFF * t;
+            }
         }
-        return I;
+        return y;
     }
 
-    function leafIntensity(leaf) {
-        // leaf behaves like a "node" at level LEVELS
-        var I = 1;
-        for (var lev = 0; lev < LEVELS; lev++) {
-            var parentK = leaf >> (LEVELS - lev);
-            var childDir = (leaf >> (LEVELS - lev - 1)) & 1;
-            var f = topFrac(nodes[lev][parentK].theta);
-            I *= (childDir === 0) ? f : (1 - f);
-        }
-        return I;
-    }
-
-    // ---------- canvas ----------
+    // ---------- state ----------
     var canvas = document.getElementById("mzi-canvas");
     var ctx = canvas.getContext("2d");
-    var W = 0, H = 0, DPR = 1;
     var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    var LABEL_ZONE = 200;   // px reserved for skill labels on the right
-    var LEFT_PAD = 26;
-    var TOP_PAD = 16;
-    var leafGap = 24;
+    var cat = 0;                          // active input channel
+    var parts = [];                       // light pulses in flight
+    var out = new Array(RAILS).fill(0);   // output port glow levels
+    var lastSpawn = 0, holdUntil = 0, nextCycle = 5200, lastTs = 0;
 
-    var NODE_W = 20, NODE_H = 26;
+    var buttons = Array.prototype.slice.call(
+        document.querySelectorAll("#channel-row .ch-btn"));
 
-    function layout() {
-        var treeW = W - LABEL_ZONE - LEFT_PAD - 10;
-        var colW = treeW / LEVELS;
-        for (var L = 0; L < LEVELS; L++) {
-            for (var k = 0; k < nodes[L].length; k++) {
-                var span = 1 << (LEVELS - L);       // leaves under this node
-                var centerLeaf = k * span + span / 2;
-                nodes[L][k].x = LEFT_PAD + (L + 0.35) * colW;
-                nodes[L][k].y = TOP_PAD + centerLeaf * leafGap;
-            }
+    function rgba(c, a) {
+        return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")";
+    }
+
+    function setCat(i, manual) {
+        cat = i;
+        for (var b = 0; b < buttons.length; b++) {
+            var on = b === i;
+            buttons[b].classList.toggle("active", on);
+            buttons[b].style.borderColor = on ? rgba(GROUPS[b].rgb, 1) : "";
+            buttons[b].style.color = on ? rgba(GROUPS[b].rgb, 1) : "";
         }
+        if (manual) holdUntil = performance.now() + 15000;
+        if (reducedMotion) drawFrame();
     }
 
-    function leafX() { return W - LABEL_ZONE - 4; }
-    function leafY(i) { return TOP_PAD + (i + 0.5) * leafGap; }
+    buttons.forEach(function (btn, i) {
+        btn.addEventListener("click", function () { setCat(i, true); });
+    });
 
-    function resize() {
-        DPR = window.devicePixelRatio || 1;
-        var scroll = document.getElementById("mesh-scroll");
-        var cssW = Math.max(680, scroll.getBoundingClientRect().width - 20);
-        var cssH = TOP_PAD * 2 + N_LEAVES * leafGap;
-        canvas.style.width = cssW + "px";
-        canvas.style.height = cssH + "px";
-        canvas.width = Math.round(cssW * DPR);
-        canvas.height = Math.round(cssH * DPR);
-        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        W = cssW; H = cssH;
-        layout();
-    }
+    // ---------- simulation ----------
+    var SPEED = 2.6; // logical px per 16.7 ms
 
-    // ---------- route animation ----------
-    // anims: [{ node, from, to, start, dur }]
-    var anims = [];
-    var highlightLeaf = null;
+    function step(ts) {
+        var dt = lastTs ? Math.min(50, ts - lastTs) : 16.7;
+        lastTs = ts;
+        var adv = SPEED * dt / 16.7;
 
-    function routeToLeaf(leaf) {
-        anims = [];
-        highlightLeaf = leaf;
-        var now = performance.now();
-        for (var lev = 0; lev < LEVELS; lev++) {
-            var k = leaf >> (LEVELS - lev);
-            var childDir = (leaf >> (LEVELS - lev - 1)) & 1; // 0 → top → θ=π
-            var node = nodes[lev][k];
-            var target = childDir === 0 ? Math.PI : 0;
-            anims.push({
-                node: node,
-                from: node.theta,
-                to: target,
-                start: now + lev * 220,   // cascade level by level
-                dur: reducedMotion ? 0 : 650
-            });
-        }
-    }
-
-    function easeInOut(t) {
-        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    }
-
-    function stepAnims(now) {
-        for (var i = anims.length - 1; i >= 0; i--) {
-            var a = anims[i];
-            if (now < a.start) continue;
-            var t = a.dur === 0 ? 1 : Math.min(1, (now - a.start) / a.dur);
-            a.node.theta = a.from + (a.to - a.from) * easeInOut(t);
-            if (t >= 1) anims.splice(i, 1);
-        }
-    }
-
-    // ---------- drawing ----------
-    function edgePath(x1, y1, x2, y2) {
-        var mx = (x1 + x2) / 2;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.bezierCurveTo(mx, y1, mx, y2, x2, y2);
-    }
-
-    function drawEdge(x1, y1, x2, y2, I, tint) {
-        // dark guide
-        ctx.strokeStyle = "rgba(55, 80, 115, 0.55)";
-        ctx.lineWidth = 2.6;
-        edgePath(x1, y1, x2, y2);
-        ctx.stroke();
-        // light
-        if (I > 0.003) {
-            var c = tint || [110, 230, 255];
-            ctx.strokeStyle = "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + Math.min(1, 0.12 + 0.95 * I) + ")";
-            ctx.lineWidth = 1.6 + 2.2 * I;
-            ctx.shadowColor = "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0.9)";
-            ctx.shadowBlur = 16 * I;
-            edgePath(x1, y1, x2, y2);
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-        }
-    }
-
-    function pointOnEdge(x1, y1, x2, y2, t) {
-        // cubic bezier with control points (mx,y1),(mx,y2)
-        var mx = (x1 + x2) / 2;
-        var u = 1 - t;
-        var x = u * u * u * x1 + 3 * u * u * t * mx + 3 * u * t * t * mx + t * t * t * x2;
-        var y = u * u * u * y1 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y2;
-        return { x: x, y: y };
-    }
-
-    function drawNode(node) {
-        var x = node.x, y = node.y;
-        var f = topFrac(node.theta);
-        var I = nodeIntensity(node.level, node.k);
-
-        // body
-        ctx.fillStyle = "rgba(14, 24, 44, 0.94)";
-        ctx.strokeStyle = I > 0.02
-            ? "rgba(120, 190, 235, " + (0.35 + 0.5 * I) + ")"
-            : "rgba(90, 120, 160, 0.35)";
-        ctx.lineWidth = 1;
-        roundRect(x - NODE_W / 2, y - NODE_H / 2, NODE_W, NODE_H, 5);
-        ctx.fill();
-        ctx.stroke();
-
-        // heater bar (the phase shifter): position slides with split ratio
-        var barY = y + (0.5 - f) * (NODE_H - 10); // f=1 → top, f=0 → bottom
-        var heat = node.theta / Math.PI;
-        ctx.fillStyle = "rgba(255, 150, 70, " + (0.35 + 0.6 * heat) + ")";
-        ctx.shadowColor = "rgba(255, 140, 60, 0.9)";
-        ctx.shadowBlur = 8 * heat * Math.max(0.25, I);
-        roundRect(x - NODE_W / 2 + 3, barY - 2.5, NODE_W - 6, 5, 2.5);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // split readout (top %) — only when carrying light
-        if (I > 0.02) {
-            ctx.fillStyle = "rgba(170, 215, 245, " + (0.4 + 0.5 * I) + ")";
-            ctx.font = "600 8px 'JetBrains Mono', monospace";
-            ctx.textAlign = "center";
-            ctx.fillText(Math.round(f * 100) + "%", x, y - NODE_H / 2 - 4);
-        }
-    }
-
-    function roundRect(x, y, w, h, r) {
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + h, r);
-        ctx.arcTo(x + w, y + h, x, y + h, r);
-        ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
-        ctx.closePath();
-    }
-
-    function childPos(L, k, dir) {
-        // position of child (top: dir=0, bottom: dir=1) of node (L,k)
-        if (L === LEVELS - 1) {
-            var leaf = k * 2 + dir;
-            return { x: leafX(), y: leafY(leaf), leaf: leaf };
-        }
-        var n = nodes[L + 1][k * 2 + dir];
-        return { x: n.x - NODE_W / 2, y: n.y, leaf: null };
-    }
-
-    var photonPhase = 0;
-
-    function drawFrame(now) {
-        stepAnims(now || performance.now());
-        ctx.clearRect(0, 0, W, H);
-
-        // input stub
-        var root = nodes[0][0];
-        drawEdge(6, root.y, root.x - NODE_W / 2, root.y, 1);
-        ctx.fillStyle = "rgba(140, 240, 255, 0.9)";
-        ctx.font = "600 10px 'JetBrains Mono', monospace";
-        ctx.textAlign = "left";
-        ctx.fillText("LIGHT IN →", 6, root.y - 10);
-
-        // edges (parent → children), leaves tinted by group
-        for (var L = 0; L < LEVELS; L++) {
-            for (var k = 0; k < nodes[L].length; k++) {
-                var node = nodes[L][k];
-                var I = nodeIntensity(L, k);
-                var f = topFrac(node.theta);
-                for (var dir = 0; dir < 2; dir++) {
-                    var child = childPos(L, k, dir);
-                    var branchI = I * (dir === 0 ? f : 1 - f);
-                    var tint = child.leaf !== null ? groupOf(child.leaf).color : null;
-                    drawEdge(node.x + NODE_W / 2, node.y, child.x, child.y, branchI, tint);
-                }
-            }
+        if (ts > nextCycle && ts > holdUntil) {
+            nextCycle = ts + 5200;
+            setCat((cat + 1) % GROUPS.length, false);
         }
 
-        // photons along bright branches
-        if (!reducedMotion) {
-            photonPhase = (photonPhase + 0.012) % 1;
-            for (var L2 = 0; L2 < LEVELS; L2++) {
-                for (var k2 = 0; k2 < nodes[L2].length; k2++) {
-                    var nd = nodes[L2][k2];
-                    var I2 = nodeIntensity(L2, k2);
-                    var f2 = topFrac(nd.theta);
-                    for (var d2 = 0; d2 < 2; d2++) {
-                        var bI = I2 * (d2 === 0 ? f2 : 1 - f2);
-                        if (bI < 0.03) continue;
-                        var ch = childPos(L2, k2, d2);
-                        var tt = (photonPhase + (L2 * 0.13 + k2 * 0.07 + d2 * 0.31)) % 1;
-                        var p = pointOnEdge(nd.x + NODE_W / 2, nd.y, ch.x, ch.y, tt);
-                        ctx.fillStyle = "rgba(220, 250, 255, " + Math.min(1, 0.3 + bI) + ")";
-                        ctx.shadowColor = "rgba(150, 240, 255, 1)";
-                        ctx.shadowBlur = 7;
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, 1.4 + 1.8 * bI, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.shadowBlur = 0;
+        if (ts - lastSpawn > 1050) {
+            lastSpawn = ts;
+            var rgb = GROUPS[cat].rgb;
+            parts.push({ rail: cat * 2, x: IN_X + 8, inten: 1, rgb: rgb });
+            parts.push({ rail: cat * 2 + 1, x: IN_X, inten: 0.85, rgb: rgb });
+        }
+
+        var next = [];
+        for (var n = 0; n < parts.length; n++) {
+            var p = parts[n];
+            var prevX = p.x;
+            p.x += adv;
+            for (var c = 0; c < cols.length; c++) {
+                var col = cols[c];
+                if (prevX < col.xc && p.x >= col.xc) {
+                    for (var k = 0; k < col.pairs.length; k++) {
+                        var a = col.pairs[k][0], b = col.pairs[k][1];
+                        if (p.rail !== a && p.rail !== b) continue;
+                        var cr = col.ratios[k];
+                        var other = p.rail === a ? b : a;
+                        var iCross = p.inten * cr, iStay = p.inten * (1 - cr);
+                        if (iCross > 0.05 && iStay > 0.05 && parts.length + next.length < 220) {
+                            p.inten = iStay;
+                            next.push({ rail: other, x: p.x, inten: iCross, rgb: p.rgb });
+                        } else if (iCross > iStay) { p.rail = other; p.inten = iCross; }
+                        else { p.inten = iStay; }
+                        break;
                     }
                 }
             }
+            if (p.x >= MESH_R) out[p.rail] = Math.min(1.4, out[p.rail] + p.inten);
         }
+        parts = parts.concat(next).filter(function (p) {
+            return p.x < MESH_R && p.inten > 0.03;
+        });
+        var decay = Math.pow(0.965, dt / 16.7);
+        for (var r = 0; r < RAILS; r++) out[r] *= decay;
+    }
 
-        // nodes on top of edges
-        for (var L3 = 0; L3 < LEVELS; L3++) {
-            for (var k3 = 0; k3 < nodes[L3].length; k3++) drawNode(nodes[L3][k3]);
-        }
+    // ---------- drawing ----------
+    function drawFrame() {
+        ctx.setTransform(2, 0, 0, 2, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        ctx.clearRect(0, 0, W, H);
 
-        // leaves: port dot + label, brightness ∝ intensity, tinted by group
-        for (var leaf = 0; leaf < N_LEAVES; leaf++) {
-            var Il = leafIntensity(leaf);
-            var gx = leafX(), gy = leafY(leaf);
-            var col = groupOf(leaf).color;
-            var isHi = leaf === highlightLeaf;
-
-            ctx.fillStyle = "rgba(" + col[0] + "," + col[1] + "," + col[2] + "," + (0.15 + 0.85 * Il) + ")";
-            ctx.shadowColor = "rgba(" + col[0] + "," + col[1] + "," + col[2] + ",0.9)";
-            ctx.shadowBlur = 18 * Il + (isHi ? 6 : 0);
+        // rails
+        ctx.strokeStyle = "rgba(130, 160, 210, 0.28)";
+        ctx.lineWidth = 1.4;
+        for (var r = 0; r < RAILS; r++) {
             ctx.beginPath();
-            ctx.arc(gx, gy, 3 + 4 * Il, 0, Math.PI * 2);
+            ctx.moveTo(IN_X, railY(r, IN_X));
+            for (var x = IN_X + 4; x <= MESH_R + 6; x += 4) ctx.lineTo(x, railY(r, x));
+            ctx.stroke();
+        }
+
+        // couplers + phase shifters
+        for (var c = 0; c < cols.length; c++) {
+            var col = cols[c];
+            for (var k = 0; k < col.pairs.length; k++) {
+                var a = col.pairs[k][0], b = col.pairs[k][1];
+                var yTop = railY0[a] + CONV_OFF, yBot = railY0[b] - CONV_OFF;
+                ctx.strokeStyle = "rgba(170, 200, 255, 0.5)";
+                ctx.lineWidth = 2;
+                for (var side = -1; side <= 1; side += 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(col.xc + side * 15, yTop);
+                    ctx.lineTo(col.xc + side * 15, yBot);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = "rgba(170, 200, 255, 0.35)";
+                ctx.fillRect(col.xc - 6, yTop - 2.5, 12, 5);
+            }
+        }
+
+        // light pulses (trail + glowing head)
+        for (var n = 0; n < parts.length; n++) {
+            var p = parts[n];
+            var y = railY(p.rail, p.x);
+            var x0 = Math.max(IN_X, p.x - 15);
+            ctx.globalAlpha = Math.min(1, 0.25 + p.inten);
+            ctx.strokeStyle = rgba(p.rgb, 1);
+            ctx.lineWidth = 0.8 + 2.4 * p.inten;
+            ctx.beginPath();
+            ctx.moveTo(x0, railY(p.rail, x0));
+            ctx.lineTo(p.x, y);
+            ctx.stroke();
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = rgba(p.rgb, 1);
+            ctx.fillStyle = rgba(p.rgb, 1);
+            ctx.beginPath();
+            ctx.arc(p.x, y, 2 + 2.5 * Math.sqrt(p.inten), 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
-
-            var alpha = 0.38 + 0.62 * Math.min(1, Il * 2.2);
-            ctx.fillStyle = isHi
-                ? "rgba(255,255,255,0.98)"
-                : "rgba(" + (155 + col[0] * 0.35) + "," + (165 + col[1] * 0.3) + "," + (190 + col[2] * 0.25) + "," + alpha + ")";
-            ctx.font = (isHi ? "700 " : "400 ") + "10.5px 'JetBrains Mono', monospace";
-            ctx.textAlign = "left";
-            var pct = Il >= 0.005 ? "  " + (Il >= 0.995 ? "100" : (Il * 100).toFixed(Il < 0.095 ? 1 : 0)) + "%" : "";
-            ctx.fillText(SKILLS[leaf] + pct, gx + 10, gy + 3.5);
         }
 
-        requestAnimationFrame(drawFrame);
-    }
+        // output port glows
+        for (var r2 = 0; r2 < RAILS; r2++) {
+            var g = out[r2];
+            if (g < 0.02) continue;
+            ctx.globalAlpha = Math.min(1, g);
+            ctx.fillStyle = rgba(GROUPS[cat].rgb, 1);
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath();
+            ctx.arc(MESH_R + 4, railY0[r2], 3 + 5 * g, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
 
-    // ---------- interaction ----------
-    var drag = null; // { node, startY, startTheta, moved }
+        // input markers on the active channel's rails
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = rgba(GROUPS[cat].rgb, 1);
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.fillStyle;
+        for (var d = 0; d < 2; d++) {
+            ctx.beginPath();
+            ctx.arc(IN_X - 10, railY0[cat * 2 + d], 3.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
 
-    function canvasPos(e) {
-        var r = canvas.getBoundingClientRect();
-        return { x: e.clientX - r.left, y: e.clientY - r.top };
-    }
-
-    function hitNode(p) {
-        for (var L = 0; L < LEVELS; L++) {
-            for (var k = 0; k < nodes[L].length; k++) {
-                var n = nodes[L][k];
-                // generous hit box (≥40px tall)
-                if (Math.abs(p.x - n.x) < 20 && Math.abs(p.y - n.y) < Math.max(20, leafGap * 0.9)) {
-                    return n;
+        // output skill labels — four per port, active group tinted
+        ctx.textAlign = "left";
+        for (var r3 = 0; r3 < RAILS; r3++) {
+            var group = GROUPS[r3 >> 1];
+            var active = (r3 >> 1) === cat;
+            var glow = Math.min(1, out[r3]);
+            for (var s = 0; s < 4; s++) {
+                var yl = railY0[r3] + (s - 1.5) * 12.5 + 3.5;
+                var alpha = Math.min(1, (active ? 0.85 : 0.4) + 0.4 * glow);
+                if (active) {
+                    ctx.fillStyle = rgba(group.rgb, alpha);
+                    ctx.font = "500 10.5px 'IBM Plex Mono', monospace";
+                } else {
+                    ctx.fillStyle = "rgba(139, 150, 171, " + alpha + ")";
+                    ctx.font = "400 10.5px 'IBM Plex Mono', monospace";
                 }
+                ctx.fillText(SKILLS[r3 * 4 + s], LABEL_X, yl);
             }
         }
-        return null;
     }
-
-    function hitLeaf(p) {
-        if (p.x < leafX() - 14) return null;
-        var i = Math.floor((p.y - TOP_PAD) / leafGap);
-        return (i >= 0 && i < N_LEAVES) ? i : null;
-    }
-
-    canvas.addEventListener("pointerdown", function (e) {
-        var p = canvasPos(e);
-        var n = hitNode(p);
-        if (n) {
-            anims = [];           // manual control cancels any running route
-            highlightLeaf = null;
-            drag = { node: n, startY: p.y, startTheta: n.theta, moved: false };
-            canvas.setPointerCapture(e.pointerId);
-            e.preventDefault();
-        }
-    });
-
-    canvas.addEventListener("pointermove", function (e) {
-        var p = canvasPos(e);
-        if (drag) {
-            var dy = drag.startY - p.y;        // drag up → more light up
-            if (Math.abs(dy) > 3) drag.moved = true;
-            drag.node.theta = Math.max(0, Math.min(Math.PI, drag.startTheta + dy * 0.02));
-            return;
-        }
-        canvas.style.cursor = (hitNode(p) || hitLeaf(p) !== null) ? "pointer" : "default";
-    });
-
-    function endPointer(e) {
-        if (drag) {
-            if (!drag.moved) {
-                // click: cycle ↑ (π) → 50:50 (π/2) → ↓ (0) → ↑ …
-                var th = drag.node.theta;
-                if (th > Math.PI * 0.75) drag.node.theta = HALF_PI;
-                else if (th > Math.PI * 0.25) drag.node.theta = 0;
-                else drag.node.theta = Math.PI;
-            }
-            drag = null;
-            return;
-        }
-        var p = canvasPos(e);
-        var leaf = hitLeaf(p);
-        if (leaf !== null) routeToLeaf(leaf);
-    }
-
-    canvas.addEventListener("pointerup", endPointer);
-    canvas.addEventListener("pointercancel", function () { drag = null; });
 
     // ---------- boot ----------
-    resize();
-    window.addEventListener("resize", resize);
-    requestAnimationFrame(drawFrame);
+    function loop(ts) {
+        step(ts);
+        drawFrame();
+        requestAnimationFrame(loop);
+    }
+
+    setCat(0, false);
+    if (reducedMotion) {
+        drawFrame(); // static mesh; channel clicks re-highlight labels
+    } else {
+        requestAnimationFrame(loop);
+    }
+
+    // canvas text renders before webfonts arrive — redraw once they do
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+            if (reducedMotion) drawFrame();
+        });
+    }
 })();

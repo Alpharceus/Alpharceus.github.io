@@ -2,3 +2,6 @@ node_modules/
 
 # private planning doc — this repo deploys publicly to ramanpandey.com
 website-completion-plan.md
+
+# local design mocks — reference only, never deploy
+*.dc.html
