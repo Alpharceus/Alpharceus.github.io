@@ -147,7 +147,7 @@ function initBlochSphere() {
 
         // Labels
         ctx.fillStyle = "#e5e7eb";
-        ctx.font = "12px 'JetBrains Mono', monospace";
+        ctx.font = "12px 'IBM Plex Mono', monospace";
         ctx.textAlign = "center";
 
         function label(text, x, y, z) {
@@ -212,7 +212,7 @@ function initBlochSphere() {
             // |r| readout
             const r = Math.sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
             ctx.fillStyle = "#fbbf24";
-            ctx.font = "12px 'JetBrains Mono', monospace";
+            ctx.font = "12px 'IBM Plex Mono', monospace";
             ctx.textAlign = "left";
             ctx.fillText(`q${blochState.selected}  |r| = ${r.toFixed(2)}`, 10, canvas.height - 12);
         }

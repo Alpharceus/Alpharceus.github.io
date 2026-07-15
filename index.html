@@ -50,7 +50,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/terminal.css">
@@ -79,37 +79,67 @@
       <div class="logo">Raman Pandey</div>
       <ul class="site-nav">
         <li><a href="about/">About</a></li>
-        <li><a href="projects.html">Projects</a></li>
-        <li><a href="papers.html">Papers</a></li>
       </ul>
     </nav>
   </header>
 
   <!-- Main Landing Section / Star Map -->
   <main>
+    <!-- Static site summary: the full picture of who Raman is and what lives on this
+         site, readable without JavaScript (crawlers and LLMs never see the star map).
+         Visually hidden while the interactive map is shown; the <noscript> style below
+         reveals it when JS is off. Same progressive-reveal rationale as the header. -->
+    <section id="site-summary" aria-label="Site overview">
+      <h1>Raman Pandey — Quantum Computing &amp; Photonics Researcher</h1>
+      <p>
+        Graduate research assistant at the Center for High Technology Materials (CHTM),
+        University of New Mexico, advised by Prof. Marek Osinski. I work on
+        systems-level engineering for quantum computing applications of photonics —
+        control, timing, and readout in a Gaussian boson sampling (GBS) system:
+        electrically driven quantum-dot emitters, an electrically tuned MZI mesh
+        (a tunable photonic unitary), FPGA readout, and dynamic SPAD biasing.
+        Broader interests: quantum error correction and machine learning for
+        quantum systems.
+      </p>
+      <p>
+        This page renders an interactive star map of the Orion constellation — each
+        star is one pillar of the work. Everything on the site, in plain links:
+      </p>
+      <ul>
+        <li><a href="about/">About / FAQ</a> — who I am, research interests, tools, and academic goals.</li>
+        <li><a href="projects.html">Projects</a> — GBS system architecture, FPGA readout for single-photon
+            detectors, deep-learning-assisted quantum fabrication with graph neural networks, a Django
+            scheduling platform for UNM IT, and more, with posters and artifacts.</li>
+        <li><a href="skills.html">Skills</a> — 32 skills across hardware, quantum, software, and machine
+            learning, rendered as an 8-mode Mach&ndash;Zehnder interferometer mesh.</li>
+        <li><a href="papers.html">Papers</a> — journal publications (none yet; conference papers and
+            posters live on the projects page).</li>
+        <li><a href="blogs.html">Blog</a> — essays on physics, computing, AI, and science communication.</li>
+        <li><a href="now/">Now</a> — what I'm working on this quarter, as a mission-control console.</li>
+        <li><a href="rigel.html">Rigel</a> — an interactive quantum circuit simulator with a live Bloch sphere.</li>
+        <li><a href="https://github.com/Alpharceus">GitHub</a> · <a href="https://linkedin.com/in/alpha-arceus">LinkedIn</a></li>
+      </ul>
+    </section>
     <noscript>
-      <div style="max-width:640px;margin:15vh auto;padding:0 24px;font-family:sans-serif;color:#dde3f5;">
-        <h1>Raman Pandey</h1>
-        <p>
-          Graduate research assistant at the Center for High Technology Materials,
-          University of New Mexico, advised by Prof. Marek Osinski. I work on
-          systems-level engineering for photonic quantum computing — FPGA-based
-          control, timing, and readout — with broader interests in quantum error
-          correction and machine learning for quantum systems.
-        </p>
-        <p>This site is an interactive star map of Orion; without JavaScript, use these links:</p>
-        <ul>
-          <li><a href="about/">About / FAQ</a></li>
-          <li><a href="projects.html">Projects</a></li>
-          <li><a href="papers.html">Papers</a></li>
-          <li><a href="skills.html">Skills</a></li>
-          <li><a href="blogs.html">Blog</a></li>
-          <li><a href="now/">What I'm working on now</a></li>
-          <li><a href="rigel.html">Interactive quantum circuit &amp; Bloch sphere demo</a></li>
-          <li><a href="https://github.com/Alpharceus">GitHub</a></li>
-          <li><a href="https://linkedin.com/in/alpha-arceus">LinkedIn</a></li>
-        </ul>
-      </div>
+      <style>
+        #intro-overlay, #skip-intro { display: none !important; }
+        #site-summary {
+          position: static;
+          width: auto;
+          height: auto;
+          overflow: visible;
+          clip: auto;
+          clip-path: none;
+          white-space: normal;
+          max-width: 680px;
+          margin: 12vh auto;
+          padding: 0 24px;
+          font-family: 'Space Grotesk', sans-serif;
+          color: #dde3f5;
+          line-height: 1.55;
+        }
+        #site-summary a { color: #70bfff; }
+      </style>
     </noscript>
   </main>
 

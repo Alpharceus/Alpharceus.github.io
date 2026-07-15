@@ -623,7 +623,7 @@ function drawBetelgeuseCTA() {
         let cursorBlink = (millis() % 1000) < 500;
 
         push();
-        textFont('Space Mono, monospace');
+        textFont('IBM Plex Mono, monospace');
         textSize(14);
         textAlign(CENTER, TOP);
 
@@ -666,7 +666,7 @@ function drawBetelgeuseHint(cycleT) {
 
     noStroke();
     fill(255, 180, 100, alpha);
-    textFont('Space Mono, monospace');
+    textFont('IBM Plex Mono, monospace');
     textSize(11);
     textAlign(CENTER, TOP);
     text("✦ start here", bx, by + 40);
@@ -737,7 +737,7 @@ function drawOrionFlat(scale) {
         rect(mouseX + 16, mouseY - 32, 220, 60, 12);
         noStroke();
         fill(255, 255, 240);
-        textFont('Inter, sans-serif');
+        textFont('Space Grotesk, sans-serif');
         textSize(16);
         textStyle(BOLD);
         text(hoveredStar.name, mouseX + 26, mouseY - 12);

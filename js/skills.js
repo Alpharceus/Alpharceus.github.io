@@ -111,7 +111,10 @@
             buttons[b].style.borderColor = on ? rgba(GROUPS[b].rgb, 1) : "";
             buttons[b].style.color = on ? rgba(GROUPS[b].rgb, 1) : "";
         }
-        if (manual) holdUntil = performance.now() + 15000;
+        if (manual) {
+            holdUntil = performance.now() + 15000;
+            lastSpawn = -1e9; // fire a pulse on the next frame, not up to ~1s later
+        }
         if (reducedMotion) drawFrame();
     }
 
