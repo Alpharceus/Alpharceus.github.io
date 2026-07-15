@@ -15,7 +15,7 @@
 #terminal-window {
     background: #111;
     color: #c8f7c5;
-    font-family: "Fira Mono", "Consolas", "Monaco", monospace;
+    font-family: "IBM Plex Mono", "Fira Mono", "Consolas", "Monaco", monospace;
     border-radius: 14px;
     box-shadow: 0 2px 48px #000b;
     min-width: 460px;

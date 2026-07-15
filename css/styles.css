@@ -1,3 +1,10 @@
+body {
+    font-family: 'Space Grotesk', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    /* the star-map canvas normally paints the backdrop; this keeps the no-JS
+       summary (light text) readable instead of light-on-white */
+    background: #05070d;
+}
+
 /* ====== SITE HEADER / FOOTER (float above the star-map canvas, z-index 100) ======
    Hidden (opacity 0) while the intro animation plays, revealed via body.intro-done.
    The links remain in the DOM throughout (mirrored in <noscript>), so this is a
@@ -30,7 +37,7 @@ body:not(.intro-done) ul.site-nav {
 }
 
 .site-header .logo {
-    font-family: 'Space Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace;
     font-size: 1.05rem;
     letter-spacing: 0.14em;
     color: rgba(220, 228, 250, 0.85);
@@ -48,7 +55,7 @@ ul.site-nav {
 }
 
 ul.site-nav a {
-    font-family: 'Inter', sans-serif;
+    font-family: 'IBM Plex Mono', monospace;
     font-weight: 400;
     font-size: 0.88rem;
     letter-spacing: 0.1em;
@@ -72,7 +79,7 @@ ul.site-nav a:hover {
     pointer-events: none;
     text-align: center;
     padding: 10px 0 12px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 0.78rem;
     color: rgba(180, 190, 220, 0.55);
     opacity: 0;
@@ -117,6 +124,20 @@ body:not(.intro-done) .site-footer .social-links {
     }
 }
 
+/* ====== STATIC SITE SUMMARY (crawlers / LLMs / screen readers) ======
+   Real content, present in the HTML from the first byte — the star map is canvas
+   and invisible to anything that doesn't execute JS. Visually hidden while the
+   map is shown; index.html's <noscript> style reveals it when JS is off. */
+#site-summary {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
 /* ====== INTRO OVERLAY ====== */
 #intro-overlay {
     position: fixed;
@@ -145,7 +166,7 @@ body:not(.intro-done) .site-footer .social-links {
     bottom: 8%;
     left: 50%;
     transform: translateX(-50%);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-weight: 300;
     font-size: 1.35rem;
     color: rgba(200, 210, 240, 0);
@@ -187,7 +208,7 @@ body:not(.intro-done) .site-footer .social-links {
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: rgba(200, 210, 240, 0.7);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-weight: 400;
     font-size: 0.82rem;
     letter-spacing: 0.12em;
@@ -217,7 +238,7 @@ body:not(.intro-done) .site-footer .social-links {
     position: fixed;
     z-index: 100;
     pointer-events: none;
-    font-family: 'Space Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace;
     font-size: 0.88rem;
     color: rgba(255, 180, 100, 0.95);
     letter-spacing: 0.08em;

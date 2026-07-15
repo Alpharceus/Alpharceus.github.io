@@ -33,7 +33,7 @@
     maxWidth: "420px",
     width: "90%",
     color: "#e5e5f0",
-    fontFamily: "'JetBrains Mono','Fira Mono',monospace",
+    fontFamily: "'IBM Plex Mono','Fira Mono',monospace",
     boxShadow: "0 0 24px rgba(56,189,248,0.4)"
   });
 
@@ -260,7 +260,7 @@
     border: "1px solid #4b5563",
     background: "rgba(15,23,42,0.96)",
     color: "#e5e7eb",
-    fontFamily: "'JetBrains Mono','Fira Mono',monospace",
+    fontFamily: "'IBM Plex Mono','Fira Mono',monospace",
     fontSize: "11px",
     cursor: "pointer",
     boxShadow: "0 0 18px rgba(56,189,248,0.4)",
@@ -295,7 +295,7 @@
     padding: "16px 24px",
     border: "1px solid #38bdf8",
     color: "#e5e7eb",
-    fontFamily: "'JetBrains Mono','Fira Mono',monospace",
+    fontFamily: "'IBM Plex Mono','Fira Mono',monospace",
     fontSize: "12px",
     boxShadow: "0 0 40px rgba(56,189,248,0.6)",
     textAlign: "center"
@@ -342,7 +342,7 @@
     border: "1px solid #4b5563",
     padding: "12px 14px",
     color: "#e5e7eb",
-    fontFamily: "'JetBrains Mono','Fira Mono',monospace",
+    fontFamily: "'IBM Plex Mono','Fira Mono',monospace",
     fontSize: "11px",
     display: "none",
     boxShadow: "0 0 24px rgba(56,189,248,0.4)",
@@ -356,7 +356,7 @@
       </div>
       <button id="eng-close-btn" style="
         background:none;border:none;color:#9ca3af;
-        font-size:12px;cursor:pointer;">âœ•</button>
+        font-size:12px;cursor:pointer;">&times;</button>
     </div>
     <div style="margin-bottom:10px;color:#9ca3af;">
       Tap the core multiple times to push it into overdrive. Clock speed, buses and arcs respond.
@@ -372,7 +372,7 @@
       <div style="color:#9ca3af;">Core state</div>
       <button id="eng-halt-btn" style="
         font-size:10px;
-        font-family:'JetBrains Mono','Fira Mono',monospace;
+        font-family:'IBM Plex Mono','Fira Mono',monospace;
         padding:4px 10px;
         border-radius:999px;
         border:1px solid #f97316;
@@ -683,7 +683,7 @@
     for (let py = y + ch + 5; py < y + h - ch - 5; py += ps) { ctx.fillRect(x - pl, py, pl, pwi); ctx.fillRect(x + w, py, pl, pwi); }
     ctx.beginPath(); ctx.arc(x + ch + 4, y + ch + 4, 2, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(160, 170, 200, " + (0.15 + 0.3 * glowFrac) + ")"; ctx.fill();
-    ctx.font = "bold 9px 'JetBrains Mono',monospace";
+    ctx.font = "bold 9px 'IBM Plex Mono',monospace";
     ctx.fillStyle = "rgba(180, 195, 220, " + (0.3 + 0.5 * glowFrac) + ")";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(label, x + w/2, y + h/2);
@@ -773,11 +773,11 @@
       ctx.fillStyle = rGrad;
       ctx.fillRect(xx - ihsSize * 1.2, yy - ihsSize * 1.2, ihsSize * 2.4, ihsSize * 2.4);
     }
-    ctx.font = "bold " + Math.round(size * 0.22) + "px 'JetBrains Mono',monospace";
+    ctx.font = "bold " + Math.round(size * 0.22) + "px 'IBM Plex Mono',monospace";
     ctx.fillStyle = "rgba(200, 220, 245, " + (0.4 + 0.4 * glowFrac + 0.1 * Math.sin(t * 0.03)) + ")";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("CORE", xx, yy);
-    ctx.font = "6px 'JetBrains Mono',monospace";
+    ctx.font = "6px 'IBM Plex Mono',monospace";
     ctx.fillStyle = "rgba(140, 150, 170, " + (0.15 * glowFrac) + ")";
     ctx.fillText("RP-2025K", xx, yy + ihsH - 8);
     ctx.restore();
@@ -902,7 +902,7 @@
       grad.addColorStop(0, "rgba(170, 140, 35, 0.3)"); grad.addColorStop(1, "rgba(140, 110, 25, 0.25)");
       ctx.fillStyle = grad; ctx.fillRect(fx, fY, fw, fh);
     }
-    ctx.font = "8px 'JetBrains Mono',monospace";
+    ctx.font = "8px 'IBM Plex Mono',monospace";
     ctx.fillStyle = "rgba(180, 190, 160, 0.1)"; ctx.textAlign = "left";
     ctx.fillText("PCB-RP2025-REV.C", m + 60, m + 14);
     ctx.restore();
