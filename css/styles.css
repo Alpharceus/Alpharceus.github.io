@@ -6,9 +6,9 @@ body {
 }
 
 /* ====== SITE HEADER / FOOTER (float above the star-map canvas, z-index 100) ======
-   Hidden (opacity 0) while the intro animation plays, revealed via body.intro-done.
-   The links remain in the DOM throughout (mirrored in <noscript>), so this is a
-   progressive reveal, not cloaked content. */
+   The About nav link stays visible and clickable from the first frame — readers
+   (and LLM crawlers) must never have to wait out the intro to reach it. Only the
+   logo joins the progressive reveal via body.intro-done. */
 .site-header {
     position: fixed;
     top: 0;
@@ -16,16 +16,18 @@ body {
     width: 100%;
     z-index: 200;
     pointer-events: none;
+}
+
+.site-header .logo {
     opacity: 0;
     transition: opacity 0.9s ease;
 }
 
-body.intro-done .site-header {
+body.intro-done .site-header .logo {
     opacity: 1;
 }
 
-body:not(.intro-done) .site-header .logo,
-body:not(.intro-done) ul.site-nav {
+body:not(.intro-done) .site-header .logo {
     pointer-events: none;
 }
 
