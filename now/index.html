@@ -55,7 +55,22 @@
             margin: 0 auto;
             padding: 30px 22px 80px;
         }
-        nav a { color: var(--cyan); text-decoration: none; font-size: 0.85rem; }
+        /* standard site header bar (matches portfolio-pages.css) */
+        header {
+            position: relative;
+            z-index: 1;
+            background: #232749;
+            padding: 0.6em 2em;
+            box-shadow: 0 2px 16px rgba(32, 40, 90, 0.10);
+        }
+        header nav,
+        header nav a {
+            color: #70bfff;
+            text-decoration: none;
+            font-size: 1.05em;
+        }
+        header nav a { margin-right: 0.4em; }
+        header nav a:hover { color: #e2cfff; text-shadow: 0 0 6px #79c3ff55; }
         .clock-bar {
             margin-top: 26px;
             padding: 14px 20px;
@@ -135,9 +150,13 @@
 <body>
     <canvas id="waveform-bg" aria-hidden="true"></canvas>
 
-    <div class="console">
-        <nav><a href="../index.html">&larr; Home</a></nav>
+    <header>
+        <nav>
+            <a href="../index.html">Home</a> | <span>Now</span>
+        </nav>
+    </header>
 
+    <div class="console">
         <div class="clock-bar">
             <span class="label">MASTER CLOCK</span>
             <span id="master-clock">SYNCHRONIZING…</span>

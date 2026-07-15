@@ -78,6 +78,9 @@ function articleTemplate({ id, title, date, summary, about, html }) {
   <meta name="description" content="${esc(summary)}">
   <link rel="canonical" href="${url}">
   <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <meta property="og:type" content="article">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(summary)}">
@@ -100,8 +103,9 @@ ${JSON.stringify(jsonld, null, 2)}
     a { color: #8fb8ff; }
     blockquote { border-left: 3px solid #4a6bb0; margin-left: 0; padding-left: 1.2em; color: #aab4d4; }
     .post-meta { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 0.9rem; color: #8b95b5; margin-bottom: 2.5em; }
-    .back-nav { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 0.9rem; margin-bottom: 3em; }
-    .back-nav a { text-decoration: none; }
+    .back-nav { font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace; font-size: 0.9rem; margin-bottom: 3em; }
+    .back-nav a { color: #70bfff; text-decoration: none; }
+    .back-nav a:hover { color: #e2cfff; }
     hr { border: none; border-top: 1px solid #2a3050; margin: 2.5em 0; }
     img { max-width: 100%; }
     pre { overflow-x: auto; background: #161a30; padding: 1em; border-radius: 6px; }
@@ -161,6 +165,9 @@ function blogsIndexTemplate(posts, quotes) {
   <meta name="description" content="Essays on science, skepticism, and philosophy by Raman Pandey — quantum computing researcher and science-communication enthusiast.">
   <link rel="canonical" href="${SITE}/blogs.html">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script type="application/ld+json">
 ${JSON.stringify(jsonld, null, 2)}
   </script>
@@ -200,8 +207,20 @@ ${JSON.stringify(jsonld, null, 2)}
         radial-gradient(ellipse at 60% 20%, #171b33 0%, #0e101f 55%);
       background-attachment: fixed;
     }
-    header { padding: 22px 32px; }
-    header a { color: #8fb8ff; text-decoration: none; font-size: 0.9rem; letter-spacing: 0.08em; }
+    /* standard site header bar (matches portfolio-pages.css) */
+    header {
+      background: #232749;
+      padding: 0.6em 2em;
+      box-shadow: 0 2px 16px rgba(32, 40, 90, 0.10);
+    }
+    header nav,
+    header nav a {
+      font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace;
+      color: #70bfff;
+      text-decoration: none;
+      font-size: 1.05em;
+    }
+    header nav a:hover { color: #e2cfff; text-shadow: 0 0 6px #79c3ff55; }
     main { max-width: 760px; margin: 0 auto; padding: 20px 24px 90px; }
     h1 { color: #f0f3ff; font-weight: 600; letter-spacing: 0.02em; }
     .lede { color: #8b95b5; margin-bottom: 2.6em; }
@@ -418,7 +437,7 @@ ${JSON.stringify(jsonld, null, 2)}
   <div id="quote-right" class="idle-quote" aria-hidden="true"></div>
 
   <header>
-    <nav><a href="index.html">&larr; Home</a></nav>
+    <nav><a href="index.html">Home</a> | <span>Blog</span></nav>
   </header>
   <main>
     <h1>Blog</h1>

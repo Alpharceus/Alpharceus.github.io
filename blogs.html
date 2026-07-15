@@ -7,6 +7,9 @@
   <meta name="description" content="Essays on science, skepticism, and philosophy by Raman Pandey — quantum computing researcher and science-communication enthusiast.">
   <link rel="canonical" href="https://ramanpandey.com/blogs.html">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -63,8 +66,20 @@
         radial-gradient(ellipse at 60% 20%, #171b33 0%, #0e101f 55%);
       background-attachment: fixed;
     }
-    header { padding: 22px 32px; }
-    header a { color: #8fb8ff; text-decoration: none; font-size: 0.9rem; letter-spacing: 0.08em; }
+    /* standard site header bar (matches portfolio-pages.css) */
+    header {
+      background: #232749;
+      padding: 0.6em 2em;
+      box-shadow: 0 2px 16px rgba(32, 40, 90, 0.10);
+    }
+    header nav,
+    header nav a {
+      font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace;
+      color: #70bfff;
+      text-decoration: none;
+      font-size: 1.05em;
+    }
+    header nav a:hover { color: #e2cfff; text-shadow: 0 0 6px #79c3ff55; }
     main { max-width: 760px; margin: 0 auto; padding: 20px 24px 90px; }
     h1 { color: #f0f3ff; font-weight: 600; letter-spacing: 0.02em; }
     .lede { color: #8b95b5; margin-bottom: 2.6em; }
@@ -281,7 +296,7 @@
   <div id="quote-right" class="idle-quote" aria-hidden="true"></div>
 
   <header>
-    <nav><a href="index.html">&larr; Home</a></nav>
+    <nav><a href="index.html">Home</a> | <span>Blog</span></nav>
   </header>
   <main>
     <h1>Blog</h1>
