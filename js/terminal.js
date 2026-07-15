@@ -74,8 +74,6 @@ function drawMatrixRain() {
 }
 
 // ----------- TERMINAL LOGIC -----------
-// === Put your admin password here ===
-const ADMIN_PW = "yourSuperSecret123"; // <-- CHANGE THIS!
 // -------- MOTD SUPPORT (from assets/motd.json) --------
 let motdCache = null;
 
@@ -135,8 +133,8 @@ const terminalCommands = {
         action: function (term) {
             term.echo(
                 "Available commands:\n" +
-                " about, resume, contact, github, linkedin, twitter, email, theme, schedule, admin\n" +
-                " logout,clear, exit\n" +
+                " about, resume, contact, github, linkedin, twitter, email, theme\n" +
+                " clear, exit\n" +
                 " [Also try: projects, papers, blog, motd, whoami]"
             );
         }
@@ -186,7 +184,7 @@ const terminalCommands = {
         desc: "Show email addresses",
         action: function (term) {
             term.echo(
-                "Institutional: ramanpandey01@unm.edu\nPersonal: alpharceus@gmail.com"
+                "Website: info@ramanpandey.com\nInstitutional: ramanpandey01@unm.edu\nPersonal: alpharceus@gmail.com"
             );
         }
     },
@@ -240,38 +238,6 @@ const terminalCommands = {
             } else {
                 term.echo("You're too early for this feature!");
             }
-        }
-    },
-    "schedule": {
-        desc: "Show your schedule (admin only)",
-        action: function (term) {
-            if (localStorage.getItem("admin") === "true") {
-                fetch('assets/schedule.json')
-                    .then(res => res.json())
-                    .then(schedule => {
-                        term.echo("Your Private Schedule:");
-                        schedule.forEach(ev =>
-                            term.echo(`- ${ev.day} ${ev.time}: ${ev.activity}`)
-                        );
-                    })
-                    .catch(() => term.echo("Could not load schedule."));
-            } else {
-                term.echo("Admin only.");
-            }
-        }
-    },
-    "admin": {
-        desc: "Login as admin to view private data",
-        action: function (term) {
-            term.echo("Enter admin password:");
-            term.awaitAdminLogin = true;
-        }
-    },
-    "logout": {
-        desc: "Logout admin",
-        action: function (term) {
-            localStorage.removeItem("admin");
-            term.echo("Logged out.");
         }
     },
     "clear": {
@@ -385,18 +351,6 @@ class Terminal {
         }
     }
     handleCmd(val) {
-        // Admin login logic (static, client-only)
-        if (this.awaitAdminLogin) {
-            if (val.trim() === ADMIN_PW) {
-                this.echo("Admin login successful!");
-                localStorage.setItem("admin", "true");
-                this.echo("Type 'schedule' to see your private schedule.");
-            } else {
-                this.echo("Wrong password.");
-            }
-            this.awaitAdminLogin = false;
-            return;
-        }
         // Contact form wizard
         if (this.awaitContactInput && this.contactForm) {
             if (val.trim().toLowerCase() === "cancel") {
@@ -420,15 +374,15 @@ class Terminal {
             if (this.contactForm.step === 2) {
                 this.contactForm.msg = val.trim();
                 this.echo("Submitting your message…");
-                // EmailJS integration
-                emailjs.send("service_x844p0t", "template_8n0fjwl", {
+                // EmailJS integration (IONOS SMTP service behind info@ramanpandey.com)
+                emailjs.send("service_1sjyyx4", "template_rqowebf", {
                     name: this.contactForm.name,
                     email: this.contactForm.email,
                     message: this.contactForm.msg
                 }).then((response) => {
                     this.echo("Thank you! Your message has been sent.");
                 }, (error) => {
-                    this.echo("Oops! Something went wrong. Please try again later.");
+                    this.echo("Something went wrong — please email me directly at info@ramanpandey.com");
                     console.error("EmailJS error:", error);
                 });
                 this.awaitContactInput = false;
@@ -457,7 +411,7 @@ class Terminal {
     }
     startContactForm() {
         this.contactForm = { step: 0, name: "", email: "", msg: "" };
-        this.echo("Contact form (type 'cancel' anytime to exit):");
+        this.echo("Contact form (type 'cancel' anytime to exit) — or email info@ramanpandey.com directly:");
         this.echo("Your Name:");
         this.awaitContactInput = true;
     }
