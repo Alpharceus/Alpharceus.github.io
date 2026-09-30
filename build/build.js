@@ -113,6 +113,7 @@ ${JSON.stringify(jsonld, null, 2)}
     pre { overflow-x: auto; background: #161a30; padding: 1em; border-radius: 6px; }
   </style>
   <link rel="stylesheet" href="../css/site.css">
+  <script src="../js/site.js" defer></script>
 </head>
 <body>
   <header class="site-bar">
@@ -187,21 +188,39 @@ function blogsIndexTemplate(posts, quotes) {
 ${JSON.stringify(jsonld, null, 2)}
   </script>
   <script>
-  // veil guard: repeat visitors and reduced-motion users never see the overlay
-  // (set to false to replay the veil on every load while testing)
+  // Arrival handshake + veil guard (portfolio-motion-brief.md section 2). Runs before first paint.
+  //   arrival: came from the Alnitak dive -> colour fill collapses onto the cover star, then the book opens
+  //   first:   no session flag -> the full book-open veil
+  //   skip:    flag set on a direct load, or reduced motion -> no veil
+  // (set VEIL_ONCE_PER_SESSION to false to replay the veil on every load while testing)
   window.VEIL_ONCE_PER_SESSION = true;
   (function () {
     var d = document.documentElement;
     try {
-      if ((window.VEIL_ONCE_PER_SESSION && sessionStorage.getItem('blogVeilPlayed')) ||
-          window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var a = JSON.parse(sessionStorage.getItem('arrival') || 'null');
+      var arriving = !!(a && Date.now() - a.ts < 4000);
+      sessionStorage.removeItem('arrival');
+      if (arriving) {
+        d.classList.add('arriving');
+        d.style.setProperty('--arrival-rgb', a.rgb.join(','));
+        window.__arrival = a;
+      }
+      if (reduced) {
+        d.classList.add('no-veil');
+      } else if (arriving) {
+        d.classList.add('veiling', 'veil-fast'); // shorter book-open, staged after the fill collapses
+      } else if (window.VEIL_ONCE_PER_SESSION && sessionStorage.getItem('blogVeilPlayed')) {
         d.classList.add('no-veil');
       } else {
         d.classList.add('veiling'); // stages the content entrance after the book opens
       }
     } catch (e) { d.classList.add('no-veil'); }
+    // failsafe: never leave the page covered if the intro script fails
+    setTimeout(function () { d.classList.remove('arriving'); }, 6000);
   }());
   </script>
+  <script src="js/transition.js"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -392,6 +411,43 @@ ${JSON.stringify(jsonld, null, 2)}
     @keyframes veilLift { to { opacity: 0; } }
     html.no-veil #book-veil { display: none; }
 
+    /* ---- arrival: colour fill collapses onto the cover star (driven by playIntro) ---- */
+    html.arriving body::before {
+      content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      background: rgb(var(--arrival-rgb, 23, 27, 51));
+      clip-path: circle(var(--arrival-r, 150vmax) at var(--arrival-x, 50%) var(--arrival-y, 50%));
+      opacity: var(--arrival-op, 1);
+    }
+    /* the star glints once when the point lands */
+    .cover-mark.glint { animation: markGlint 0.32s ease-out; }
+    @keyframes markGlint {
+      0% { transform: scale(1); filter: brightness(1); }
+      35% { transform: scale(1.7); filter: brightness(1.9); text-shadow: 0 0 26px rgba(255, 226, 150, 0.95), 0 0 6px #fff; }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    /* arrival veil: the same book-open, compressed (whole arrival <= 2.5s).
+       Timeline from html.veil-open: cover 0.2s, leaves 0.7s-1.36s, veil lifts 1.3s-1.7s */
+    html.veil-fast.veil-open .book-scene { animation: veilCamera 1.7s cubic-bezier(0.4, 0.1, 0.3, 1) forwards; }
+    html.veil-fast.veil-open .book { animation: bookCenter 0.6s 0.2s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+    html.veil-fast.veil-open .book-cover { animation: coverOpen 0.6s 0.2s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+    html.veil-fast.veil-open .leaf-1 { animation: leafFlip1 0.3s 0.7s ease-in-out forwards; }
+    html.veil-fast.veil-open .leaf-2 { animation: leafFlip2 0.3s 0.79s ease-in-out forwards; }
+    html.veil-fast.veil-open .leaf-3 { animation: leafFlip3 0.3s 0.88s ease-in-out forwards; }
+    html.veil-fast.veil-open .leaf-4 { animation: leafFlip4 0.3s 0.97s ease-in-out forwards; }
+    html.veil-fast.veil-open .leaf-5 { animation: leafFlip5 0.3s 1.06s ease-in-out forwards; }
+    html.veil-fast.veil-open #book-veil { animation: veilLift 0.4s 1.3s ease forwards; }
+    html.veil-fast.veil-done header, html.veil-fast.veil-done main > *, html.veil-fast.veil-done footer {
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    html.veil-fast.veil-done main > *:nth-child(1) { transition-delay: 0.03s; }
+    html.veil-fast.veil-done main > *:nth-child(2) { transition-delay: 0.07s; }
+    html.veil-fast.veil-done main > *:nth-child(3) { transition-delay: 0.11s; }
+    html.veil-fast.veil-done main > *:nth-child(4) { transition-delay: 0.15s; }
+    html.veil-fast.veil-done main > *:nth-child(5) { transition-delay: 0.19s; }
+    html.veil-fast.veil-done main > *:nth-child(n+6) { transition-delay: 0.23s; }
+    html.veil-fast.veil-done footer { transition-delay: 0.25s; }
+    @media (prefers-reduced-motion: reduce) { .cover-mark.glint { animation: none; } }
+
     /* blog elements appear once the book has opened (only when the veil plays;
        no-JS / reduced-motion never get the hidden state) */
     html.veiling header, html.veiling main > *, html.veiling footer {
@@ -433,6 +489,7 @@ ${JSON.stringify(jsonld, null, 2)}
     @media (prefers-reduced-motion: reduce) { .idle-quote { display: none; } }
   </style>
   <link rel="stylesheet" href="css/site.css">
+  <script src="js/site.js" defer></script>
 </head>
 <body>
   <div id="book-veil" aria-hidden="true">
@@ -488,11 +545,27 @@ ${cards}
   (function () {
     var docEl = document.documentElement;
 
-    // ---- book-open veil: ancient tome, ~4s, click/key to skip ----
+    // ---- book-open veil: ancient tome, click/key to skip ----
     // CSS owns the choreography (html.veil-open); JS only starts it, reveals
-    // the content near the end, and hard-stops everything at 3.95s or on skip
+    // the content near the end, and hard-stops everything on skip.
+    // Once-per-session flag: the pre-existing 'blogVeilPlayed' key (kept as is).
+    var T = window.SiteTransition;
     var veil = document.getElementById('book-veil');
+    var mark = document.querySelector('.cover-mark');
+
+    // ---- timing (ms): tune here ----
+    var FIRST = { doneAt: 3050, total: 3950 };         // unchanged from before the arrival variant
+    var ARRIVAL = {
+      hold: 80, collapse: 340,                         // colour fill holds, then shrinks onto the star
+      dotPx: 5, dotEnd: 520,                           // it lands as a small dot, absorbed into the glint
+      glintAt: 420,                                    // star glints as the point lands
+      openAt: 560,                                     // book-open starts (veil-fast timings in CSS)
+      doneAt: 1620, total: 2300                        // content reveal, hard stop
+    };
+    var REDUCED_FADE_MS = 150;                         // reduced-motion arrival: fill fades out
+
     var veilTimers = [];
+    var arrivalRun = null;
     function endVeil() {
       veilTimers.forEach(clearTimeout);
       docEl.classList.add('no-veil');
@@ -501,31 +574,91 @@ ${cards}
         try { sessionStorage.setItem('blogVeilPlayed', '1'); } catch (e) {}
       }
     }
-    if (veil && docEl.classList.contains('veiling') && !docEl.classList.contains('no-veil')) {
-      veil.addEventListener('click', endVeil);
-      window.addEventListener('keydown', endVeil, { once: true });
+    function clearArrival() {
+      docEl.classList.remove('arriving');
+      ['--arrival-r', '--arrival-x', '--arrival-y', '--arrival-op', '--arrival-rgb'].forEach(function (k) {
+        docEl.style.removeProperty(k);
+      });
+    }
+    function setVar(k, v) { docEl.style.setProperty(k, String(v)); }
+    function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+    // Centre of the gold star on the closed cover, in viewport px. Measured on the
+    // glyph itself (the span is full width), so it follows the book's 3D transform.
+    function starPoint() {
+      var r = mark.getBoundingClientRect();
+      if (document.createRange) {
+        var rg = document.createRange();
+        rg.selectNodeContents(mark);
+        var g = rg.getBoundingClientRect();
+        if (g.width > 0) r = g;
+      }
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    window.blogStarPoint = starPoint;   // hook: where the arrival colour lands
+
+    function startVeil() {
+      if (docEl.classList.contains('no-veil')) return;
+      docEl.classList.add('veil-open');
+      // blog elements start appearing while the veil is still lifting
+      veilTimers.push(setTimeout(function () { docEl.classList.add('veil-done'); }, FIRST.doneAt));
+      veilTimers.push(setTimeout(endVeil, FIRST.total));
+    }
+    function whenVisible(fn) {
       // don't burn the animation while the tab is still hidden (fresh window
-      // spawning, background tab) — wait until the reader can actually see it
-      var startVeil = function () {
-        if (docEl.classList.contains('no-veil')) return;
-        docEl.classList.add('veil-open');
-        // blog elements start appearing while the veil is still lifting
-        veilTimers.push(setTimeout(function () { docEl.classList.add('veil-done'); }, 3050));
-        veilTimers.push(setTimeout(endVeil, 3950));
-      };
+      // spawning, background tab) - wait until the reader can actually see it
       if (document.visibilityState === 'hidden') {
         document.addEventListener('visibilitychange', function onVis() {
           if (document.visibilityState === 'visible') {
             document.removeEventListener('visibilitychange', onVis);
-            startVeil();
+            fn();
           }
         });
       } else {
-        startVeil();
+        fn();
       }
-    } else {
-      endVeil();
     }
+
+    // mode: 'arrival' | 'first' | 'skip'; arrival: {star, rgb, starRgb, ts} or null
+    function playIntro(mode, arrival) {
+      var playable = !!(veil && mark && docEl.classList.contains('veiling') && !docEl.classList.contains('no-veil'));
+      if (mode === 'arrival' && !playable) {
+        // reduced motion: no book, the arrival fill just fades out (<= 200 ms)
+        endVeil();
+        if (T) T.run(REDUCED_FADE_MS, function (t) { setVar('--arrival-op', 1 - clamp01(t / REDUCED_FADE_MS)); }, clearArrival);
+        else clearArrival();
+        return;
+      }
+      if (mode === 'skip' || !playable) { endVeil(); clearArrival(); return; }
+
+      veil.addEventListener('click', endVeil);
+      window.addEventListener('keydown', endVeil, { once: true });
+      if (T) T.wireSkip(function () { if (arrivalRun) arrivalRun.finish(); else endVeil(); });
+
+      if (mode !== 'arrival' || !T) { clearArrival(); whenVisible(startVeil); return; }
+
+      whenVisible(function () {
+        var p = starPoint();
+        var W = window.innerWidth, H = window.innerHeight;
+        var r0 = Math.hypot(Math.max(p.x, W - p.x), Math.max(p.y, H - p.y)) + 2;
+        setVar('--arrival-x', p.x + 'px');
+        setVar('--arrival-y', p.y + 'px');
+        var glinted = false, opened = false, revealed = false;
+        arrivalRun = T.run(ARRIVAL.total, function (t) {
+          var c = clamp01((t - ARRIVAL.hold) / ARRIVAL.collapse);
+          setVar('--arrival-r', (ARRIVAL.dotPx + (r0 - ARRIVAL.dotPx) * (1 - T.easeInOutCubic(c))).toFixed(1) + 'px');
+          setVar('--arrival-op', t >= ARRIVAL.dotEnd ? 0 : 1);
+          if (!glinted && t >= ARRIVAL.glintAt) { glinted = true; mark.classList.add('glint'); }
+          if (!opened && t >= ARRIVAL.openAt) { opened = true; docEl.classList.add('veil-open'); }
+          if (!revealed && t >= ARRIVAL.doneAt) { revealed = true; docEl.classList.add('veil-done'); }
+        }, function () {
+          clearArrival();
+          endVeil();
+        });
+      });
+    }
+    window.playIntro = playIntro;
+    playIntro(window.__arrival ? 'arrival' : (docEl.classList.contains('no-veil') ? 'skip' : 'first'), window.__arrival || null);
 
     // ---- margin quotes: my own sentences, persistent rotation ----
     var QUOTES = __QUOTES_JSON__;
