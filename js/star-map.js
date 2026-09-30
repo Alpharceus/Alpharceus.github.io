@@ -20,6 +20,10 @@ const ZOOM_DURATION = 2200;
 const DRAW_DURATION = 3000;
 const CTA_TYPING_SPEED = 55;
 
+// ---- Star dive (timings live in js/transition.js) ----
+const DIVE_TARGETS = [null, "projects.html", "papers.html", "skills.html", "blogs.html", "now/", "rigel.html"];
+const DIVE_STREAK_ALPHA = 0.9;   // peak opacity of the radial streaks
+
 // ---- Projection ----
 const SKY = window.ORION_SKY;
 const FIG_CENTER = { x: 0.02, y: 0.13 };   // middle of the seven-star figure, degrees
@@ -353,6 +357,15 @@ function draw() {
     background(14, 16, 31);
     introTimer = millis() - introStartTime;
 
+    // Star dive: the whole sky scales about the clicked star
+    const dv = window.SiteTransition ? SiteTransition.diveFrame() : null;
+    if (dv) {
+        drawingContext.save();
+        drawingContext.translate(dv.x, dv.y);
+        drawingContext.scale(dv.scale, dv.scale);
+        drawingContext.translate(-dv.x, -dv.y);
+    }
+
     switch (introState) {
         case "telescope":
             drawTelescopePhase();
@@ -368,8 +381,24 @@ function draw() {
             break;
     }
 
+    if (dv) drawingContext.restore();
+
     // Cosmic dust always on
     drawCosmicDust();
+
+    if (dv) drawDiveOverlay(dv);
+}
+
+// Radial streaks from the star, then the flat colour flood
+function drawDiveOverlay(dv) {
+    const ctx = drawingContext;
+    if (dv.scale > 1) drawWarpStreaks(dv.zoom, dv.x, dv.y, DIVE_STREAK_ALPHA);
+    if (dv.flood > 0) {
+        ctx.save();
+        ctx.fillStyle = rgba(SiteTransition.diveColor(dv), dv.flood);
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+    }
 }
 
 // ========== PHASE 1: TELESCOPE ==========
@@ -541,7 +570,11 @@ function drawLink(ctx, A, B, ga, gb, p, a) {
 
 function hitRadius(i) { return Math.max(26, coreD(i) * 1.2); }
 
-function interactive() { return introState === "idle" || (introState === "draw" && ctaVisible); }
+function diving() { return !!(window.SiteTransition && SiteTransition.isDiving()); }
+
+function interactive() {
+    return !diving() && (introState === "idle" || (introState === "draw" && ctaVisible));
+}
 
 function drawOrion(progress) {
     const ctx = drawingContext;
@@ -560,6 +593,8 @@ function drawOrion(progress) {
         }
     }
     const hi = hoveredStar ? hoveredStar.idx : -1;
+    // warm the destination before the click
+    if (hi > 0 && window.SiteTransition) SiteTransition.prefetch(DIVE_TARGETS[hi]);
 
     // lines, drawn in sequence, stopping short of each star
     const total = orionLines.length;
@@ -821,7 +856,7 @@ function skipIntro() {
 function mousePressed() {
     // During telescope/zoom, do NOT skip — let animation play
     if (introState === "telescope" || introState === "zoom") return;
-    if (!interactive() || !orionStarScreenPos.length) return;
+    if (diving() || !interactive() || !orionStarScreenPos.length) return;
 
     for (let i = 0; i < orionStarScreenPos.length; i++) {
         const p = orionStarScreenPos[i];
@@ -844,23 +879,31 @@ function keyPressed() {
 
 // ---- Star actions ----
 function handleStarClick(idx) {
-    switch (idx) {
-        case 0: openTerminal(); break;
-        case 1: openProjects(); break;
-        case 2: openPapers(); break;
-        case 3: openSkills(); break;
-        case 4: openBlog(); break;
-        case 5: openNow(); break;
-        case 6: openRigel(); break;
+    if (idx === 0) { openTerminal(); return; }
+    if (window.SiteTransition) {
+        const p = orionStarScreenPos[idx];
+        hoveredStar = null;
+        cursor(ARROW);
+        SiteTransition.startDive({
+            star: orionStars[idx].name,
+            target: DIVE_TARGETS[idx],
+            rgb: orionStars[idx].col,
+            x: p.x,
+            y: p.y
+        });
+        return;
     }
+    // fallback if transition.js failed to load: plain navigation
+    window.location.href = DIVE_TARGETS[idx];
 }
 
-function openSkills() { window.location.href = "skills.html"; }
-function openNow() { window.location.href = "now/"; }
-function openProjects() { window.location.href = "projects.html"; }
-function openPapers() { window.location.href = "papers.html"; }
-function openBlog() { window.location.href = "blogs.html"; }
-function openRigel() { window.location.href = "rigel.html"; }
+// bfcache restore (Back): drop hover state; the dive itself is reset by SiteTransition
+if (window.SiteTransition) {
+    SiteTransition.onReset(function () {
+        hoveredStar = null;
+        if (typeof cursor === "function") cursor(ARROW);
+    });
+}
 
 function windowResized() {
     resizeCanvas(window.innerWidth, window.innerHeight);
@@ -1021,9 +1064,10 @@ function drawLensFlare(cx, cy, radius, angle, intensity) {
 }
 
 // ---- Warp Speed Streaks ----
-function drawWarpStreaks(t) {
-    let cx = width / 2;
-    let cy = height / 2;
+// Centred on the screen by default; the star dive centres them on the star.
+function drawWarpStreaks(t, cx, cy, peak) {
+    if (cx === undefined) { cx = width / 2; cy = height / 2; }
+    if (peak === undefined) peak = 1;
 
     push();
     for (let w of warpStars) {
@@ -1035,7 +1079,7 @@ function drawWarpStreaks(t) {
         let x2 = cx + cos(w.angle) * (currentDist - streakLength / max(width, height)) * max(width, height);
         let y2 = cy + sin(w.angle) * (currentDist - streakLength / max(width, height)) * max(width, height);
 
-        let alpha = w.alpha * t * (1 - currentDist * 0.5);
+        let alpha = w.alpha * t * (1 - currentDist * 0.5) * peak;
         stroke(220, 230, 255, alpha);
         strokeWeight(w.size * (0.5 + t));
         line(x1, y1, x2, y2);
