@@ -42,26 +42,59 @@
     }
     </script>
 
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        /* plain, semantic, fast: this page is the one crawlers and LLMs read first,
+           so it stays static HTML; it just wears the site's colours now */
+        :root { color-scheme: dark; }
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 40px;
-            max-width: 900px;
+            margin: 0;
+            background: #0e101f;
+            color: #d6dcf0;
+            font: 400 1.03rem/1.7 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif;
         }
-        h1, h2 {
-            color: #222;
-        }
+        .faq { max-width: 720px; margin: 0 auto; padding: 56px 22px 96px; }
         h1 {
-            border-bottom: 2px solid #ccc;
-            padding-bottom: 10px;
+            margin: 0 0 1.6em;
+            font-size: 2.1rem; font-weight: 600; letter-spacing: 0.005em;
+            color: #f0f3ff;
         }
         section {
-            margin-bottom: 30px;
+            margin: 0 0 2.2em;
+            padding-left: 18px;
+            border-left: 1px solid rgba(130, 155, 225, 0.22);
         }
+        h2 {
+            margin: 0 0 0.5em;
+            font-size: 1.18rem; font-weight: 600;
+            color: #f0f3ff;
+        }
+        p, li { color: #c3cbe6; }
+        ul { padding-left: 1.2em; }
+        li { margin-bottom: 0.45em; }
+        a { color: #8fb8ff; text-underline-offset: 3px; }
+        a:hover { color: #d4e2ff; }
+        strong { color: #eef1fb; font-weight: 600; }
     </style>
+    <link rel="stylesheet" href="../css/site.css">
 </head>
 <body>
+    <header class="site-bar">
+      <a class="site-bar__home" href="../index.html">Raman Pandey</a>
+      <nav aria-label="Site">
+        <a href="../projects.html">Projects</a>
+        <a href="../skills.html">Skills</a>
+        <a href="../papers.html">Papers</a>
+        <a href="../blogs.html">Blog</a>
+        <a href="../now/">Now</a>
+        <a href="../rigel.html">Rigel</a>
+        <a href="../about/" aria-current="page">About</a>
+      </nav>
+    </header>
+    <main class="faq">
 
     <h1>Raman Pandey – FAQ</h1>
 
@@ -177,5 +210,6 @@
         </p>
     </section>
 
+    </main>
 </body>
 </html>

@@ -1,0 +1,137 @@
+/* ==========================================================================
+   site.css — shared tokens + site bar for every subpage.
+   Load it LAST so .site-bar rules win over each page's old `header nav` styles.
+   Page-specific looks (PCB, book, console, mesh) stay in their own files;
+   this file is only what every page should agree on.
+   ========================================================================== */
+
+:root {
+    /* sky */
+    --sky-0: #0e101f;          /* page ground, same as the star map */
+    --sky-1: #151a2e;          /* raised panels */
+    --line: rgba(130, 155, 225, 0.18);
+    /* ink */
+    --ink: #e6eaf7;
+    --ink-soft: #b6bfdc;
+    --ink-muted: #858fb0;
+    /* light */
+    --link: #8fb8ff;
+    --link-hover: #d4e2ff;
+    --betelgeuse: #ffb46e;     /* the one warm accent: "start here" */
+    /* type */
+    --font-ui: 'Space Grotesk', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', Menlo, Consolas, monospace;
+    --font-read: Georgia, 'Times New Roman', serif;
+    --bar-h: 56px;
+}
+
+/* ---- site bar ---------------------------------------------------------- */
+header.site-bar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    min-height: var(--bar-h);
+    margin: 0;
+    padding: 0 max(24px, 4vw);
+    background: rgba(12, 14, 28, 0.78);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    box-shadow: none;
+    box-sizing: border-box;
+    font-family: var(--font-ui);
+}
+
+header.site-bar .site-bar__home {
+    flex: none;
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 1.02rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    text-decoration: none;
+    text-shadow: none;
+}
+
+header.site-bar .site-bar__home:hover {
+    color: #fff;
+    text-shadow: none;
+}
+
+header.site-bar nav {
+    display: flex;
+    gap: 22px;
+    margin: 0 0 0 auto;
+    padding: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    font-family: var(--font-ui);
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+}
+
+header.site-bar nav::-webkit-scrollbar { display: none; }
+
+header.site-bar nav a {
+    position: relative;
+    flex: none;
+    margin: 0;
+    padding: 6px 0;
+    font-family: var(--font-ui);
+    font-size: inherit;
+    color: var(--ink-muted);
+    text-decoration: none;
+    text-shadow: none;
+    transition: color 0.2s ease;
+}
+
+header.site-bar nav a:hover,
+header.site-bar nav a:focus-visible {
+    color: var(--ink);
+    text-shadow: none;
+}
+
+header.site-bar nav a[aria-current="page"] {
+    color: var(--ink);
+}
+
+/* current page: a short line of light under the link */
+header.site-bar nav a[aria-current="page"]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--link);
+    box-shadow: 0 0 8px rgba(143, 184, 255, 0.7);
+}
+
+header.site-bar a:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 4px;
+    border-radius: 2px;
+}
+
+@media (max-width: 720px) {
+    header.site-bar {
+        gap: 18px;
+        padding: 0 16px;
+    }
+    header.site-bar nav {
+        gap: 18px;
+        font-size: 0.9rem;
+        /* fade the scroll edge so it reads as "more this way" */
+        -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+        mask-image: linear-gradient(90deg, #000 85%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    header.site-bar nav a { transition: none; }
+}

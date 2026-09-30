@@ -20,7 +20,7 @@
       "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
     }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             color-scheme: dark;
@@ -146,13 +146,21 @@
         }
         footer { position: relative; z-index: 1; text-align: center; color: var(--dim); font-size: 0.75rem; padding: 16px; }
     </style>
+    <link rel="stylesheet" href="../css/site.css">
 </head>
 <body>
     <canvas id="waveform-bg" aria-hidden="true"></canvas>
 
-    <header>
-        <nav>
-            <a href="../index.html">Home</a> | <span>Now</span>
+    <header class="site-bar">
+        <a class="site-bar__home" href="../index.html">Raman Pandey</a>
+        <nav aria-label="Site">
+            <a href="../projects.html">Projects</a>
+            <a href="../skills.html">Skills</a>
+            <a href="../papers.html">Papers</a>
+            <a href="../blogs.html">Blog</a>
+            <a href="../now/" aria-current="page">Now</a>
+            <a href="../rigel.html">Rigel</a>
+            <a href="../about/">About</a>
         </nav>
     </header>
 

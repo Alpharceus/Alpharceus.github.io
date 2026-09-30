@@ -1,5 +1,11 @@
 // ========================================================
-// STAR MAP — Telescope → Orion Intro Animation
+// STAR MAP — Telescope → Orion intro, drawn from the real sky
+//
+// Sky data lives in js/orion-sky.js (window.ORION_SKY): Hipparcos-derived
+// stars to V≈7.3 on a gnomonic projection centred on Orion, in degrees.
+// Star size follows apparent magnitude, colour follows B−V, and every
+// layer (background, figure, M42) shares one projection, so the figure
+// keeps its true proportions on any screen.
 // ========================================================
 
 // ---- State Machine ----
@@ -14,8 +20,21 @@ const ZOOM_DURATION = 2200;
 const DRAW_DURATION = 3000;
 const CTA_TYPING_SPEED = 55;
 
+// ---- Projection ----
+const SKY = window.ORION_SKY;
+const FIG_CENTER = { x: 0.02, y: 0.13 };   // middle of the seven-star figure, degrees
+const FIG_W = 10.3, FIG_H = 17.3;          // figure extent, degrees
+const TELESCOPE_SCALE = 0.45;              // eyepiece view: wide field, Orion small
+let ppd = 30;                               // pixels per degree at the final view
+let sizeK = 1;                              // figure-star size factor for small screens
+
+// ---- Layers ----
+let bgStars = [];      // faint stars, baked into skyLayer
+let liveStars = [];    // brighter stars, drawn per frame with twinkle
+let skyLayer = null;
+let nebulaSprite = null;
+
 // ---- Stars & Orion ----
-let stars = [];
 let shootingStars = [];
 let dustParticles = [];
 let hoveredStar = null;
@@ -23,7 +42,6 @@ let orionStarScreenPos = [];
 let drawProgress = 0;
 let starIgnitions = [];
 let ctaText = "Click Betelgeuse to begin ✦";
-let ctaCharsRevealed = 0;
 let ctaStartTime = 0;
 let ctaVisible = false;
 let ctaDismissed = false;
@@ -37,53 +55,78 @@ let lensFlareAngle = 0;
 // ---- Zoom warp ----
 let warpStars = [];
 
+// page = where the star leads; label side keeps belt labels off each other and off the lines
 const orionStars = [
-    { name: "Betelgeuse", ra: 5.92, dec: 7.4, type: "M2", info: "Red supergiant, Alpha Orionis" },
-    { name: "Bellatrix", ra: 5.42, dec: 6.3, type: "B2", info: "Blue giant, Gamma Orionis" },
-    { name: "Alnilam", ra: 5.60, dec: -1.2, type: "B0", info: "Blue supergiant, Epsilon Orionis" },
-    { name: "Mintaka", ra: 5.53, dec: -0.3, type: "O9", info: "Blue giant, Delta Orionis" },
-    { name: "Alnitak", ra: 5.68, dec: -1.9, type: "O9", info: "Blue supergiant, Zeta Orionis" },
-    { name: "Saiph", ra: 5.80, dec: -9.7, type: "B2", info: "Blue supergiant, Kappa Orionis" },
-    { name: "Rigel", ra: 5.24, dec: -8.2, type: "B8", info: "Blue supergiant, Beta Orionis" }
+    { name: "Betelgeuse", info: "Red supergiant, Alpha Orionis", page: "Terminal", desc: "Interactive terminal", side: "left" },
+    { name: "Bellatrix", info: "Blue giant, Gamma Orionis", page: "Projects", desc: "Research and engineering projects", side: "right" },
+    { name: "Alnilam", info: "Blue supergiant, Epsilon Orionis", page: "Papers", desc: "Journal publications", side: "below" },
+    { name: "Mintaka", info: "Blue giant, Delta Orionis", page: "Skills", desc: "Skills, routed through an MZI mesh", side: "right" },
+    { name: "Alnitak", info: "Blue supergiant, Zeta Orionis", page: "Blog", desc: "Essays on physics, computing, and AI", side: "left" },
+    { name: "Saiph", info: "Blue supergiant, Kappa Orionis", page: "Now", desc: "What I'm working on this quarter", side: "left" },
+    { name: "Rigel", info: "Blue supergiant, Beta Orionis", page: "Rigel", desc: "Quantum circuit simulator", side: "right" }
 ];
+orionStars.forEach(function (s) {
+    const d = SKY.main[s.name];
+    s.x = d[0]; s.y = d[1]; s.mag = d[2]; s.bv = d[3];
+    s.col = bvToRGB(s.bv, 0.12);
+});
 
 const orionLines = [
     [0, 4], [1, 3], [0, 1], [2, 3], [2, 4], [4, 5], [3, 6], [5, 6]
 ];
 
-// ---- Color helpers ----
-function randomColorFromType(type) {
-    switch (type) {
-        case "M2": return color(255, 136, 76);
-        case "B2": return color(153, 217, 255);
-        case "B0":
-        case "O9":
-        case "B8": return color(170, 210, 255);
-        default: return color(220, 220, 255);
+// ========== COLOUR & SIZE ==========
+
+// B−V → blackbody temperature (Ballesteros 2012) → RGB (Helland's fit),
+// then mixed toward white: the eye sees star colour faintly.
+function bvToRGB(bv, whiteMix) {
+    bv = Math.max(-0.4, Math.min(2.0, bv));
+    const T = 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62));
+    const t = T / 100;
+    let r, g, b;
+    if (t <= 66) {
+        r = 255;
+        g = 99.4708025861 * Math.log(t) - 161.1195681661;
+        b = t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+    } else {
+        r = 329.698727446 * Math.pow(t - 60, -0.1332047592);
+        g = 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+        b = 255;
     }
+    const w = whiteMix === undefined ? 0.3 : whiteMix;
+    return [r, g, b].map(function (v) {
+        v = Math.max(0, Math.min(255, v));
+        return Math.round(v * (1 - w) + 255 * w);
+    });
 }
 
-function getNormalizedCoords(star) {
-    let x = map(star.ra, 5.2, 5.92, 1, 0);
-    let y = map(star.dec, -10, 8, 1, 0);
-    return createVector(x, y);
+function rgba(c, a) {
+    return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + Math.max(0, Math.min(1, a)).toFixed(3) + ")";
 }
 
-function skyToScreenFlat(normVec, scale, centerX, centerY) {
-    if (centerX === undefined) centerX = width / 2;
-    if (centerY === undefined) centerY = height / 2;
-    let px = (normVec.x - 0.5) * scale * width * 0.6 + centerX;
-    let py = (normVec.y - 0.5) * scale * width * 0.6 + centerY;
-    return createVector(px, py);
+// background point radius (px) and opacity from V magnitude
+function pointRadius(m) { return Math.max(0.55, Math.min(3.4, 3.0 * Math.pow(10, -0.2 * (m - 1)) + 0.45)); }
+function pointAlpha(m) { return Math.min(1, 0.26 + 0.74 * Math.pow(10, -0.2 * (m - 4))); }
+
+// figure-star core diameter (px): radius ∝ √flux ∝ 10^(−0.2 m)
+function coreD(i) {
+    return (10 + 11 * Math.pow(10, -0.2 * (orionStars[i].mag - 0.2))) * sizeK;
 }
 
-// ---- Easing ----
-function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+// ========== PROJECTION ==========
+function computeScale() {
+    ppd = Math.min(height * 0.70 / FIG_H, (width - 160) / FIG_W, width * 0.62 / FIG_W);
+    sizeK = constrain(ppd / 36, 0.7, 1.2);
 }
-function easeOutExpo(t) {
-    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+function toScreen(x, y, view) {
+    return {
+        x: width / 2 + (x - view.cx) * ppd * view.s,
+        y: height / 2 + (y - view.cy) * ppd * view.s
+    };
 }
+
+const FINAL_VIEW = { s: 1, cx: FIG_CENTER.x, cy: FIG_CENTER.y };
 
 // ========== SETUP ==========
 function setup() {
@@ -92,6 +135,7 @@ function setup() {
     canvas.style('z-index', '100');
     canvas.style('position', 'fixed');
     frameRate(60);
+    computeScale();
 
     introStartTime = millis();
 
@@ -99,32 +143,28 @@ function setup() {
     // backgrounded mid-animation) — full intro runs ~8.2s
     setTimeout(function () { document.body.classList.add('intro-done'); }, 9000);
 
+    // Split the catalogue: faint stars get baked once, brighter ones twinkle live
+    const bg = SKY.bg;
+    for (let i = 0; i < bg.length; i += 4) {
+        const m = bg[i + 2];
+        const s = {
+            x: bg[i], y: bg[i + 1], m: m,
+            r: pointRadius(m), a: pointAlpha(m),
+            col: bvToRGB(bg[i + 3], 0.35),
+            seed: Math.random() * 1000,
+            speed: 0.0012 + Math.random() * 0.0018
+        };
+        (m < 4.6 ? liveStars : bgStars).push(s);
+    }
+    liveStars.sort(function (a, b) { return b.m - a.m; }); // faint first, bright on top
+
+    buildNebulaSprite();
+    buildSkyLayer();
+
     // Check for returning visitor; respect OS reduced-motion preference
     if (sessionStorage.getItem('introPlayed') ||
         (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
         skipIntro();
-    }
-
-    // Background stars
-    for (let i = 0; i < 350; i++) {
-        let isMainStar = (i < 12);
-        let colorType = random();
-        let tint;
-        if (colorType < 0.05) tint = color(255, 210, 210);
-        else if (colorType < 0.15) tint = color(195, 210, 255);
-        else if (colorType < 0.22) tint = color(255, 255, 180);
-        else tint = color(255, 255, 230);
-
-        stars.push({
-            base: createVector(random(), random()),
-            r: isMainStar ? random(4, 6) : random(1.8, 3.5),
-            twinkleSeed: random(10000),
-            noiseSeedX: random(10000),
-            noiseSeedY: random(10000),
-            color: tint,
-            twinkleSpeed: isMainStar ? 0.008 : 0.012,
-            maxAlpha: isMainStar ? 255 : 210 + random(0, 45)
-        });
     }
 
     // Warp stars for zoom effect
@@ -153,12 +193,7 @@ function setup() {
 
     // Star ignition state
     for (let i = 0; i < orionStars.length; i++) {
-        starIgnitions.push({
-            ignited: false,
-            igniteTime: 0,
-            burstRadius: 0,
-            burstAlpha: 0
-        });
+        starIgnitions.push({ ignited: false, igniteTime: 0 });
     }
 
     // Telescope vignette sizing
@@ -174,6 +209,143 @@ function setup() {
             skipIntro();
         });
     }
+}
+
+// ========== SKY RENDERING ==========
+
+// Faint stars at the final view, rendered once per resize
+function buildSkyLayer() {
+    if (skyLayer) skyLayer.remove();
+    skyLayer = createGraphics(width, height);
+    const ctx = skyLayer.drawingContext;
+    ctx.clearRect(0, 0, width, height);
+    for (const s of bgStars) {
+        const p = toScreen(s.x, s.y, FINAL_VIEW);
+        if (p.x < -4 || p.x > width + 4 || p.y < -4 || p.y > height + 4) continue;
+        plotPoint(ctx, p.x, p.y, s.r, s.col, s.a);
+    }
+}
+
+function plotPoint(ctx, x, y, r, col, a) {
+    ctx.fillStyle = rgba(col, a);
+    if (r < 1.1) {
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    } else {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// Orion Nebula: H-alpha red outer shell, teal-white core, Trapezium at the heart.
+// Seeded so it looks the same every visit.
+function buildNebulaSprite() {
+    const N = 512;
+    const c = document.createElement('canvas');
+    c.width = c.height = N;
+    const g = c.getContext('2d');
+    let seed = 42;
+    const rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const gauss = function () { return (rnd() + rnd() + rnd() - 1.5) / 1.5; };
+    const blob = function (x, y, r, col, a) {
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, rgba(col, a));
+        gr.addColorStop(1, rgba(col, 0));
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    };
+    g.globalCompositeOperation = 'lighter';
+    // outer hydrogen shell, skewed like the real wings
+    for (let i = 0; i < 90; i++) {
+        const ang = rnd() * Math.PI * 2;
+        const rad = Math.abs(gauss()) * N * 0.34;
+        const x = N / 2 + Math.cos(ang) * rad * 1.1 + N * 0.03;
+        const y = N / 2 + Math.sin(ang) * rad * 0.9 + N * 0.02;
+        const warm = rnd();
+        const col = warm < 0.72 ? [200, 95 + warm * 30, 125] : [125, 115, 190];
+        blob(x, y, N * (0.07 + rnd() * 0.14), col, 0.022 + rnd() * 0.026);
+    }
+    // ionised core
+    for (let i = 0; i < 40; i++) {
+        const x = N / 2 + gauss() * N * 0.07;
+        const y = N / 2 + gauss() * N * 0.06;
+        blob(x, y, N * (0.03 + rnd() * 0.06), rnd() < 0.6 ? [110, 200, 205] : [220, 230, 245], 0.028 + rnd() * 0.035);
+    }
+    // dark bay ("fish mouth") cutting in from the east
+    g.globalCompositeOperation = 'destination-out';
+    const bay = g.createRadialGradient(N * 0.38, N * 0.44, 0, N * 0.38, N * 0.44, N * 0.11);
+    bay.addColorStop(0, 'rgba(0,0,0,0.55)');
+    bay.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = bay;
+    g.beginPath(); g.arc(N * 0.38, N * 0.44, N * 0.11, 0, Math.PI * 2); g.fill();
+    // Trapezium
+    g.globalCompositeOperation = 'lighter';
+    [[0, 0], [5, -3], [-4, 3], [2, 6]].forEach(function (o) {
+        blob(N / 2 + o[0], N / 2 + o[1], 6, [235, 242, 255], 0.55);
+    });
+    nebulaSprite = c;
+}
+
+function drawNebula(view, alphaMul) {
+    if (!nebulaSprite) return;
+    const p = toScreen(SKY.m42[0], SKY.m42[1], view);
+    // true size is ~1°; drawn larger so it reads at this scale
+    const size = 3.6 * ppd * view.s;
+    const ctx = drawingContext;
+    const breathe = 0.82 + 0.1 * Math.sin(millis() * 0.0006);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alphaMul * breathe;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(0.35 + 0.02 * Math.sin(millis() * 0.00015));
+    ctx.drawImage(nebulaSprite, -size / 2, -size / 2, size, size);
+    ctx.restore();
+}
+
+function drawBrightGlow(ctx, x, y, r, col, a) {
+    const R = r * 6;
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, R);
+    gr.addColorStop(0, rgba(col, 0.35 * a));
+    gr.addColorStop(1, rgba(col, 0));
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+}
+
+// Whole sky at an arbitrary view; the final view uses the baked layer
+function drawSky(view, alphaMul) {
+    const ctx = drawingContext;
+    const t = millis();
+    const baked = view.s === 1 && view.cx === FINAL_VIEW.cx && view.cy === FINAL_VIEW.cy;
+
+    ctx.save();
+    ctx.globalAlpha = alphaMul;
+    if (baked) {
+        image(skyLayer, 0, 0, width, height);
+    } else {
+        for (const s of bgStars) {
+            const p = toScreen(s.x, s.y, view);
+            if (p.x < -4 || p.x > width + 4 || p.y < -4 || p.y > height + 4) continue;
+            plotPoint(ctx, p.x, p.y, s.r, s.col, s.a);
+        }
+    }
+    ctx.restore();
+
+    drawNebula(view, alphaMul);
+
+    ctx.save();
+    for (const s of liveStars) {
+        const p = toScreen(s.x, s.y, view);
+        if (p.x < -30 || p.x > width + 30 || p.y < -30 || p.y > height + 30) continue;
+        const tw = 0.8 + 0.13 * Math.sin(t * s.speed + s.seed) + 0.07 * Math.sin(t * s.speed * 2.7 + s.seed * 3);
+        const a = s.a * tw * alphaMul;
+        if (s.m < 2.3) {
+            ctx.globalCompositeOperation = 'lighter';
+            drawBrightGlow(ctx, p.x, p.y, s.r, s.col, a);
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        plotPoint(ctx, p.x, p.y, s.r, s.col, a);
+    }
+    ctx.restore();
 }
 
 // ========== MAIN DRAW LOOP ==========
@@ -208,16 +380,13 @@ function drawTelescopePhase() {
         return;
     }
 
-    // Deep space background with stars visible through eyepiece
-    drawDeepSpaceBackground(0.7 + t * 0.3);
+    // Wide field through the eyepiece: Orion small, Sirius and Aldebaran in view
+    const view = { s: TELESCOPE_SCALE, cx: FIG_CENTER.x, cy: FIG_CENTER.y };
+    drawSky(view, 0.7 + t * 0.3);
+    drawFigurePoints(view, 0.7 + t * 0.3);
 
-    // Telescope vignette — circular mask with dark outside
     drawTelescopeVignette(vignetteRadius, 1.0);
-
-    // Lens refraction rings
     drawLensRefraction(vignetteRadius, t);
-
-    // Lens flare
     lensFlareAngle += 0.008;
     drawLensFlare(width / 2, height / 2, vignetteRadius, lensFlareAngle, t);
 }
@@ -233,27 +402,22 @@ function drawZoomPhase() {
         return;
     }
 
-    // Stars are visible and start warping
-    drawDeepSpaceBackground(0.5 + easedT * 0.5);
-
-    // Warp speed star streaks
+    // The field genuinely magnifies toward the final framing; streaks sell the speed
+    const view = { s: lerp(TELESCOPE_SCALE, 1, easedT), cx: FIG_CENTER.x, cy: FIG_CENTER.y };
+    drawSky(view, 1);
+    drawFigurePoints(view, 1);
     drawWarpStreaks(easedT);
 
-    // Vignette expands and fades
     let expandedRadius = lerp(vignetteRadius, max(width, height) * 1.5, easeOutExpo(t));
     let vignetteAlpha = 1.0 - easeOutExpo(t);
     if (vignetteAlpha > 0.02) {
         drawTelescopeVignette(expandedRadius, vignetteAlpha);
     }
-
-    // Lens effects fade out
     if (t < 0.5) {
         drawLensRefraction(expandedRadius, 1 - t * 2);
         drawLensFlare(width / 2, height / 2, expandedRadius, lensFlareAngle, 1 - t * 2);
     }
     lensFlareAngle += 0.01;
-
-    // Subtle ambient glow
     drawGradient();
 }
 
@@ -270,22 +434,15 @@ function drawConstellationDrawPhase() {
         document.body.classList.add('intro-done');
     }
 
-    // Full starfield
-    drawDeepSpaceBackground(1.0);
+    drawSky(FINAL_VIEW, 1);
     drawGradient();
-
-    // Shooting stars
     updateShootingStars();
+    drawOrion(drawProgress);
 
-    // Draw Orion with animated lines
-    drawOrionAnimated(drawProgress);
-
-    // Betelgeuse CTA
     if (ctaVisible && !ctaDismissed) {
         drawBetelgeuseCTA();
     }
 
-    // Transition to idle after timeout
     if (ctaVisible && (millis() - ctaStartTime > 20000)) {
         transitionToIdle();
     }
@@ -293,12 +450,11 @@ function drawConstellationDrawPhase() {
 
 // ========== PHASE 4: IDLE ==========
 function drawIdlePhase() {
-    drawDeepSpaceBackground(1.0);
+    drawSky(FINAL_VIEW, 1);
     drawGradient();
     updateShootingStars();
-    drawOrionFlat(0.65);
+    drawOrion(1);
 
-    // Periodic Betelgeuse hint
     if (!ctaDismissed) {
         let terminalOpen = false;
         try { terminalOpen = typeof terminal !== 'undefined' && terminal && terminal.opened; } catch (e) { }
@@ -312,25 +468,416 @@ function drawIdlePhase() {
     }
 }
 
-// ========== DRAWING HELPERS ==========
+// ========== ORION ==========
 
-function drawDeepSpaceBackground(alphaMultiplier) {
-    for (let s of stars) {
-        let wanderX = s.base.x + (noise(s.noiseSeedX + millis() * 0.00005) - 0.5) * 0.02;
-        let wanderY = s.base.y + (noise(s.noiseSeedY + millis() * 0.00005) - 0.5) * 0.02;
-        let spos = skyToScreenFlat(createVector(wanderX, wanderY), 1.0, width / 2, height / 2);
-
-        let t = millis() * 0.0003 + s.twinkleSeed;
-        let alpha = s.maxAlpha +
-            50 * (noise(t) - 0.5) +
-            24 * sin(frameCount * s.twinkleSpeed + s.twinkleSeed * 5);
-        alpha *= alphaMultiplier;
-
-        fill(red(s.color), green(s.color), blue(s.color), alpha);
-        noStroke();
-        circle(spos.x, spos.y, s.r);
+// Figure stars as plain catalogue points (before they ignite)
+function drawFigurePoints(view, alphaMul) {
+    const ctx = drawingContext;
+    for (let i = 0; i < orionStars.length; i++) {
+        const s = orionStars[i];
+        const p = toScreen(s.x, s.y, view);
+        const r = pointRadius(s.mag) * (0.8 + 0.4 * view.s);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        drawBrightGlow(ctx, p.x, p.y, r, s.col, alphaMul);
+        ctx.restore();
+        plotPoint(ctx, p.x, p.y, r, s.col, alphaMul);
     }
 }
+
+function drawMainStar(ctx, x, y, i, k, hovered) {
+    const s = orionStars[i];
+    const t = millis();
+    let d = coreD(i) * (1 + 0.05 * Math.sin(t * 0.0027 + i * 7)) * (hovered ? 1.22 : 1);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // halo
+    let halo = d * 2.6;
+    if (i === 0) halo *= 1 + 0.12 * Math.sin(t * 0.0011); // Betelgeuse: semiregular variable
+    let g = ctx.createRadialGradient(x, y, 0, x, y, halo);
+    g.addColorStop(0, rgba(s.col, 0.5 * k));
+    g.addColorStop(0.22, rgba(s.col, 0.2 * k));
+    g.addColorStop(1, rgba(s.col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, halo, 0, Math.PI * 2); ctx.fill();
+
+    // diffraction spikes on the two zero-magnitude stars
+    if (s.mag < 1) {
+        const L = d * 2.1;
+        ctx.strokeStyle = rgba(s.col, 0.22 * k);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - L, y); ctx.lineTo(x + L, y);
+        ctx.moveTo(x, y - L); ctx.lineTo(x, y + L);
+        ctx.stroke();
+    }
+
+    // core
+    g = ctx.createRadialGradient(x, y, 0, x, y, d * 0.55);
+    g.addColorStop(0, "rgba(255,255,255," + (0.95 * k).toFixed(3) + ")");
+    g.addColorStop(0.35, rgba(s.col, 0.85 * k));
+    g.addColorStop(1, rgba(s.col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, d * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+}
+
+function drawLink(ctx, A, B, ga, gb, p, a) {
+    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy);
+    const full = L - ga - gb;
+    if (full <= 0) return;
+    const ux = dx / L, uy = dy / L;
+    const sx = A.x + ux * ga, sy = A.y + uy * ga;
+    const ex = sx + ux * full * p, ey = sy + uy * full * p;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = "rgba(90,140,255," + (0.10 * a).toFixed(3) + ")";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(160,190,255," + (0.55 * a).toFixed(3) + ")";
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+}
+
+function hitRadius(i) { return Math.max(26, coreD(i) * 1.2); }
+
+function interactive() { return introState === "idle" || (introState === "draw" && ctaVisible); }
+
+function drawOrion(progress) {
+    const ctx = drawingContext;
+    const pos = orionStars.map(function (s) { return toScreen(s.x, s.y, FINAL_VIEW); });
+    orionStarScreenPos = pos;
+    const now = millis();
+
+    // hover
+    hoveredStar = null;
+    if (interactive()) {
+        for (let i = 0; i < pos.length; i++) {
+            if (dist(mouseX, mouseY, pos[i].x, pos[i].y) < hitRadius(i)) {
+                hoveredStar = { idx: i, sx: pos[i].x, sy: pos[i].y };
+                break;
+            }
+        }
+    }
+    const hi = hoveredStar ? hoveredStar.idx : -1;
+
+    // lines, drawn in sequence, stopping short of each star
+    const total = orionLines.length;
+    const done = progress * total;
+    for (let li = 0; li < total; li++) {
+        if (li >= done) break;
+        const a = orionLines[li][0], b = orionLines[li][1];
+        const lp = constrain(done - li, 0, 1);
+        const lit = (a === hi || b === hi) ? 1 : 0.72;
+        drawLink(ctx, pos[a], pos[b], coreD(a) * 0.9, coreD(b) * 0.9, lp, lit);
+
+        if (!starIgnitions[a].ignited) { starIgnitions[a].ignited = true; starIgnitions[a].igniteTime = now; }
+        if (lp >= 0.95 && !starIgnitions[b].ignited) { starIgnitions[b].ignited = true; starIgnitions[b].igniteTime = now; }
+    }
+
+    // stars: catalogue point until ignited, then grow into the full glow
+    for (let i = 0; i < orionStars.length; i++) {
+        const s = orionStars[i];
+        const p = pos[i];
+        const ig = starIgnitions[i];
+        const growT = ig.ignited ? constrain((now - ig.igniteTime) / 500, 0, 1) : 0;
+
+        if (growT < 1) {
+            plotPoint(ctx, p.x, p.y, pointRadius(s.mag) * 1.2, s.col, 1 - growT);
+        }
+        if (ig.ignited) {
+            const since = now - ig.igniteTime;
+            if (since < 800) {
+                const bt = since / 800;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5 + bt * 45, 0, Math.PI * 2);
+                ctx.strokeStyle = rgba(s.col, 0.8 * (1 - easeOutExpo(bt)));
+                ctx.lineWidth = 2.5 * (1 - bt);
+                ctx.stroke();
+            }
+            drawMainStar(ctx, p.x, p.y, i, easeOutExpo(growT), i === hi);
+        }
+    }
+
+    // page labels: always visible once the figure is drawn (touch has no hover)
+    let labelA = 0;
+    if (introState === "idle") labelA = 1;
+    else if (ctaVisible) labelA = constrain((now - ctaStartTime) / 800, 0, 1);
+    if (labelA > 0) drawLabels(ctx, pos, labelA, hi);
+
+    if (hoveredStar) {
+        drawTooltip(ctx, hi);
+        cursor(HAND);
+    } else {
+        cursor(ARROW);
+    }
+}
+
+function drawLabels(ctx, pos, a, hi) {
+    const fs = width < 500 ? 10.5 : 12;
+    ctx.save();
+    ctx.font = "500 " + fs + "px 'IBM Plex Mono', Menlo, monospace";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < orionStars.length; i++) {
+        const s = orionStars[i];
+        let off = coreD(i) * 0.9 + 10;
+        if (i === 0) off = Math.max(off, Math.max(48, coreD(0) * 3.4) / 2 + 8); // clear the CTA ring
+        let x = pos[i].x, y = pos[i].y;
+        let side = s.side;
+        const tw = ctx.measureText(s.page).width;
+        if (side === "left" && x - off - tw < 6) side = "above";
+        if (side === "right" && x + off + tw > width - 6) side = "above";
+        if (side === "left") { ctx.textAlign = "right"; x -= off; }
+        else if (side === "right") { ctx.textAlign = "left"; x += off; }
+        else if (side === "above") { ctx.textAlign = "center"; y -= off + fs * 0.4; }
+        else { ctx.textAlign = "center"; y += off + fs * 0.4; }
+        const base = i === hi ? 1 : 0.62;
+        ctx.fillStyle = i === 0
+            ? "rgba(255,180,110," + (base * a).toFixed(3) + ")"
+            : "rgba(205,215,245," + (base * a).toFixed(3) + ")";
+        ctx.fillText(s.page, x, y);
+    }
+    ctx.restore();
+}
+
+function drawTooltip(ctx, i) {
+    const s = orionStars[i];
+    const l1 = s.page, l2 = s.desc, l3 = s.name + " · " + s.info;
+    ctx.save();
+    ctx.font = "600 15px 'Space Grotesk', sans-serif";
+    const w1 = ctx.measureText(l1).width;
+    ctx.font = "400 12.5px 'Space Grotesk', sans-serif";
+    const w2 = ctx.measureText(l2).width;
+    ctx.font = "400 11px 'Space Grotesk', sans-serif";
+    const w3 = ctx.measureText(l3).width;
+    const w = Math.max(w1, w2, w3) + 24, h = 70;
+    let x = mouseX + 18, y = mouseY - 34;
+    if (x + w > width - 8) x = mouseX - 18 - w;
+    y = constrain(y, 8, height - h - 8);
+
+    ctx.fillStyle = "rgba(18,22,40,0.92)";
+    ctx.strokeStyle = "rgba(110,140,220,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, w, h, 10) : ctx.rect(x, y, w, h);
+    ctx.fill(); ctx.stroke();
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = i === 0 ? "rgb(255,190,120)" : "rgb(240,244,255)";
+    ctx.font = "600 15px 'Space Grotesk', sans-serif";
+    ctx.fillText(l1, x + 12, y + 22);
+    ctx.fillStyle = "rgb(190,200,228)";
+    ctx.font = "400 12.5px 'Space Grotesk', sans-serif";
+    ctx.fillText(l2, x + 12, y + 41);
+    ctx.fillStyle = "rgba(160,172,205,0.8)";
+    ctx.font = "400 11px 'Space Grotesk', sans-serif";
+    ctx.fillText(l3, x + 12, y + 59);
+    ctx.restore();
+}
+
+// ---- Betelgeuse CTA ----
+function drawBetelgeuseCTA() {
+    if (orionStarScreenPos.length === 0) return;
+    let bx = orionStarScreenPos[0].x;
+    let by = orionStarScreenPos[0].y;
+    const ringD = Math.max(48, coreD(0) * 3.4);
+
+    betelgeuseOrbitAngle += 0.015;
+    push();
+    noFill();
+    let cta_elapsed = millis() - ctaStartTime;
+    let fadeIn = constrain(cta_elapsed / 800, 0, 1);
+
+    let segments = 8;
+    let gapAngle = TWO_PI / segments * 0.3;
+    for (let s = 0; s < segments; s++) {
+        let startAngle = betelgeuseOrbitAngle + (TWO_PI / segments) * s;
+        let endAngle = startAngle + (TWO_PI / segments) - gapAngle;
+        stroke(255, 160, 80, 180 * fadeIn);
+        strokeWeight(2);
+        arc(bx, by, ringD, ringD, startAngle, endAngle);
+    }
+
+    let breathR = ringD + 8 * sin(millis() * 0.003);
+    stroke(255, 136, 76, 40 * fadeIn);
+    strokeWeight(1);
+    ellipse(bx, by, breathR, breathR);
+
+    noStroke();
+    pop();
+
+    // Typing text effect
+    let charsToShow = floor((millis() - ctaStartTime) / CTA_TYPING_SPEED);
+    charsToShow = constrain(charsToShow, 0, ctaText.length);
+
+    if (charsToShow > 0) {
+        let displayText = ctaText.substring(0, charsToShow);
+        let cursorBlink = (millis() % 1000) < 500;
+
+        push();
+        textFont('IBM Plex Mono, monospace');
+        const fs = width < 500 ? 12 : 14;
+        textSize(fs);
+        textAlign(CENTER, TOP);
+
+        let tw_text = textWidth(ctaText) + 24;
+        let th = fs + 16;
+        // keep the whole pill on screen (it used to clip on phones)
+        let tx = constrain(bx, tw_text / 2 + 8, width - tw_text / 2 - 8);
+        let ty = by + ringD / 2 + 14;
+
+        fill(14, 16, 31, 200 * fadeIn);
+        noStroke();
+        rect(tx - tw_text / 2, ty - 4, tw_text, th, 15);
+
+        fill(255, 180, 100, 240 * fadeIn);
+        text(displayText, tx, ty + 3);
+
+        if (charsToShow < ctaText.length && cursorBlink) {
+            let cursorX = tx - textWidth(ctaText) / 2 + textWidth(displayText);
+            fill(255, 180, 100, 200 * fadeIn);
+            rect(cursorX + 1, ty + 2, 2, fs + 2);
+        }
+
+        pop();
+    }
+}
+
+// ---- Betelgeuse Hint (idle state) ----
+function drawBetelgeuseHint(cycleT) {
+    if (orionStarScreenPos.length === 0) return;
+    let bx = orionStarScreenPos[0].x;
+    let by = orionStarScreenPos[0].y;
+    let alpha = sin(cycleT * PI) * 180;
+    const r0 = Math.max(24, coreD(0) * 1.7);
+
+    push();
+    noFill();
+    let radius = r0 + 3 * sin(millis() * 0.004);
+    stroke(255, 160, 80, alpha * 0.5);
+    strokeWeight(1.5);
+    ellipse(bx, by, radius * 2, radius * 2);
+
+    noStroke();
+    fill(255, 180, 100, alpha);
+    textFont('IBM Plex Mono, monospace');
+    textSize(11);
+    textAlign(CENTER, TOP);
+    text("✦ start here", bx, by + r0 + 8);
+    pop();
+}
+
+// ========== TRANSITIONS ==========
+
+function transitionToZoom() {
+    introState = "zoom";
+    let introText = document.getElementById('intro-text');
+    if (introText) introText.style.display = 'none';
+}
+
+function transitionToDraw() {
+    introState = "draw";
+    let overlay = document.getElementById('intro-overlay');
+    if (overlay) {
+        overlay.classList.add('fade-out');
+        setTimeout(() => overlay.classList.add('hidden'), 800);
+    }
+    let skipBtn = document.getElementById('skip-intro');
+    if (skipBtn) skipBtn.style.display = 'none';
+}
+
+function transitionToIdle() {
+    introState = "idle";
+    ctaDismissed = false;
+    sessionStorage.setItem('introPlayed', 'true');
+    document.body.classList.add('intro-done');
+    frameRate(30); // twinkle and drift don't need 60fps; saves laptop batteries
+}
+
+function skipIntro() {
+    if (introSkipped) return;
+    introSkipped = true;
+    introState = "idle";
+    drawProgress = 1;
+    ctaDismissed = false;
+
+    for (let ig of starIgnitions) {
+        ig.ignited = true;
+        ig.igniteTime = millis() - 1000;
+    }
+
+    let overlay = document.getElementById('intro-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    let skipBtn = document.getElementById('skip-intro');
+    if (skipBtn) skipBtn.style.display = 'none';
+
+    sessionStorage.setItem('introPlayed', 'true');
+    document.body.classList.add('intro-done');
+    frameRate(30);
+}
+
+// ========== INTERACTION ==========
+function mousePressed() {
+    // During telescope/zoom, do NOT skip — let animation play
+    if (introState === "telescope" || introState === "zoom") return;
+    if (!interactive() || !orionStarScreenPos.length) return;
+
+    for (let i = 0; i < orionStarScreenPos.length; i++) {
+        const p = orionStarScreenPos[i];
+        if (dist(mouseX, mouseY, p.x, p.y) < hitRadius(i)) {
+            if (i === 0) {
+                ctaDismissed = true;
+                if (introState === "draw") transitionToIdle();
+            }
+            // every star is live as soon as the figure is drawn
+            // (previously only Betelgeuse worked for the first 20s)
+            handleStarClick(i);
+            return;
+        }
+    }
+}
+
+function keyPressed() {
+    // No-op during intro — only Skip button can skip
+}
+
+// ---- Star actions ----
+function handleStarClick(idx) {
+    switch (idx) {
+        case 0: openTerminal(); break;
+        case 1: openProjects(); break;
+        case 2: openPapers(); break;
+        case 3: openSkills(); break;
+        case 4: openBlog(); break;
+        case 5: openNow(); break;
+        case 6: openRigel(); break;
+    }
+}
+
+function openSkills() { window.location.href = "skills.html"; }
+function openNow() { window.location.href = "now/"; }
+function openProjects() { window.location.href = "projects.html"; }
+function openPapers() { window.location.href = "papers.html"; }
+function openBlog() { window.location.href = "blogs.html"; }
+function openRigel() { window.location.href = "rigel.html"; }
+
+function windowResized() {
+    resizeCanvas(window.innerWidth, window.innerHeight);
+    vignetteRadius = min(width, height) * 0.35;
+    computeScale();
+    buildSkyLayer();
+}
+
+// ---- Easing ----
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+function easeOutExpo(t) {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+
+// ========== UNCHANGED HELPERS ==========
 
 function drawGradient() {
     let ctx = drawingContext;
@@ -497,308 +1044,6 @@ function drawWarpStreaks(t) {
     pop();
 }
 
-// ---- Animated Orion Drawing ----
-function drawOrionAnimated(progress) {
-    let centerX = width / 2;
-    let centerY = height / 2;
-    let normPos = orionStars.map(getNormalizedCoords);
-    let starPositions = normPos.map(nv => skyToScreenFlat(nv, 0.65, centerX, centerY));
-    orionStarScreenPos = starPositions;
-
-    let totalLines = orionLines.length;
-    let linesComplete = progress * totalLines;
-
-    push();
-    for (let li = 0; li < totalLines; li++) {
-        if (li >= linesComplete) break;
-        let [a, b] = orionLines[li];
-        let lineProgress = constrain(linesComplete - li, 0, 1);
-
-        let ax = starPositions[a].x;
-        let ay = starPositions[a].y;
-        let bx = lerp(ax, starPositions[b].x, lineProgress);
-        let by = lerp(ay, starPositions[b].y, lineProgress);
-
-        stroke(60, 120, 255, 40);
-        strokeWeight(6);
-        line(ax, ay, bx, by);
-        stroke(90, 140, 240, 180);
-        strokeWeight(2.1);
-        line(ax, ay, bx, by);
-
-        if (!starIgnitions[a].ignited) {
-            starIgnitions[a].ignited = true;
-            starIgnitions[a].igniteTime = millis();
-        }
-        if (lineProgress >= 0.95 && !starIgnitions[b].ignited) {
-            starIgnitions[b].ignited = true;
-            starIgnitions[b].igniteTime = millis();
-        }
-    }
-    noStroke();
-    pop();
-
-    // Draw stars with ignition bursts
-    for (let i = 0; i < orionStars.length; i++) {
-        let sx = starPositions[i].x;
-        let sy = starPositions[i].y;
-        let baseCol = randomColorFromType(orionStars[i].type);
-
-        if (starIgnitions[i].ignited) {
-            let timeSinceIgnite = millis() - starIgnitions[i].igniteTime;
-
-            if (timeSinceIgnite < 800) {
-                let burstT = timeSinceIgnite / 800;
-                let burstR = 5 + burstT * 45;
-                let burstAlpha = 200 * (1 - easeOutExpo(burstT));
-                push();
-                noFill();
-                stroke(red(baseCol), green(baseCol), blue(baseCol), burstAlpha);
-                strokeWeight(2.5 * (1 - burstT));
-                ellipse(sx, sy, burstR * 2, burstR * 2);
-                noStroke();
-                pop();
-            }
-
-            let growT = constrain(timeSinceIgnite / 400, 0, 1);
-            let tw = (18 + 8 * sin(frameCount * 0.045 + i * 7)) * easeOutExpo(growT);
-
-            for (let g = 3; g > 0; g--) {
-                fill(red(baseCol), green(baseCol), blue(baseCol), 15 * g * growT);
-                noStroke();
-                ellipse(sx, sy, tw + g * 8, tw + g * 8);
-            }
-            fill(red(baseCol), green(baseCol), blue(baseCol), 230 * growT);
-            ellipse(sx, sy, tw);
-            fill(255, 255, 255, 120 * growT);
-            ellipse(sx, sy, tw * 0.35);
-
-            if (i === 0) {
-                let pulseFactor = 0.7 + 0.3 * sin(millis() * 0.002);
-                fill(255, 100, 40, 25 * pulseFactor * growT);
-                ellipse(sx, sy, tw * 2.5 * pulseFactor);
-                fill(255, 136, 76, 12 * pulseFactor * growT);
-                ellipse(sx, sy, tw * 3.5 * pulseFactor);
-            }
-        }
-    }
-}
-
-// ---- Betelgeuse CTA ----
-function drawBetelgeuseCTA() {
-    if (orionStarScreenPos.length === 0) return;
-    let bx = orionStarScreenPos[0].x;
-    let by = orionStarScreenPos[0].y;
-
-    betelgeuseOrbitAngle += 0.015;
-    push();
-    noFill();
-    let cta_elapsed = millis() - ctaStartTime;
-    let fadeIn = constrain(cta_elapsed / 800, 0, 1);
-
-    let segments = 8;
-    let gapAngle = TWO_PI / segments * 0.3;
-    for (let s = 0; s < segments; s++) {
-        let startAngle = betelgeuseOrbitAngle + (TWO_PI / segments) * s;
-        let endAngle = startAngle + (TWO_PI / segments) - gapAngle;
-        stroke(255, 160, 80, 180 * fadeIn);
-        strokeWeight(2);
-        arc(bx, by, 65, 65, startAngle, endAngle);
-    }
-
-    let breathR = 65 + 8 * sin(millis() * 0.003);
-    stroke(255, 136, 76, 40 * fadeIn);
-    strokeWeight(1);
-    ellipse(bx, by, breathR, breathR);
-
-    noStroke();
-    pop();
-
-    // Typing text effect
-    let charsToShow = floor((millis() - ctaStartTime) / CTA_TYPING_SPEED);
-    charsToShow = constrain(charsToShow, 0, ctaText.length);
-
-    if (charsToShow > 0) {
-        let displayText = ctaText.substring(0, charsToShow);
-        let cursorBlink = (millis() % 1000) < 500;
-
-        push();
-        textFont('IBM Plex Mono, monospace');
-        textSize(14);
-        textAlign(CENTER, TOP);
-
-        let tw_text = textWidth(ctaText) + 24;
-        let th = 30;
-        let tx = bx;
-        let ty = by + 48;
-
-        fill(14, 16, 31, 200 * fadeIn);
-        noStroke();
-        rect(tx - tw_text / 2, ty - 4, tw_text, th, 15);
-
-        fill(255, 180, 100, 240 * fadeIn);
-        text(displayText, tx, ty + 3);
-
-        if (charsToShow < ctaText.length && cursorBlink) {
-            let cursorX = tx - textWidth(ctaText) / 2 + textWidth(displayText);
-            fill(255, 180, 100, 200 * fadeIn);
-            rect(cursorX + 1, ty + 2, 2, 16);
-        }
-
-        pop();
-    }
-}
-
-// ---- Betelgeuse Hint (idle state) ----
-function drawBetelgeuseHint(cycleT) {
-    if (orionStarScreenPos.length === 0) return;
-    let bx = orionStarScreenPos[0].x;
-    let by = orionStarScreenPos[0].y;
-
-    let alpha = sin(cycleT * PI) * 180;
-
-    push();
-    noFill();
-    let radius = 32 + 3 * sin(millis() * 0.004);
-    stroke(255, 160, 80, alpha * 0.5);
-    strokeWeight(1.5);
-    ellipse(bx, by, radius * 2, radius * 2);
-
-    noStroke();
-    fill(255, 180, 100, alpha);
-    textFont('IBM Plex Mono, monospace');
-    textSize(11);
-    textAlign(CENTER, TOP);
-    text("✦ start here", bx, by + 40);
-    pop();
-}
-
-// ---- Original Orion Drawing (Idle State) ----
-function drawOrionFlat(scale) {
-    let centerX = width / 2;
-    let centerY = height / 2;
-    let normPos = orionStars.map(getNormalizedCoords);
-    let starPositions = normPos.map(nv => skyToScreenFlat(nv, scale, centerX, centerY));
-    orionStarScreenPos = starPositions;
-
-    // Lines with glow
-    push();
-    stroke(60, 120, 255, 30);
-    strokeWeight(6);
-    for (let pair of orionLines) {
-        let [a, b] = pair;
-        line(starPositions[a].x, starPositions[a].y, starPositions[b].x, starPositions[b].y);
-    }
-    stroke(90, 140, 240, 140);
-    strokeWeight(2.1);
-    for (let pair of orionLines) {
-        let [a, b] = pair;
-        line(starPositions[a].x, starPositions[a].y, starPositions[b].x, starPositions[b].y);
-    }
-    noStroke();
-    pop();
-
-    // Stars
-    hoveredStar = null;
-    for (let i = 0; i < orionStars.length; i++) {
-        let sx = starPositions[i].x, sy = starPositions[i].y;
-        let tw = 18 + 8 * sin(frameCount * 0.045 + i * 7);
-        let d = dist(mouseX, mouseY, sx, sy);
-        let baseCol = randomColorFromType(orionStars[i].type);
-        let isHovered = d < 28;
-
-        for (let g = 3; g > 0; g--) {
-            fill(red(baseCol), green(baseCol), blue(baseCol), 12 * g);
-            noStroke();
-            ellipse(sx, sy, (isHovered ? tw * 1.5 : tw) + g * 8);
-        }
-        fill(red(baseCol), green(baseCol), blue(baseCol), isHovered ? 255 : 215);
-        ellipse(sx, sy, isHovered ? tw * 1.4 : tw);
-        fill(255, 255, 255, isHovered ? 140 : 90);
-        ellipse(sx, sy, tw * 0.3);
-
-        if (i === 0) {
-            let pulseFactor = 0.7 + 0.3 * sin(millis() * 0.002);
-            fill(255, 100, 40, 20 * pulseFactor);
-            ellipse(sx, sy, tw * 2.5 * pulseFactor);
-            fill(255, 136, 76, 10 * pulseFactor);
-            ellipse(sx, sy, tw * 3.5 * pulseFactor);
-        }
-
-        if (d < 23) hoveredStar = { ...orionStars[i], sx, sy, idx: i };
-    }
-
-    // Tooltip
-    if (hoveredStar) {
-        push();
-        fill(20, 24, 42, 230);
-        stroke(80, 120, 200, 60);
-        strokeWeight(1);
-        rect(mouseX + 16, mouseY - 32, 220, 60, 12);
-        noStroke();
-        fill(255, 255, 240);
-        textFont('Space Grotesk, sans-serif');
-        textSize(16);
-        textStyle(BOLD);
-        text(hoveredStar.name, mouseX + 26, mouseY - 12);
-        textStyle(NORMAL);
-        textSize(12);
-        fill(180, 190, 220);
-        text(hoveredStar.info, mouseX + 26, mouseY + 8);
-        pop();
-        cursor(HAND);
-    } else {
-        cursor(ARROW);
-    }
-}
-
-// ========== TRANSITIONS ==========
-
-function transitionToZoom() {
-    introState = "zoom";
-    let introText = document.getElementById('intro-text');
-    if (introText) introText.style.display = 'none';
-}
-
-function transitionToDraw() {
-    introState = "draw";
-    let overlay = document.getElementById('intro-overlay');
-    if (overlay) {
-        overlay.classList.add('fade-out');
-        setTimeout(() => overlay.classList.add('hidden'), 800);
-    }
-    let skipBtn = document.getElementById('skip-intro');
-    if (skipBtn) skipBtn.style.display = 'none';
-}
-
-function transitionToIdle() {
-    introState = "idle";
-    ctaDismissed = false;
-    sessionStorage.setItem('introPlayed', 'true');
-    document.body.classList.add('intro-done');
-}
-
-function skipIntro() {
-    if (introSkipped) return;
-    introSkipped = true;
-    introState = "idle";
-    drawProgress = 1;
-    ctaDismissed = false;
-
-    for (let ig of starIgnitions) {
-        ig.ignited = true;
-        ig.igniteTime = millis() - 1000;
-    }
-
-    let overlay = document.getElementById('intro-overlay');
-    if (overlay) overlay.classList.add('hidden');
-    let skipBtn = document.getElementById('skip-intro');
-    if (skipBtn) skipBtn.style.display = 'none';
-
-    sessionStorage.setItem('introPlayed', 'true');
-    document.body.classList.add('intro-done');
-}
-
 // ========== SHOOTING STARS ==========
 function updateShootingStars() {
     if (random(1) < 0.010 && shootingStars.length < 2) {
@@ -838,64 +1083,3 @@ function updateShootingStars() {
     }
 }
 
-// ========== INTERACTION ==========
-function mousePressed() {
-    // During telescope/zoom, do NOT skip — let animation play
-    if (introState === "telescope" || introState === "zoom") {
-        return;
-    }
-
-    // During draw phase, clicking Betelgeuse transitions to idle
-    if (introState === "draw" && ctaVisible) {
-        if (orionStarScreenPos.length > 0) {
-            let bPos = orionStarScreenPos[0];
-            if (dist(mouseX, mouseY, bPos.x, bPos.y) < 40) {
-                ctaDismissed = true;
-                transitionToIdle();
-                openTerminal();
-                return;
-            }
-        }
-    }
-
-    // Normal star click handling in idle
-    if (introState === "idle" && orionStarScreenPos) {
-        for (let i = 0; i < orionStarScreenPos.length; i++) {
-            let pos = orionStarScreenPos[i];
-            if (dist(mouseX, mouseY, pos.x, pos.y) < 24) {
-                handleStarClick(i);
-                break;
-            }
-        }
-    }
-}
-
-function keyPressed() {
-    // No-op during intro — only Skip button can skip
-}
-
-// ---- Star actions ----
-function handleStarClick(idx) {
-    switch (idx) {
-        case 0: openTerminal(); break;
-        case 1: openProjects(); break;
-        case 2: openPapers(); break;
-        case 3: openSkills(); break;
-        case 4: openBlog(); break;
-        case 5: openNow(); break;
-        case 6: openRigel(); break;
-    }
-}
-
-function openSkills() { window.location.href = "skills.html"; }
-function openNow() { window.location.href = "now/"; }
-
-function openProjects() { window.location.href = "projects.html"; }
-function openPapers() { window.location.href = "papers.html"; }
-function openBlog() { window.location.href = "blogs.html"; }
-function openRigel() { window.location.href = "rigel.html"; }
-
-function windowResized() {
-    resizeCanvas(window.innerWidth, window.innerHeight);
-    vignetteRadius = min(width, height) * 0.35;
-}

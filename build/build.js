@@ -80,7 +80,7 @@ function articleTemplate({ id, title, date, summary, about, html }) {
   <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <meta property="og:type" content="article">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(summary)}">
@@ -92,17 +92,17 @@ ${JSON.stringify(jsonld, null, 2)}
   <style>
     :root { color-scheme: dark; }
     body {
-      margin: 0; padding: 0 20px;
+      margin: 0;
       background: #0e101f; color: #d6dcf0;
       font: 400 1.05rem/1.75 Georgia, 'Times New Roman', serif;
     }
-    article { max-width: 680px; margin: 0 auto; padding: 48px 0 80px; }
-    h1, h2 { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #f0f3ff; line-height: 1.3; }
+    article { max-width: 680px; margin: 0 auto; padding: 48px 20px 80px; }
+    h1, h2 { font-family: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif; color: #f0f3ff; line-height: 1.3; }
     h1 { font-size: 2rem; margin-bottom: 0.3em; }
     h2 { font-size: 1.3rem; margin-top: 2em; }
     a { color: #8fb8ff; }
     blockquote { border-left: 3px solid #4a6bb0; margin-left: 0; padding-left: 1.2em; color: #aab4d4; }
-    .post-meta { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 0.9rem; color: #8b95b5; margin-bottom: 2.5em; }
+    .post-meta { font-family: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 0.9rem; color: #8b95b5; margin-bottom: 2.5em; }
     .back-nav { font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace; font-size: 0.9rem; margin-bottom: 3em; }
     .back-nav a { color: #70bfff; text-decoration: none; }
     .back-nav a:hover { color: #e2cfff; }
@@ -110,8 +110,21 @@ ${JSON.stringify(jsonld, null, 2)}
     img { max-width: 100%; }
     pre { overflow-x: auto; background: #161a30; padding: 1em; border-radius: 6px; }
   </style>
+  <link rel="stylesheet" href="../css/site.css">
 </head>
 <body>
+  <header class="site-bar">
+    <a class="site-bar__home" href="../index.html">Raman Pandey</a>
+    <nav aria-label="Site">
+      <a href="../projects.html">Projects</a>
+      <a href="../skills.html">Skills</a>
+      <a href="../papers.html">Papers</a>
+      <a href="../blogs.html" aria-current="page">Blog</a>
+      <a href="../now/">Now</a>
+      <a href="../rigel.html">Rigel</a>
+      <a href="../about/">About</a>
+    </nav>
+  </header>
   <article>
     <nav class="back-nav"><a href="../blogs.html">&larr; All posts</a> &nbsp;&middot;&nbsp; <a href="../index.html">ramanpandey.com</a></nav>
     <h1>${esc(title)}</h1>
@@ -167,7 +180,7 @@ function blogsIndexTemplate(posts, quotes) {
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script type="application/ld+json">
 ${JSON.stringify(jsonld, null, 2)}
   </script>
@@ -282,7 +295,20 @@ ${JSON.stringify(jsonld, null, 2)}
       box-shadow: 0 18px 50px rgba(0,0,0,0.65), inset 0 0 40px rgba(0,0,0,0.5);
     }
     .book-back { inset: -3px -4px; border-radius: 3px 11px 11px 3px; }
-    .book-cover { transform: translateZ(12px); }
+    .book-cover { transform: translateZ(12px); transform-style: preserve-3d; }
+    /* cover art faces outward only; without this the title shows mirrored once the cover swings open */
+    .book-cover > span, .book-cover::before { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .book-cover::after { /* inside of the cover: endpaper */
+      content: ""; position: absolute; inset: 6px 8px 6px 4px;
+      transform: translateZ(-1px) rotateY(180deg);
+      backface-visibility: hidden; -webkit-backface-visibility: hidden;
+      border-radius: 8px 2px 2px 8px;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(120, 60, 30, 0.25), transparent 40%),
+        radial-gradient(circle at 70% 65%, rgba(60, 40, 80, 0.25), transparent 45%),
+        linear-gradient(135deg, #3b2a1f, #2a1d2c 50%, #3a2616);
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
+    }
     .book-cover::before { /* embossed gold frame */
       content: ""; position: absolute; inset: 11px;
       border: 3px double rgba(212, 175, 95, 0.55);
@@ -404,6 +430,7 @@ ${JSON.stringify(jsonld, null, 2)}
     @media (max-width: 1319px) { .idle-quote { display: none; } }
     @media (prefers-reduced-motion: reduce) { .idle-quote { display: none; } }
   </style>
+  <link rel="stylesheet" href="css/site.css">
 </head>
 <body>
   <div id="book-veil" aria-hidden="true">
@@ -436,8 +463,17 @@ ${JSON.stringify(jsonld, null, 2)}
   <div id="quote-left" class="idle-quote" aria-hidden="true"></div>
   <div id="quote-right" class="idle-quote" aria-hidden="true"></div>
 
-  <header>
-    <nav><a href="index.html">Home</a> | <span>Blog</span></nav>
+  <header class="site-bar">
+    <a class="site-bar__home" href="index.html">Raman Pandey</a>
+    <nav aria-label="Site">
+      <a href="projects.html">Projects</a>
+      <a href="skills.html">Skills</a>
+      <a href="papers.html">Papers</a>
+      <a href="blogs.html" aria-current="page">Blog</a>
+      <a href="now/">Now</a>
+      <a href="rigel.html">Rigel</a>
+      <a href="about/">About</a>
+    </nav>
   </header>
   <main>
     <h1>Blog</h1>
