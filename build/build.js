@@ -14,6 +14,8 @@
  *   articles/<id>.html   — static post pages (Article JSON-LD, canonical, back-nav)
  *   assets/blogs.json    — index { id, title, date, summary }
  *   blogs.html           — static card index page (Alnitak)
+ *   projects.html        — project cards rendered from assets/projects.json between
+ *                          <!-- projects:start --> and <!-- projects:end --> markers
  *   sitemap.xml          — regenerated with all pages + posts
  */
 
@@ -587,6 +589,45 @@ function sitemapTemplate(posts) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
 }
 
+// ---------- projects page cards ----------
+// Cards are static HTML (crawlers/LLMs don't run JS); js/projects.js only enhances them.
+const ARTIFACT_LABELS = { code: 'Code', paper: 'Paper', poster: 'Poster', nsf: 'NSF Award', org: 'GitHub Org' };
+
+function projectCardHtml(proj) {
+  const badges = Object.entries(proj.artifacts || {})
+    .filter(([, url]) => url)
+    .map(([key, url]) => `<a class="artifact-badge" href="${esc(url)}" data-title="${esc(proj.title)}">${ARTIFACT_LABELS[key] || esc(key)}</a>`)
+    .join('');
+  const status = proj.status === 'in-progress'
+    ? '<span class="status-chip in-progress">In&nbsp;progress</span>'
+    : '<span class="status-chip done">Done</span>';
+  const lines = [
+    `<div class="project" id="${esc(proj.id)}"${proj.short ? ` data-short="${esc(proj.short)}"` : ''}>`,
+    `  <h2>${esc(proj.title)} ${status}</h2>`,
+    `  <p>${esc(proj.desc || '')}</p>`,
+  ];
+  if (proj.summary) lines.push(`  <details><summary>Show Summary</summary><div>${esc(proj.summary)}</div></details>`);
+  if (proj.note) lines.push(`  <p class="project-note">${esc(proj.note)}</p>`);
+  if (badges) lines.push(`  <div class="artifact-row">${badges}</div>`);
+  lines.push('</div>');
+  return lines.join('\n');
+}
+
+function buildProjectsPage() {
+  const projects = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'projects.json'), 'utf8').replace(/^\uFEFF/, ''));
+  const file = path.join(ROOT, 'projects.html');
+  const html = fs.readFileSync(file, 'utf8');
+  const START = '<!-- projects:start -->';
+  const END = '<!-- projects:end -->';
+  const a = html.indexOf(START);
+  const b = html.indexOf(END);
+  if (a === -1 || b === -1 || b < a) throw new Error('projects.html is missing the projects:start / projects:end markers');
+  const cards = projects.map(projectCardHtml).join('\n');
+  const next = html.slice(0, a + START.length) + '\n' + cards + '\n        ' + html.slice(b);
+  if (next !== html) fs.writeFileSync(file, next);
+  console.log(`built projects.html (${projects.length} cards)`);
+}
+
 // ---------- main ----------
 function main() {
   const posts = [];
@@ -626,6 +667,8 @@ function main() {
 
   fs.writeFileSync(path.join(ROOT, 'blogs.html'), blogsIndexTemplate(posts, quotes));
   console.log('built blogs.html');
+
+  buildProjectsPage();
 
   fs.writeFileSync(path.join(ROOT, 'sitemap.xml'), sitemapTemplate(posts));
   console.log('built sitemap.xml');

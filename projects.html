@@ -18,12 +18,82 @@
       "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
     }
     </script>
+    <script>
+    // Arrival handshake (portfolio-motion-brief.md section 2): runs before first paint.
+    // arriving = came from the Bellatrix dive (paint the arrival colour first);
+    // pj-cover = an intro will play, so the cards start transparent (opacity only, never display:none).
+    (function () {
+      var root = document.documentElement;
+      try {
+        var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var a = JSON.parse(sessionStorage.getItem('arrival') || 'null');
+        if (a && Date.now() - a.ts < 4000) {
+          root.classList.add('arriving');
+          root.style.setProperty('--arrival-rgb', a.rgb.join(','));
+          window.__arrival = a;
+          if (!reduced) root.classList.add('pj-cover');
+        } else if (!reduced && !sessionStorage.getItem('intro:projects')) {
+          root.classList.add('pj-cover');
+        }
+        sessionStorage.removeItem('arrival');
+      } catch (e) {}
+      // failsafe: never leave the page covered if the intro script fails
+      setTimeout(function () { root.classList.remove('arriving', 'pj-cover'); }, 6000);
+    }());
+    </script>
+    <script src="js/transition.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/portfolio-pages.css?v=2">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="css/site.css">
+    <style>
+        /* ---- board + cards layout ------------------------------------------
+           Desktop: the board owns the left of the viewport, the cards scroll in a
+           column on the right (js/projects.js reads main's left edge to size the
+           board). Mobile: one column; the board is a backdrop behind the cards. */
+        #circuit-canvas { opacity: 1; }
+        main.projects-main { max-width: none; margin: 0; padding: 1.4rem 16px 1.5rem; }
+        main.projects-main h1 { font-size: 1.7rem; margin: 0.4em 0 0.9em; }
+        @media (min-width: 900px) {
+            main.projects-main {
+                width: min(620px, 40vw);
+                margin: 0 clamp(24px, 3vw, 56px) 0 auto;
+                padding: 2rem 0 1.5rem;
+            }
+        }
+        .project { margin-bottom: 1.2em; }
+
+        /* keyboard focus is the same "look at this card" signal as hover */
+        .project:focus-within { border-color: rgba(170, 200, 255, 0.7); }
+        .project summary:focus-visible,
+        .artifact-badge:focus-visible {
+            outline: 2px solid #9fd7ff;
+            outline-offset: 3px;
+            border-radius: 6px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .project, .artifact-badge { transition: none; }
+            #eng-chip-toggle * { animation: none !important; }
+        }
+
+        /* ---- intro (driven by playIntro) ---- */
+        /* cards wait for their module: opacity only, the content stays in the DOM */
+        html.pj-cover .project { opacity: 0; }
+        /* arrival fill: the last frame of the star dive, collapsing to the core */
+        html.arriving body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            background: rgb(var(--arrival-rgb, 7, 10, 16));
+            clip-path: circle(var(--arrival-r, 150vmax) at var(--arrival-x, 50%) var(--arrival-y, 50%));
+            opacity: var(--arrival-op, 1);
+        }
+    </style>
 </head>
 <body>
     <header class="site-bar">
@@ -38,15 +108,81 @@
             <a href="about/">About</a>
         </nav>
     </header>
-    <!-- Animated Circuit Background -->
-    <main>
+    <!-- Animated microprocessor board (drawn by js/projects.js) -->
+    <canvas id="circuit-canvas" aria-hidden="true"></canvas>
+    <main class="projects-main">
         <h1>My Projects</h1>
-        <div id="project-list" class="projects-grid"></div>
-
+        <div id="project-list" class="projects-grid">
+        <!-- projects:start -->
+<div class="project" id="dl-spm" data-short="DL-SPM">
+  <h2>Deep-Learning-Assisted Scanning Probe Microscopy <span class="status-chip done">Done</span></h2>
+  <p>GNN-assisted quantum fabrication, with Tito Busani's group at UNM CHTM.</p>
+  <details><summary>Show Summary</summary><div>Used a graph neural network to analyze scanning probe microscopy data in real time, identifying fabrication paths and reducing overall writing time by ~40%.</div></details>
+  <p class="project-note">Poster: R. Pandey, I. Stricklin, T. Busani — &quot;Deep-Learning-Assisted Scanning Probe Microscopy Quantum Fabrication&quot;, UNM CHTM. PDF hosting coming soon.</p>
+</div>
+<div class="project" id="gbs-sle" data-short="GBS-SLE">
+  <h2>GBS Systems-Level Engineering (NSF NQVL QCAP) <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Systems-level engineering for the NSF NQVL QCAP project — control, timing, and readout for a Gaussian boson sampling architecture on integrated photonics.</p>
+  <details><summary>Show Summary</summary><div>Part of the UNM-led Quantum Computing Applications of Photonics (QCAP) project. Poster: R. Pandey, J. Dusch, Y. Ngenzi, B. S. Sheelam, K. Pomorski, M. Osinski — &quot;Systems-Level Engineering for Quantum Computing Applications of Photonics: Control, Timing, and Readout in a GBS Sampler&quot;.</div></details>
+  <p class="project-note">SLE poster PDF hosting coming soon.</p>
+  <div class="artifact-row"><a class="artifact-badge" href="https://www.nsf.gov/awardsearch/showAward?AWD_ID=2531569" data-title="GBS Systems-Level Engineering (NSF NQVL QCAP)">NSF Award</a></div>
+</div>
+<div class="project" id="mzi-unitary" data-short="MZI MESH">
+  <h2>Electrically Tuned MZI-Mesh Photonic Unitary <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Electrically tuned MZI-mesh photonic unitary for the QCAP GBS platform — programmable interferometric network under FPGA-based control.</p>
+  <details><summary>Show Summary</summary><div>A programmable Mach–Zehnder interferometer network forming a tunable photonic unitary, developed within the QCAP project.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/MZIMesh" data-title="Electrically Tuned MZI-Mesh Photonic Unitary">Code</a></div>
+</div>
+<div class="project" id="snspd-fpga" data-short="FPGA READOUT">
+  <h2>SNSPD FPGA Readout Pipeline <span class="status-chip done">Done</span></h2>
+  <p>FPGA-based readout for superconducting nanowire single-photon detectors (SNSPDs) — a precision photon-timing pipeline.</p>
+  <details><summary>Show Summary</summary><div>Designed FPGA logic to capture and timestamp SNSPD pulses in a multi-stage readout pipeline, developed from senior design into research work at UNM.</div></details>
+  <p class="project-note">Conference paper citation forthcoming. Project code is institutional and not public.</p>
+</div>
+<div class="project" id="unm-scheduler" data-short="SCHEDULER">
+  <h2>UNM IT Scheduling Platform <span class="status-chip done">Done</span></h2>
+  <p>Full-stack scheduling web app for UNM IT using Django, Node.js, and REST APIs.</p>
+  <details><summary>Show Summary</summary><div>Developed a robust scheduling platform with authentication and user management, streamlining IT appointment booking for UNM staff and students.</div></details>
+  <p class="project-note">Code is institutional (UNM IT).</p>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Scheduler-UNM" data-title="UNM IT Scheduling Platform">GitHub Org</a></div>
+</div>
+<div class="project" id="orion" data-short="ORION">
+  <h2>Project Orion — Local-First AI Assistant <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Voice-controlled offline assistant with gesture recognition, persistent memory, and smart-home delegation.</p>
+  <details><summary>Show Summary</summary><div>A Jarvis-style local-LLM assistant: 20/20/20 rule reminders, persistent memory, live browser queries, OpenCV gesture recognition, and planned TTS-synced animations — all running locally.</div></details>
+  <p class="project-note">Code release pending a repository security review.</p>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-orion" data-title="Project Orion — Local-First AI Assistant">Code</a></div>
+</div>
+<div class="project" id="agent-sim" data-short="TYPHON">
+  <h2>Project Typhon — 2D Evolution Simulator <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Agents evolve survival strategies against harsh climates, environments, and each other.</p>
+  <details><summary>Show Summary</summary><div>An emergent-systems sandbox: populations of agents adapt to shifting climates and competition, exploring evolution and survival dynamics.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-typhon" data-title="Project Typhon — 2D Evolution Simulator">Code</a></div>
+</div>
+<div class="project" id="star-map-site" data-short="THIS SITE">
+  <h2>This Website — Orion Star-Map Portfolio <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Interactive p5.js star-map homepage, terminal interface, and themed subpages — each star of Orion is one pillar of work.</p>
+  <details><summary>Show Summary</summary><div>Telescope-to-Orion intro animation, a working terminal (Betelgeuse), an animated microprocessor projects page, a quantum circuit simulator with Bloch sphere (Rigel), and static-HTML content underneath for machines.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/Alpharceus.github.io" data-title="This Website — Orion Star-Map Portfolio">Code</a></div>
+</div>
+<div class="project" id="eons-survival" data-short="CHRONOS">
+  <h2>Chronos — Text-Based Geological Adventure <span class="status-chip done">Done</span></h2>
+  <p>Procedural text adventure set across geological eras, inspired by PBS Eons.</p>
+  <details><summary>Show Summary</summary><div>A dynamic narrative engine generating survival encounters with time-period-accurate biology and evolving environments.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/eons-survival" data-title="Chronos — Text-Based Geological Adventure">Code</a></div>
+</div>
+<div class="project" id="project-umbra" data-short="UMBRA">
+  <h2>Project Umbra — Distributed Ambient Display <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>A distributed LAN ambient-display system turning idle screens into a coordinated information surface.</p>
+  <details><summary>Show Summary</summary><div>Networked devices coordinate over the local network to render ambient scenes and glanceable information.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-umbra" data-title="Project Umbra — Distributed Ambient Display">Code</a></div>
+</div>
+        <!-- projects:end -->
+        </div>
     </main>
     <footer>
         <p>&copy; 2026 Raman Pandey</p>
     </footer>
-    <script src="js/projects.js?v=2"></script>
+    <script src="js/projects.js?v=3"></script>
 </body>
 </html>

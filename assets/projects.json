@@ -1,7 +1,8 @@
 [
   {
     "id": "dl-spm",
-    "title": "🧠 Deep-Learning-Assisted Scanning Probe Microscopy",
+    "title": "Deep-Learning-Assisted Scanning Probe Microscopy",
+    "short": "DL-SPM",
     "desc": "GNN-assisted quantum fabrication, with Tito Busani's group at UNM CHTM.",
     "summary": "Used a graph neural network to analyze scanning probe microscopy data in real time, identifying fabrication paths and reducing overall writing time by ~40%.",
     "artifacts": {
@@ -14,7 +15,8 @@
   },
   {
     "id": "gbs-sle",
-    "title": "💡 GBS Systems-Level Engineering (NSF NQVL QCAP)",
+    "title": "GBS Systems-Level Engineering (NSF NQVL QCAP)",
+    "short": "GBS-SLE",
     "desc": "Systems-level engineering for the NSF NQVL QCAP project — control, timing, and readout for a Gaussian boson sampling architecture on integrated photonics.",
     "summary": "Part of the UNM-led Quantum Computing Applications of Photonics (QCAP) project. Poster: R. Pandey, J. Dusch, Y. Ngenzi, B. S. Sheelam, K. Pomorski, M. Osinski — \"Systems-Level Engineering for Quantum Computing Applications of Photonics: Control, Timing, and Readout in a GBS Sampler\".",
     "artifacts": {
@@ -28,11 +30,12 @@
   },
   {
     "id": "mzi-unitary",
-    "title": "🌈 Electrically Tuned MZI-Mesh Photonic Unitary",
+    "title": "Electrically Tuned MZI-Mesh Photonic Unitary",
+    "short": "MZI MESH",
     "desc": "Electrically tuned MZI-mesh photonic unitary for the QCAP GBS platform — programmable interferometric network under FPGA-based control.",
     "summary": "A programmable Mach–Zehnder interferometer network forming a tunable photonic unitary, developed within the QCAP project.",
     "artifacts": {
-      "code": null,
+      "code": "https://github.com/Alpharceus/MZIMesh",
       "paper": null,
       "poster": null
     },
@@ -41,7 +44,8 @@
   },
   {
     "id": "snspd-fpga",
-    "title": "📡 SNSPD FPGA Readout Pipeline",
+    "title": "SNSPD FPGA Readout Pipeline",
+    "short": "FPGA READOUT",
     "desc": "FPGA-based readout for superconducting nanowire single-photon detectors (SNSPDs) — a precision photon-timing pipeline.",
     "summary": "Designed FPGA logic to capture and timestamp SNSPD pulses in a multi-stage readout pipeline, developed from senior design into research work at UNM.",
     "artifacts": {
@@ -54,7 +58,8 @@
   },
   {
     "id": "unm-scheduler",
-    "title": "📅 UNM IT Scheduling Platform",
+    "title": "UNM IT Scheduling Platform",
+    "short": "SCHEDULER",
     "desc": "Full-stack scheduling web app for UNM IT using Django, Node.js, and REST APIs.",
     "summary": "Developed a robust scheduling platform with authentication and user management, streamlining IT appointment booking for UNM staff and students.",
     "artifacts": {
@@ -68,11 +73,12 @@
   },
   {
     "id": "orion",
-    "title": "🤖 Project Orion — Local-First AI Assistant",
+    "title": "Project Orion — Local-First AI Assistant",
+    "short": "ORION",
     "desc": "Voice-controlled offline assistant with gesture recognition, persistent memory, and smart-home delegation.",
     "summary": "A Jarvis-style local-LLM assistant: 20/20/20 rule reminders, persistent memory, live browser queries, OpenCV gesture recognition, and planned TTS-synced animations — all running locally.",
     "artifacts": {
-      "code": null,
+      "code": "https://github.com/Alpharceus/project-orion",
       "paper": null,
       "poster": null
     },
@@ -81,11 +87,12 @@
   },
   {
     "id": "agent-sim",
-    "title": "🧬 Agent Survival Simulation",
+    "title": "Project Typhon — 2D Evolution Simulator",
+    "short": "TYPHON",
     "desc": "Agents evolve survival strategies against harsh climates, environments, and each other.",
     "summary": "An emergent-systems sandbox: populations of agents adapt to shifting climates and competition, exploring evolution and survival dynamics.",
     "artifacts": {
-      "code": "https://github.com/Alpharceus/agent-sim-project",
+      "code": "https://github.com/Alpharceus/project-typhon",
       "paper": null,
       "poster": null
     },
@@ -94,7 +101,8 @@
   },
   {
     "id": "star-map-site",
-    "title": "🌌 This Website — Orion Star-Map Portfolio",
+    "title": "This Website — Orion Star-Map Portfolio",
+    "short": "THIS SITE",
     "desc": "Interactive p5.js star-map homepage, terminal interface, and themed subpages — each star of Orion is one pillar of work.",
     "summary": "Telescope-to-Orion intro animation, a working terminal (Betelgeuse), an animated microprocessor projects page, a quantum circuit simulator with Bloch sphere (Rigel), and static-HTML content underneath for machines.",
     "artifacts": {
@@ -107,7 +115,8 @@
   },
   {
     "id": "eons-survival",
-    "title": "🦴 Eons Survival — Text-Based Geological Adventure",
+    "title": "Chronos — Text-Based Geological Adventure",
+    "short": "CHRONOS",
     "desc": "Procedural text adventure set across geological eras, inspired by PBS Eons.",
     "summary": "A dynamic narrative engine generating survival encounters with time-period-accurate biology and evolving environments.",
     "artifacts": {
@@ -120,7 +129,8 @@
   },
   {
     "id": "project-umbra",
-    "title": "📺 Project Umbra — Distributed Ambient Display",
+    "title": "Project Umbra — Distributed Ambient Display",
+    "short": "UMBRA",
     "desc": "A distributed LAN ambient-display system turning idle screens into a coordinated information surface.",
     "summary": "Networked devices coordinate over the local network to render ambient scenes and glanceable information.",
     "artifacts": {

@@ -1,15 +1,86 @@
-﻿document.addEventListener("DOMContentLoaded", () => {
-  // ============================================================
-  // 1. PROJECT LIST + PIPELINE LOADER
-  // ============================================================
+// ========================================================
+// PROJECTS — microprocessor board + Bellatrix arrival intro
+//
+// The project cards are static HTML (build/build.js renders them from
+// assets/projects.json); this file enhances them and draws the board.
+//
+//   Board:  one square package (pins on all four sides, die visible through
+//           the lid), one module per project, octilinear buses (top layer ->
+//           via -> inner layer -> via -> top layer), constant-speed packets.
+//   Layers: mask, traces, pads, silkscreen and package are drawn once per
+//           resize into an offscreen canvas. Only packets, glow and the core
+//           pulse are redrawn per frame (idle: <= IDLE_FPS, paused when hidden).
+//   Intro:  window.playIntro(mode, arrival), mode = 'arrival' | 'first' | 'skip'
+//           (see portfolio-motion-brief.md, "Projects (Bellatrix)").
+//   QA:     window.__board exposes the computed geometry; window.__QA.static
+//           freezes ambient animation so screenshots are deterministic.
+// ========================================================
+(function () {
+  "use strict";
 
+  // ---- Intro timing (ms) — tune here ----
+  // core: [start, end] of the core power-on; cells: [first, last] die cell lit;
+  // launch: first module's packets leave; stagger: gap per module in distance order;
+  // travel: time the longest trace takes (fixes the packet speed for the intro).
+  const INTRO_ARRIVAL = { total: 2450, collapse: 560, core: [300, 700], cells: [420, 1200], launch: 700, stagger: 50, travel: 650 };
+  const INTRO_FIRST = { total: 3800, sweep: 1100, core: [1100, 1550], cells: [1350, 2150], launch: 1700, stagger: 75, travel: 800 };
+  const TRACE_STAGGER_MS = 12;    // per trace inside one bus
+  const CELL_RISE_MS = 80;
+  const CELL_DECAY_MS = 500;      // lit die cell settles to its idle glow
+  const MODULE_RISE_MS = 60;
+  const MODULE_DECAY_MS = 500;    // module flash after a packet lands
+  const CARD_FADE_MS = 300;       // card fades up as its module lights
+  const CARD_LEAD_MS = 80;
+  const REDUCED_FADE_MS = 150;    // reduced motion: arrival colour fades, nothing else moves
+  const CORE_BUMP_MS = 420;
+
+  // ---- Idle / interaction ----
+  const IDLE_FPS = 30;
+  const DPR_CAP = 2;
+  const AMBIENT_PACKETS_PER_S = 2.4;
+  const MAX_PACKETS = 90;
+  const BURST_STAGGER_MS = 45;    // per trace when a card is hovered
+  const BURST_REPEAT_MS = 1500;   // re-send while the card stays hovered
+  const HOVER_EASE_PER_S = 9;
+  const FLASH_DECAY_PER_S = 2.2;
+  const IDLE_CELL_ALPHA = 0.07;
+  const PEAK_CELL_ALPHA = 0.5;
+
+  // ---- Layout ----
+  const MOBILE_MAX_W = 900;       // below this the board is a backdrop behind one card column
+  const EDGE_PX = 18;             // min gap between a module and the board edge
+  const BUS_PITCH_MIN = 4.4, BUS_PITCH_MAX = 12;
+  // module i -> side of the package, walking clockwise from the top-left
+  const SIDE_PATTERN = {
+    desktop: ["T", "T", "T", "R", "R", "B", "B", "B", "L", "L"],
+    mobile: ["T", "T", "R", "R", "R", "B", "B", "L", "L", "L"]
+  };
+  // traces per bus (4-8) for module i
+  const BUS_SIZES = {
+    desktop: [6, 5, 5, 8, 8, 5, 6, 5, 8, 8],
+    mobile: [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+  };
+  const SIDES = ["T", "R", "B", "L"];
+
+  // ---- Palette ----
+  const MASK = "#07100f";
+  const MASK_EDGE = "#040908";
+  const COPPER_TOP = "rgba(203, 141, 80, 0.92)";
+  const COPPER_INNER = "rgba(126, 96, 62, 0.62)";
+  const PAD_FILL = "rgba(224, 168, 112, 0.95)";
+  const PIN_FILL = "rgba(178, 190, 200, 0.75)";
+  const SILK = "rgba(196, 212, 224, 0.16)";
+  const SILK_TEXT = "rgba(196, 212, 224, 0.34)";
+  const PKG_BODY = "#0f1719";
+  const PKG_EDGE = "#2c3b41";
+  const DIE_LINE = "rgba(126, 190, 205, 0.22)";
+
+  // ---- state shared with the pipeline overlay + engineering UI ----
   let isPipelineActive = false;
   let pipelineStageIndex = -1;
   let loadingProject = null;
   const pipelineStages = ["FETCH", "DECODE", "EXECUTE", "MEMORY", "WRITEBACK"];
   let pipelineTimeouts = [];
-
-  const projectListEl = document.getElementById("project-list");
 
   // Pipeline overlay
   const pipelineOverlay = document.createElement("div");
@@ -145,75 +216,6 @@
     }, total);
     pipelineTimeouts.push(finishId);
   }
-
-  // Artifact key → badge label
-  const ARTIFACT_LABELS = {
-    code: "Code",
-    paper: "Paper",
-    poster: "Poster",
-    nsf: "NSF Award",
-    org: "GitHub Org"
-  };
-
-  function escapeHtml(s) {
-    const div = document.createElement("div");
-    div.textContent = s;
-    return div.innerHTML;
-  }
-
-  // Fetch & render projects
-  fetch("assets/projects.json")
-    .then((res) => res.json())
-    .then((projects) => {
-      if (!Array.isArray(projects) || !projects.length) {
-        projectListEl.innerHTML = "<p>No projects available.</p>";
-        return;
-      }
-
-      projects.forEach((proj) => {
-        const div = document.createElement("div");
-        div.className = "project";
-        if (proj.id) div.id = proj.id;
-
-        const badges = Object.entries(proj.artifacts || {})
-          .filter(([, url]) => url)
-          .map(
-            ([key, url]) =>
-              `<a class="artifact-badge" href="${escapeHtml(url)}" data-title="${escapeHtml(proj.title)}">${ARTIFACT_LABELS[key] || key}</a>`
-          )
-          .join("");
-
-        const status = proj.status === "in-progress"
-          ? `<span class="status-chip in-progress">In&nbsp;progress</span>`
-          : `<span class="status-chip done">Done</span>`;
-
-        div.innerHTML = `
-          <h2>${escapeHtml(proj.title)} ${status}</h2>
-          <p>${escapeHtml(proj.desc || "")}</p>
-          ${
-            proj.summary
-              ? `<details><summary>Show Summary</summary><div>${escapeHtml(proj.summary)}</div></details>`
-              : ""
-          }
-          ${proj.note ? `<p class="project-note">${escapeHtml(proj.note)}</p>` : ""}
-          ${badges ? `<div class="artifact-row">${badges}</div>` : ""}
-        `;
-
-        // Badge clicks play the pipeline animation, then navigate
-        div.querySelectorAll(".artifact-badge").forEach((a) => {
-          a.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            startPipelineLoad({ title: proj.title, url: a.getAttribute("href") });
-          });
-        });
-
-        projectListEl.appendChild(div);
-      });
-    })
-    .catch(() => {
-      projectListEl.innerHTML = "<p>No projects available.</p>";
-    });
 
   // ============================================================
   // 2. ENGINEERING MODE UI + OVERDRIVE + TOAST
@@ -430,60 +432,390 @@
   });
 
 
+
   // ============================================================
-  // 3. CANVAS: CINEMATIC PCB MICROPROCESSOR BACKGROUND
+  // 3. BOARD: LAYOUT (pure geometry, no drawing)
   // ============================================================
 
-  const canvas = document.createElement("canvas");
-  canvas.id = "circuit-canvas";
-  Object.assign(canvas.style, {
-    position: "fixed", top: "0", left: "0",
-    width: "100vw", height: "100vh",
-    zIndex: "0", pointerEvents: "none"
-  });
-  document.body.insertBefore(canvas, document.body.firstChild);
+  const root = document.documentElement;
+  const T = window.SiteTransition;
+  const QA = window.__QA || {};
+  const reducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const canvas = document.getElementById("circuit-canvas");
   const ctx = canvas.getContext("2d");
+  const staticCv = document.createElement("canvas");
+  const sctx = staticCv.getContext("2d");
 
-  let t = 0;
-  let cpuCenter = { x: 0, y: 0 };
-  let cpuRadius = 0;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  const easeInOut = (t) => (T ? T.easeInOutCubic(t) : t);
 
-  // ---- Intro animation state ----
-  const PHASE_DARK = 0, PHASE_POWERON = 1, PHASE_TRACEDRAW = 2,
-        PHASE_ZOOMOUT = 3, PHASE_IDLE = 4;
-  // boot sequence plays once per session (repeat visits and reduced-motion
-  // users land straight on the idle board)
-  let skipIntro = false;
-  try {
-    skipIntro = !!sessionStorage.getItem("projectsIntroPlayed") ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch (e) { skipIntro = true; }
-  let introPhase = skipIntro ? PHASE_IDLE : PHASE_DARK;
-  let introTime = skipIntro ? 9999 : 0; // past every timing threshold
-  let introScale = skipIntro ? 1.0 : 2.8;
-  let traceDrawProgress = skipIntro ? 1 : 0;
-  let cardsShown = false;
+  const cardEls = Array.from(document.querySelectorAll("#project-list .project"));
+  const projectDefs = cardEls.map((el, i) => ({
+    id: el.id,
+    label: (el.getAttribute("data-short") || el.id || "P" + i).toUpperCase()
+  }));
 
-  // ---- CPU hitbox ----
-  const cpuHitbox = document.createElement("div");
-  Object.assign(cpuHitbox.style, {
-    position: "fixed", zIndex: "35", pointerEvents: "auto",
-    background: "transparent", cursor: "pointer"
-  });
-  document.body.appendChild(cpuHitbox);
-  cpuHitbox.addEventListener("click", () => {
-    if (introPhase < PHASE_IDLE) return;
-    if (!engineeringMode) setEngineeringMode(true, true);
-    coreOverdrive = Math.min(coreOverdrive + 1.2, 6);
-  });
-
-  // ---- Resize ----
-  function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+  // Frames: (u, v) is "u out from the package edge, v along the edge".
+  function makeFrames(cx, cy, S) {
+    return {
+      T: (u, v) => ({ x: cx + v, y: cy - S / 2 - u }),
+      R: (u, v) => ({ x: cx + S / 2 + u, y: cy + v }),
+      B: (u, v) => ({ x: cx - v, y: cy + S / 2 + u }),
+      L: (u, v) => ({ x: cx - S / 2 - u, y: cy - v })
+    };
   }
-  window.addEventListener("resize", resize);
-  resize();
+
+  function rectsOverlap(a, b, pad) {
+    return a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y;
+  }
+
+  // One attempt at a pitch. Returns { ok, board }.
+  function tryLayout(o) {
+    const { W, H, x0, x1, y0, y1, p, mobile } = o;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    const font = clamp(p * 1.05, 7, 11);
+    const charW = font * 0.62;
+    const pinLen = Math.max(6, p * 0.9), pinW = p * 0.5;
+    const padLen = Math.max(5, p * 0.7), padW = p * 0.5;
+    const tw = Math.max(1.3, p * 0.2);
+    const viaR = Math.max(2, p * 0.34);
+    const stub0 = Math.max(8, p * 1.4), approach = Math.max(8, p * 1.4), rankStep = 2 * p;
+    const pattern = mobile ? SIDE_PATTERN.mobile : SIDE_PATTERN.desktop;
+    const sizes = mobile ? BUS_SIZES.mobile : BUS_SIZES.desktop;
+
+    const bySide = { T: [], R: [], B: [], L: [] };
+    projectDefs.forEach((d, i) => {
+      bySide[pattern[i % pattern.length]].push({ i, id: d.id, label: d.label, size: sizes[i % sizes.length] });
+    });
+    let maxPins = 6;
+    const pinsPer = {};
+    SIDES.forEach((s) => {
+      pinsPer[s] = bySide[s].reduce((a, m) => a + m.size, 0);
+      maxPins = Math.max(maxPins, pinsPer[s]);
+    });
+    const S = maxPins * p + 8 * p;
+    const frame = makeFrames(cx, cy, S);
+    const board = {
+      W, H, x0, x1, y0, y1, cx, cy, S, p, font, tw, viaR, mobile,
+      pkg: { x: cx - S / 2, y: cy - S / 2, s: S },
+      modules: new Array(projectDefs.length), pins: [], pads: [], traces: [], vias: []
+    };
+
+    for (const side of SIDES) {
+      const list = bySide[side];
+      const k = list.length;
+      if (!k) continue;
+      const n = pinsPer[side];
+      const horiz = side === "T" || side === "B";
+      list.forEach((m) => {
+        const lw = m.label.length * charW;
+        m.ts = horiz ? Math.max(m.size * p + 2 * p, lw + 16) : Math.max(m.size * p + 1.4 * p, font * 2.4);
+        m.nd = horiz ? Math.max(3.6 * p, font * 2.8) : lw + 16;
+      });
+      let off = 0;
+      list.forEach((m) => { m.off = off; m.pvc = (off + (m.size - 1) / 2 - (n - 1) / 2) * p; off += m.size; });
+
+      const gapM = horiz ? Math.max(12, p * 1.6) : Math.max(4, p * 0.9);
+      let Dmin = 0;
+      for (let j = 0; j < k - 1; j++) {
+        const need = (list[j].ts + list[j + 1].ts) / 2 + gapM;
+        Dmin = Math.max(Dmin, need - (list[j + 1].pvc - list[j].pvc));
+      }
+      const maxND = Math.max(...list.map((m) => m.nd));
+      const maxTS = Math.max(...list.map((m) => m.ts));
+      let Ud;
+      if (side === "T") Ud = (cy - S / 2) - (y0 + EDGE_PX + maxND);
+      else if (side === "B") Ud = (y1 - EDGE_PX - maxND) - (cy + S / 2);
+      else if (side === "L") Ud = (cx - S / 2) - (x0 + EDGE_PX + maxND);
+      else Ud = (x1 - EDGE_PX - maxND) - (cx + S / 2);
+
+      const half = (k - 1) / 2;
+      let D = Dmin;
+      if (horiz && k >= 2) {
+        const hs = Math.min(cx - x0, x1 - cx) - EDGE_PX - maxTS / 2;
+        D = Math.max(Dmin, (0.8 * hs - list[k - 1].pvc) / half);
+      }
+      // ranks: buses turning the same way fan out from the outside in
+      const dvOf = (j, d) => (k === 1 ? 0 : (j - half) * d);
+      const stubs = (d) => list.map((m, j) => {
+        const dv = dvOf(j, d);
+        let rank = 0;
+        if (dv < -0.5) { for (let i2 = 0; i2 < j; i2++) if (dvOf(i2, d) < -0.5) rank++; }
+        else if (dv > 0.5) { for (let i2 = j + 1; i2 < k; i2++) if (dvOf(i2, d) > 0.5) rank++; }
+        return stub0 + rank * rankStep;
+      });
+      const need = (d) => {
+        const st = stubs(d);
+        let r = 0;
+        list.forEach((m, j) => { r = Math.max(r, pinLen + st[j] + Math.abs(dvOf(j, d)) + approach); });
+        return r;
+      };
+      // shrink the fan-out until every bus fits in the space to its module row
+      let guard = 0;
+      while (need(D) > Ud - 4 && D > Dmin && guard++ < 200) D = Math.max(Dmin, D - Math.max(2, p * 0.5));
+      if (need(D) > Ud - 4) return { ok: false };
+      const stubList = stubs(D);
+
+      list.forEach((m, j) => {
+        const dv = dvOf(j, D);
+        const mv = m.pvc + dv;
+        const stub = stubList[j];
+        const c = frame[side](Ud + m.nd / 2, mv);
+        const rect = horiz ? { x: c.x - m.ts / 2, y: c.y - m.nd / 2, w: m.ts, h: m.nd } : { x: c.x - m.nd / 2, y: c.y - m.ts / 2, w: m.nd, h: m.ts };
+        if (!horiz && Math.abs(mv) + m.ts / 2 > S / 2 - 1) return void (board.bad = true);
+        if (rect.x < x0 + EDGE_PX - 0.01 || rect.x + rect.w > x1 - EDGE_PX + 0.01 || rect.y < y0 + EDGE_PX - 0.01 || rect.y + rect.h > y1 - EDGE_PX + 0.01) board.bad = true;
+        const mod = { i: m.i, id: m.id, label: m.label, side, x: rect.x, y: rect.y, w: rect.w, h: rect.h, bus: [], ref: "U" + (m.i + 2), mv, dv };
+        for (let kk = 0; kk < m.size; kk++) {
+          const q = m.off + kk;
+          const pv = (q - (n - 1) / 2) * p;
+          const pd = mv + (kk - (m.size - 1) / 2) * p;
+          const uv = [[pinLen - 0.5, pv], [pinLen + stub, pv]];
+          const layers = ["t"];
+          if (Math.abs(dv) > 0.5) { uv.push([pinLen + stub + Math.abs(dv), pd]); layers.push("i", "i"); } else layers.push("i");
+          uv.push([Ud - approach, pd], [Ud, pd]);
+          layers.push("t");
+          const pts = uv.map((a) => frame[side](a[0], a[1]));
+          const len = [0];
+          for (let z = 1; z < pts.length; z++) len.push(len[z - 1] + Math.hypot(pts[z].x - pts[z - 1].x, pts[z].y - pts[z - 1].y));
+          const pinC = frame[side](pinLen / 2, pv), padC = frame[side](Ud, pd);
+          const pinRect = horiz ? { x: pinC.x - pinW / 2, y: pinC.y - pinLen / 2, w: pinW, h: pinLen } : { x: pinC.x - pinLen / 2, y: pinC.y - pinW / 2, w: pinLen, h: pinW };
+          const padRect = horiz ? { x: padC.x - padW / 2, y: padC.y - padLen / 2, w: padW, h: padLen } : { x: padC.x - padLen / 2, y: padC.y - padW / 2, w: padLen, h: padW };
+          const pinIdx = board.pins.push(Object.assign({ side, q }, pinRect)) - 1;
+          const padIdx = board.pads.push(Object.assign({ module: m.id }, padRect)) - 1;
+          const tr = { module: m.id, mod: m.i, pin: pinIdx, pad: padIdx, pts, layers, len, total: len[len.length - 1] };
+          for (let z = 1; z < layers.length; z++) if (layers[z] !== layers[z - 1]) board.vias.push({ x: pts[z].x, y: pts[z].y, r: viaR });
+          mod.bus.push(board.traces.push(tr) - 1);
+        }
+        board.modules[m.i] = mod;
+      });
+    }
+    if (board.bad) return { ok: false };
+    const mods = board.modules.filter(Boolean);
+    for (let a = 0; a < mods.length; a++) for (let b = a + 1; b < mods.length; b++) if (rectsOverlap(mods[a], mods[b], 4)) return { ok: false };
+    board.modules = mods;
+    return { ok: true, board };
+  }
+
+  function computeLayout(W, regionRight, H, barH) {
+    const mobile = W < MOBILE_MAX_W;
+    const x0 = 0, x1 = regionRight, y0 = barH, y1 = H;
+    const base = clamp(Math.min(x1 - x0, y1 - y0) / 85, BUS_PITCH_MIN, BUS_PITCH_MAX);
+    let last = null;
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const p = base * Math.pow(0.93, attempt);
+      const res = tryLayout({ W, H, x0, x1, y0, y1, p, mobile });
+      if (res.ok) return res.board;
+      last = p;
+    }
+    // give up gracefully: an empty board (the cards still work)
+    return { W, H, x0, x1, y0, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, S: 0, p: last, font: 8, tw: 1.3, viaR: 2, mobile, pkg: { x: 0, y: 0, s: 0 }, modules: [], pins: [], pads: [], traces: [], vias: [] };
+  }
+
+  // ============================================================
+  // 4. BOARD: STATIC LAYER (once per resize)
+  // ============================================================
+
+  let board = null;
+  let dpr = 1, cssW = 0, cssH = 0;
+  let dieCells = [];   // { x, y, w, h, core, rank }
+  let dieRect = null;
+
+  function chamfer(c, x, y, w, h, k) {
+    c.beginPath();
+    c.moveTo(x + k, y); c.lineTo(x + w, y); c.lineTo(x + w, y + h); c.lineTo(x, y + h); c.lineTo(x, y + k); c.closePath();
+  }
+
+  function buildDie(B) {
+    const S = B.S;
+    const win = { x: B.pkg.x + S * 0.13, y: B.pkg.y + S * 0.13, s: S * 0.74 };
+    const dieS = win.s * 0.9;
+    const die = { x: win.x + (win.s - dieS) / 2, y: win.y + (win.s - dieS) / 2, s: dieS };
+    const N = 9;
+    const area = dieS * 0.76;
+    const ax = die.x + (dieS - area) / 2, ay = die.y + (dieS - area) / 2;
+    const cell = area / N;
+    const cells = [];
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        const dr = r - 4, dc = c - 4;
+        cells.push({
+          x: ax + c * cell, y: ay + r * cell, w: cell, h: cell,
+          core: Math.max(Math.abs(dr), Math.abs(dc)) <= 1,
+          centre: dr === 0 && dc === 0,
+          d: Math.hypot(dr, dc), a: Math.atan2(dr, dc)
+        });
+      }
+    }
+    // lighting order: outward from the centre
+    const order = cells.map((_, i) => i).sort((a, b) => cells[a].d - cells[b].d || cells[a].a - cells[b].a);
+    order.forEach((idx, rank) => { cells[idx].rank = rank / (cells.length - 1); });
+    dieCells = cells;
+    dieRect = { win, die, ax, ay, area, cell };
+  }
+
+  function drawStatic(c, B) {
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    // solder mask
+    const g = c.createRadialGradient(B.cx, B.cy, 0, B.cx, B.cy, Math.max(cssW, cssH) * 0.75);
+    g.addColorStop(0, "#0a1614");
+    g.addColorStop(1, MASK_EDGE);
+    c.fillStyle = MASK;
+    c.fillRect(0, 0, cssW, cssH);
+    c.fillStyle = g;
+    c.fillRect(0, 0, cssW, cssH);
+    if (!B.S) return;
+
+    // board outline + mounting holes (silkscreen)
+    const bo = 8;
+    c.strokeStyle = SILK; c.lineWidth = 1; c.setLineDash([6, 4]);
+    c.strokeRect(B.x0 + bo, B.y0 + bo, B.x1 - B.x0 - 2 * bo, B.y1 - B.y0 - 2 * bo);
+    c.setLineDash([]);
+    [[B.x0 + bo + 12, B.y0 + bo + 12], [B.x1 - bo - 12, B.y0 + bo + 12], [B.x0 + bo + 12, B.y1 - bo - 12], [B.x1 - bo - 12, B.y1 - bo - 12]].forEach((h) => {
+      c.beginPath(); c.arc(h[0], h[1], 4, 0, Math.PI * 2); c.fillStyle = "#03070a"; c.fill();
+      c.beginPath(); c.arc(h[0], h[1], 7, 0, Math.PI * 2); c.strokeStyle = SILK; c.stroke();
+    });
+
+    // traces: top layer bright copper, inner layer muted
+    c.lineJoin = "miter"; c.miterLimit = 4; c.lineCap = "butt";
+    c.lineWidth = B.tw;
+    for (const tr of B.traces) {
+      let z = 0;
+      while (z < tr.layers.length) {
+        let e = z;
+        while (e + 1 < tr.layers.length && tr.layers[e + 1] === tr.layers[z]) e++;
+        c.strokeStyle = tr.layers[z] === "t" ? COPPER_TOP : COPPER_INNER;
+        c.beginPath();
+        c.moveTo(tr.pts[z].x, tr.pts[z].y);
+        for (let q = z + 1; q <= e + 1; q++) c.lineTo(tr.pts[q].x, tr.pts[q].y);
+        c.stroke();
+        z = e + 1;
+      }
+    }
+    // vias
+    for (const v of B.vias) {
+      c.beginPath(); c.arc(v.x, v.y, v.r, 0, Math.PI * 2); c.fillStyle = "rgba(214, 156, 96, 0.95)"; c.fill();
+      c.beginPath(); c.arc(v.x, v.y, v.r * 0.45, 0, Math.PI * 2); c.fillStyle = "#040908"; c.fill();
+    }
+    // pads + pins
+    c.fillStyle = PAD_FILL;
+    for (const d of B.pads) c.fillRect(d.x, d.y, d.w, d.h);
+    c.fillStyle = PIN_FILL;
+    for (const d of B.pins) c.fillRect(d.x, d.y, d.w, d.h);
+
+    // modules
+    c.font = "600 " + B.font + "px 'IBM Plex Mono', Consolas, monospace";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    for (const m of B.modules) {
+      chamfer(c, m.x, m.y, m.w, m.h, Math.min(6, m.h * 0.2));
+      c.fillStyle = "#0c1412"; c.fill();
+      c.strokeStyle = "rgba(120, 146, 154, 0.38)"; c.lineWidth = 1; c.stroke();
+      c.fillStyle = "rgba(186, 204, 212, 0.46)";
+      c.fillText(m.label, m.x + m.w / 2, m.y + m.h / 2);
+      if (B.p >= 8) {
+        c.font = "500 7px 'IBM Plex Mono', Consolas, monospace";
+        c.textAlign = "left"; c.textBaseline = "top";
+        c.fillStyle = SILK_TEXT;
+        c.fillText(m.ref, m.x + 4, m.y + 3);
+        c.font = "600 " + B.font + "px 'IBM Plex Mono', Consolas, monospace";
+        c.textAlign = "center"; c.textBaseline = "middle";
+      }
+    }
+
+    // package body, lid window, die
+    const P = B.pkg;
+    c.beginPath(); c.roundRect(P.x, P.y, P.s, P.s, P.s * 0.04);
+    c.fillStyle = PKG_BODY; c.fill(); c.strokeStyle = PKG_EDGE; c.lineWidth = 1.2; c.stroke();
+    c.beginPath(); c.arc(P.x + P.s * 0.07, P.y + P.s * 0.07, Math.max(1.5, P.s * 0.012), 0, Math.PI * 2);
+    c.fillStyle = "rgba(196, 212, 224, 0.5)"; c.fill();   // pin-1 dot
+    const R = dieRect;
+    c.fillStyle = "#070c0d"; c.strokeStyle = "rgba(150, 190, 200, 0.3)"; c.lineWidth = 1;
+    c.beginPath(); c.roundRect(R.win.x, R.win.y, R.win.s, R.win.s, 3); c.fill(); c.stroke();
+    c.fillStyle = "#0a1315"; c.fillRect(R.die.x, R.die.y, R.die.s, R.die.s);
+    c.strokeStyle = DIE_LINE; c.strokeRect(R.die.x + 0.5, R.die.y + 0.5, R.die.s - 1, R.die.s - 1);
+    // I/O ring: pad ticks around the die edge
+    const ring = R.die.s * 0.04;
+    c.strokeRect(R.die.x + ring, R.die.y + ring, R.die.s - 2 * ring, R.die.s - 2 * ring);
+    c.fillStyle = "rgba(126, 190, 205, 0.16)";
+    const ticks = 24;
+    for (let t = 0; t < ticks; t++) {
+      const f = (t + 0.5) / ticks, tk = Math.max(1, ring * 0.45);
+      c.fillRect(R.die.x + f * R.die.s, R.die.y + 1, tk, ring * 0.6);
+      c.fillRect(R.die.x + f * R.die.s, R.die.y + R.die.s - ring * 0.6 - 1, tk, ring * 0.6);
+      c.fillRect(R.die.x + 1, R.die.y + f * R.die.s, ring * 0.6, tk);
+      c.fillRect(R.die.x + R.die.s - ring * 0.6 - 1, R.die.y + f * R.die.s, ring * 0.6, tk);
+    }
+    // cores + cache banks
+    c.strokeStyle = DIE_LINE; c.lineWidth = 0.6;
+    for (const k of dieCells) {
+      const gap = 0.9;
+      if (k.core) c.strokeRect(k.x + gap, k.y + gap, k.w - 2 * gap, k.h - 2 * gap);
+      else {
+        c.strokeRect(k.x + gap, k.y + gap, k.w - 2 * gap, k.h - 2 * gap);
+        c.beginPath();
+        for (let ly = k.y + k.h / 4; ly < k.y + k.h - 1; ly += k.h / 4) { c.moveTo(k.x + gap, ly); c.lineTo(k.x + k.w - gap, ly); }
+        c.globalAlpha = 0.5; c.stroke(); c.globalAlpha = 1;
+      }
+    }
+    // marking
+    if (P.s > 170) {
+      c.font = "600 " + Math.max(7, P.s * 0.034) + "px 'IBM Plex Mono', Consolas, monospace";
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = SILK_TEXT;
+      c.fillText("BELLATRIX  U1", P.x + P.s / 2, P.y + P.s - P.s * 0.065);
+    }
+  }
+
+  // ============================================================
+  // 5. BOARD: BUILD (layout + static layer + derived data)
+  // ============================================================
+
+  let modById = {};
+  let order = [];            // module indices, nearest to the core first
+  let introMeta = null;      // per-module launch times for the running intro
+  const headerEl = document.querySelector("header.site-bar") || document.querySelector("header");
+  const mainEl = document.querySelector("main");
+
+  function measureRegion() {
+    const W = document.documentElement.clientWidth || window.innerWidth;
+    const H = window.innerHeight;
+    const barH = headerEl ? Math.round(headerEl.getBoundingClientRect().height) : 56;
+    let right = W;
+    if (W >= MOBILE_MAX_W && mainEl) right = Math.max(W * 0.4, Math.round(mainEl.getBoundingClientRect().left) - 32);
+    return { W, H, right, barH };
+  }
+
+  function buildBoard() {
+    const r = measureRegion();
+    const prev = board;
+    board = computeLayout(r.W, r.right, r.H, r.barH);
+    board.staticBuilds = (prev && prev.staticBuilds || 0) + 1;
+    board.frames = prev ? prev.frames : 0;
+    board.introDone = prev ? prev.introDone : false;
+    board.introMs = prev ? prev.introMs : 0;
+    board.mode = prev ? prev.mode : null;
+    dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    cssW = window.innerWidth; cssH = window.innerHeight;
+    for (const cv of [canvas, staticCv]) { cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr); }
+    canvas.style.width = cssW + "px"; canvas.style.height = cssH + "px";
+    buildDie(board);
+    drawStatic(sctx, board);
+    modById = {};
+    board.modules.forEach((m) => {
+      modById[m.id] = m;
+      m.hoverG = prev && prev.byId && prev.byId[m.id] ? prev.byId[m.id].hoverG : 0;
+      m.hover = prev && prev.byId && prev.byId[m.id] ? prev.byId[m.id].hover : false;
+      m.flash = 0;
+      m.lastBurst = -1e9;
+      m.dist = Math.hypot(m.x + m.w / 2 - board.cx, m.y + m.h / 2 - board.cy);
+    });
+    board.byId = modById;
+    order = board.modules.map((_, i) => i).sort((a, b) => board.modules[a].dist - board.modules[b].dist);
+    board.modules.forEach((m) => { m.rank = order.indexOf(board.modules.indexOf(m)); });
+    board.speedPx = board.p * 26;   // px/s, constant for every packet
+    window.__board = board;
+  }
 
   function getAnimMult() {
     let m = 1.0;
@@ -495,547 +827,451 @@
   }
 
   // ============================================================
-  // ORGANIC TRACE PATHS
+  // 6. BOARD: DYNAMIC LAYER (per frame: packets, glow, core pulse)
   // ============================================================
 
-  let tracePaths = [];
-  let modules = [];
-  let vias = [];
-  let smds = [];
+  const state = {
+    packets: [],
+    queue: [],
+    spawnAcc: 0,
+    pulse: 0,
+    corePulseBump: 0,
+    dirty: true
+  };
+  const rand = Math.random;
 
-  function buildLayout() {
-    const W = canvas.width, H = canvas.height;
-    const cx = W * 0.5, cy = H * 0.5;
-    const chipSz = Math.min(W, H) * 0.09;
-    const mw = chipSz * 1.4, mh = chipSz * 0.5;
-
-    modules = [
-      { label: "ROM",     x: cx - mw*2.8, y: cy - mh*4.2, w: mw*0.8, h: mh },
-      { label: "RAM",     x: cx - mw*0.9, y: cy - mh*4.6, w: mw*0.8, h: mh },
-      { label: "CACHE",   x: cx + mw*1.0, y: cy - mh*4.2, w: mw*0.9, h: mh },
-      { label: "MEM",     x: cx + mw*2.4, y: cy - mh*3.0, w: mw*0.8, h: mh },
-      { label: "ALU",     x: cx + mw*3.0, y: cy - mh*0.3, w: mw*0.7, h: mh*1.2 },
-      { label: "DSP",     x: cx + mw*2.6, y: cy + mh*2.2, w: mw*0.7, h: mh },
-      { label: "FPGA",    x: cx - mw*3.2, y: cy - mh*0.5, w: mw*0.9, h: mh*1.2 },
-      { label: "REGFILE", x: cx - mw*2.8, y: cy + mh*2.8, w: mw*0.9, h: mh },
-      { label: "I/O",     x: cx - mw*0.8, y: cy + mh*4.0, w: mw*0.7, h: mh },
-      { label: "CTRL",    x: cx + mw*0.6, y: cy + mh*4.2, w: mw*0.8, h: mh },
-      { label: "DEBUG",   x: cx + mw*2.2, y: cy + mh*3.6, w: mw*0.7, h: mh },
-    ];
-
-    tracePaths = [];
-    for (const mod of modules) {
-      const mx = mod.x + mod.w / 2;
-      const my = mod.y + mod.h / 2;
-      const path = buildTracePath(cx, cy, mx, my, chipSz);
-      tracePaths.push({ path, module: mod, numTracks: 4 });
-    }
-
-    const decoEnds = [
-      { x: W * 0.05, y: H * 0.3 }, { x: W * 0.95, y: H * 0.7 },
-      { x: W * 0.08, y: H * 0.75 }, { x: W * 0.92, y: H * 0.25 },
-      { x: W * 0.15, y: H * 0.08 }, { x: W * 0.85, y: H * 0.92 },
-    ];
-    for (const end of decoEnds) {
-      tracePaths.push({ path: buildTracePath(cx, cy, end.x, end.y, chipSz), module: null, numTracks: 2 });
-    }
-
-    vias = [];
-    for (let i = 0; i < 80; i++) {
-      vias.push({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 2.5, thermal: Math.random() > 0.7 });
-    }
-
-    smds = [];
-    for (let i = 0; i < 50; i++) {
-      smds.push({ x: Math.random() * W, y: Math.random() * H, w: 5 + Math.random() * 6, h: 2.5 + Math.random() * 2, rot: Math.random() > 0.5 ? 0 : Math.PI / 2, isCap: Math.random() > 0.5 });
-    }
+  function pointAt(tr, s) {
+    const L = tr.len;
+    s = clamp(s, 0, tr.total);
+    let i = 1;
+    while (i < L.length - 1 && L[i] < s) i++;
+    const seg = L[i] - L[i - 1] || 1;
+    const f = (s - L[i - 1]) / seg;
+    return { x: tr.pts[i - 1].x + (tr.pts[i].x - tr.pts[i - 1].x) * f, y: tr.pts[i - 1].y + (tr.pts[i].y - tr.pts[i - 1].y) * f, i };
   }
 
-  function buildTracePath(x0, y0, x1, y1, chipEdge) {
-    const dx = x1 - x0, dy = y1 - y0;
-    const angle = Math.atan2(dy, dx);
-    const exitDist = chipEdge * 1.3;
-    const ex = x0 + Math.cos(angle) * exitDist;
-    const ey = y0 + Math.sin(angle) * exitDist;
-    const pts = [{ x: x0, y: y0 }, { x: ex, y: ey }];
-    const remainX = x1 - ex, remainY = y1 - ey;
-    const absX = Math.abs(remainX), absY = Math.abs(remainY);
-    if (absX > 20 && absY > 20) {
-      const bendDist = Math.min(absX, absY) * 0.5;
-      const sx = Math.sign(remainX), sy = Math.sign(remainY);
-      const b1x = ex + sx * bendDist, b1y = ey + sy * bendDist;
-      pts.push({ x: b1x, y: b1y });
-      if (absX > absY) pts.push({ x: x1, y: b1y });
-      else pts.push({ x: b1x, y: y1 });
-    } else if (absX > 10) {
-      pts.push({ x: x1, y: ey });
-    }
-    pts.push({ x: x1, y: y1 });
-    return pts;
-  }
-
-  function pathMeta(pts) {
-    let totalLen = 0;
-    const segs = [];
-    for (let i = 1; i < pts.length; i++) {
-      const len = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
-      segs.push(len);
-      totalLen += len;
-    }
-    return { segs, totalLen };
-  }
-
-  function posOnPath(pts, segs, totalLen, f) {
-    let target = f * totalLen, traveled = 0;
-    for (let i = 0; i < segs.length; i++) {
-      if (target <= traveled + segs[i]) {
-        const local = (target - traveled) / segs[i];
-        return { x: pts[i].x + (pts[i+1].x - pts[i].x) * local, y: pts[i].y + (pts[i+1].y - pts[i].y) * local };
-      }
-      traveled += segs[i];
-    }
-    return { x: pts[pts.length-1].x, y: pts[pts.length-1].y };
-  }
-
-  function perpAtFrac(pts, segs, totalLen, f) {
-    let target = f * totalLen, traveled = 0;
-    for (let i = 0; i < segs.length; i++) {
-      if (target <= traveled + segs[i]) {
-        const dx = pts[i+1].x - pts[i].x, dy = pts[i+1].y - pts[i].y;
-        const len = Math.hypot(dx, dy) || 1;
-        return { x: -dy/len, y: dx/len };
-      }
-      traveled += segs[i];
-    }
-    return { x: 0, y: 1 };
-  }
-
-  buildLayout();
-  window.addEventListener("resize", () => { resize(); buildLayout(); });
-
-  // ============================================================
-  // DRAWING FUNCTIONS
-  // ============================================================
-
-  function drawPCBBase() {
-    ctx.fillStyle = "#080c14";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.globalAlpha = 0.025;
-    ctx.strokeStyle = "#1a3020";
-    ctx.lineWidth = 0.4;
-    for (let x = 0; x < canvas.width; x += 7) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
-    for (let y = 0; y < canvas.height; y += 7) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-    ctx.restore();
-    ctx.save();
-    ctx.globalAlpha = 0.015;
-    ctx.strokeStyle = "#6B5010";
-    ctx.lineWidth = 0.3;
-    for (let x = -canvas.height; x < canvas.width; x += 18) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + canvas.height, canvas.height); ctx.stroke(); }
-    ctx.restore();
-  }
-
-  function drawVias() {
-    ctx.save();
-    for (const v of vias) {
-      ctx.beginPath(); ctx.arc(v.x, v.y, v.r + 1.8, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(100, 80, 20, 0.12)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(v.x, v.y, v.r, 0, Math.PI * 2);
-      ctx.fillStyle = "#060a0e"; ctx.fill();
-      ctx.strokeStyle = "rgba(120, 100, 30, 0.15)"; ctx.lineWidth = 0.5; ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  function drawSMDs() {
-    ctx.save();
-    for (const s of smds) {
-      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.rot);
-      const pw = s.w * 0.25;
-      ctx.fillStyle = "rgba(120, 100, 30, 0.14)";
-      ctx.fillRect(-s.w/2, -s.h/2, pw, s.h); ctx.fillRect(s.w/2 - pw, -s.h/2, pw, s.h);
-      ctx.fillStyle = s.isCap ? "rgba(90, 70, 40, 0.25)" : "rgba(20, 22, 30, 0.35)";
-      ctx.fillRect(-s.w/2 + pw, -s.h/2, s.w - pw*2, s.h);
-      ctx.restore();
-    }
-    ctx.restore();
-  }
-
-  function drawModule(mod, glowFrac) {
-    const { x, y, w, h, label } = mod;
-    ctx.save();
-    const ch = Math.min(w, h) * 0.06;
+  function strokeTraceRange(tr, s0, s1) {
+    const a = pointAt(tr, s0), b = pointAt(tr, s1);
     ctx.beginPath();
-    ctx.moveTo(x + ch, y); ctx.lineTo(x + w - ch, y); ctx.lineTo(x + w, y + ch);
-    ctx.lineTo(x + w, y + h - ch); ctx.lineTo(x + w - ch, y + h); ctx.lineTo(x + ch, y + h);
-    ctx.lineTo(x, y + h - ch); ctx.lineTo(x, y + ch); ctx.closePath();
-    ctx.fillStyle = "rgba(14, 18, 28, " + (0.7 + 0.25 * glowFrac) + ")";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(80, 100, 140, " + (0.2 + 0.4 * glowFrac) + ")";
-    ctx.lineWidth = 1; ctx.stroke();
-    if (glowFrac > 0.01) {
-      ctx.shadowColor = "rgba(56, 180, 248, 0.6)"; ctx.shadowBlur = 12 * glowFrac;
-      ctx.stroke(); ctx.shadowBlur = 0;
-    }
-    ctx.fillStyle = "rgba(130, 110, 40, " + (0.12 + 0.15 * glowFrac) + ")";
-    const ps = 4.5, pl = 4, pwi = 1.5;
-    for (let px = x + ch + 5; px < x + w - ch - 5; px += ps) { ctx.fillRect(px, y - pl, pwi, pl); ctx.fillRect(px, y + h, pwi, pl); }
-    for (let py = y + ch + 5; py < y + h - ch - 5; py += ps) { ctx.fillRect(x - pl, py, pl, pwi); ctx.fillRect(x + w, py, pl, pwi); }
-    ctx.beginPath(); ctx.arc(x + ch + 4, y + ch + 4, 2, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(160, 170, 200, " + (0.15 + 0.3 * glowFrac) + ")"; ctx.fill();
-    ctx.font = "bold 9px 'IBM Plex Mono',monospace";
-    ctx.fillStyle = "rgba(180, 195, 220, " + (0.3 + 0.5 * glowFrac) + ")";
+    ctx.moveTo(a.x, a.y);
+    for (let z = a.i; z < b.i; z++) ctx.lineTo(tr.pts[z].x, tr.pts[z].y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // s = distance travelled from the start of the run (dir +1: pin -> pad, -1: pad -> pin)
+  function drawPacket(tr, s, dir) {
+    const Lp = Math.max(10, board.p * 1.6);
+    let a, b;
+    if (dir > 0) { a = s - Lp; b = s; } else { a = tr.total - s; b = a + Lp; }
+    if (b <= 0 || a >= tr.total) return;
+    const s0 = Math.max(0, a), s1 = Math.min(tr.total, b);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = board.tw * 3.4; ctx.strokeStyle = "rgba(90, 210, 255, 0.22)";
+    strokeTraceRange(tr, s0, s1);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = board.tw * 1.3; ctx.strokeStyle = "rgba(226, 252, 255, 0.95)";
+    strokeTraceRange(tr, s0, s1);
+  }
+
+  function spawn(traceIdx, dir, delay) {
+    if (state.packets.length >= MAX_PACKETS) return;
+    const tr = board.traces[traceIdx];
+    state.packets.push({ tr, dir, s: -(delay || 0) * board.speedPx, hit: false });
+  }
+
+  function burst(mod, now) {
+    if (reducedMotion || !mod || !board.modules.length) return;
+    mod.lastBurst = now;
+    mod.bus.forEach((ti, kk) => state.queue.push({ at: now + kk * BURST_STAGGER_MS, ti, dir: 1 }));
+  }
+
+  function setHover(mod, on) {
+    if (!mod) return;
+    mod.hover = on;
+    state.dirty = true;
+    if (on) burst(mod, performance.now());
+    if (reducedMotion) { mod.hoverG = on ? 1 : 0; drawNow(); }
+  }
+
+  function moduleGlow(m, introG) {
+    return Math.max(introG || 0, m.hoverG * 0.95, m.flash);
+  }
+
+  function drawModuleGlow(m, g) {
+    if (g < 0.01) return;
+    // bus: copper lit up
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineJoin = "miter"; ctx.miterLimit = 4;
+    ctx.lineWidth = board.tw * 1.5;
+    ctx.strokeStyle = "rgba(255, 176, 96, " + (0.42 * g).toFixed(3) + ")";
+    for (const ti of m.bus) strokeTraceRange(board.traces[ti], 0, board.traces[ti].total);
+    ctx.globalCompositeOperation = "source-over";
+    // module body
+    chamfer(ctx, m.x, m.y, m.w, m.h, Math.min(6, m.h * 0.2));
+    ctx.fillStyle = "rgba(60, 170, 210, " + (0.10 * g).toFixed(3) + ")"; ctx.fill();
+    ctx.strokeStyle = "rgba(130, 225, 255, " + (0.2 + 0.6 * g).toFixed(3) + ")"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.font = "600 " + board.font + "px 'IBM Plex Mono', Consolas, monospace";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(label, x + w/2, y + h/2);
-    if (glowFrac > 0.5) {
-      const colors = ["#22c55e", "#38bdf8", "#facc15"];
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath(); ctx.arc(x + w - 7 - i*6, y + h - 5, 1.2, 0, Math.PI * 2);
-        ctx.fillStyle = colors[i];
-        ctx.globalAlpha = glowFrac * (0.3 + 0.25 * Math.sin(t * 0.06 + i * 2));
-        ctx.fill(); ctx.globalAlpha = 1;
-      }
-    }
-    ctx.restore();
+    ctx.fillStyle = "rgba(225, 248, 255, " + (0.25 + 0.7 * g).toFixed(3) + ")";
+    ctx.fillText(m.label, m.x + m.w / 2, m.y + m.h / 2);
+    // status LED
+    ctx.beginPath(); ctx.arc(m.x + m.w - 5, m.y + 5, 1.6, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(60, 235, 150, " + (0.35 + 0.65 * g).toFixed(3) + ")"; ctx.fill();
   }
 
-  function drawCore(cx, cy, size, glowFrac) {
-    const mult = getAnimMult();
-    const jBase = engineeringMode || isPipelineActive ? 1.2 : 0.4;
-    const jOver = 1.0 * coreOverdrive;
-    const jitter = (jBase + jOver) * (mult / 2.5);
-    const xx = cx + Math.sin(t / 25) * jitter;
-    const yy = cy + Math.cos(t / 23) * jitter;
-    const half = size;
-    ctx.save();
-    const ihsSize = size * 2.3, ihsH = ihsSize / 2;
-    const ihsGrad = ctx.createLinearGradient(xx - ihsH, yy - ihsH, xx + ihsH, yy + ihsH);
-    ihsGrad.addColorStop(0, "rgba(30, 35, 50, 0.95)");
-    ihsGrad.addColorStop(0.5, "rgba(45, 50, 65, 0.97)");
-    ihsGrad.addColorStop(1, "rgba(28, 32, 48, 0.95)");
-    ctx.fillStyle = ihsGrad;
-    ctx.beginPath(); ctx.roundRect(xx - ihsH, yy - ihsH, ihsSize, ihsSize, 5); ctx.fill();
-    ctx.strokeStyle = "rgba(100, 120, 160, " + (0.25 + 0.4 * glowFrac) + ")";
-    ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.save(); ctx.globalAlpha = 0.03; ctx.strokeStyle = "#999"; ctx.lineWidth = 0.3;
-    for (let ly = yy - ihsH + 3; ly < yy + ihsH - 3; ly += 1.3) { ctx.beginPath(); ctx.moveTo(xx - ihsH + 3, ly); ctx.lineTo(xx + ihsH - 3, ly); ctx.stroke(); }
-    ctx.restore();
-    ctx.fillStyle = "rgba(15, 20, 12, 0.9)";
-    ctx.beginPath(); ctx.roundRect(xx - half, yy - half, half*2, half*2, 3); ctx.fill();
-    ctx.strokeStyle = "rgba(80, 90, 50, " + (0.2 + 0.3 * glowFrac) + ")";
-    ctx.lineWidth = 0.8; ctx.stroke();
-    const dieSize = size * 1.05, dieH = dieSize / 2;
-    const dieGrad = ctx.createLinearGradient(xx - dieH, yy - dieH, xx + dieH, yy + dieH);
-    dieGrad.addColorStop(0, "rgba(15, 22, 42, 0.96)");
-    dieGrad.addColorStop(0.5, "rgba(25, 40, 70, 0.98)");
-    dieGrad.addColorStop(1, "rgba(12, 20, 38, 0.96)");
-    ctx.fillStyle = dieGrad;
-    ctx.beginPath(); ctx.rect(xx - dieH, yy - dieH, dieSize, dieSize); ctx.fill();
-    ctx.save(); ctx.globalAlpha = 0.06; ctx.strokeStyle = "#4080c0"; ctx.lineWidth = 0.3;
-    for (let gx = xx - dieH + 2; gx < xx + dieH; gx += 3.5) { ctx.beginPath(); ctx.moveTo(gx, yy - dieH + 2); ctx.lineTo(gx, yy + dieH - 2); ctx.stroke(); }
-    for (let gy = yy - dieH + 2; gy < yy + dieH; gy += 3.5) { ctx.beginPath(); ctx.moveTo(xx - dieH + 2, gy); ctx.lineTo(xx + dieH - 2, gy); ctx.stroke(); }
-    ctx.restore();
-    ctx.strokeStyle = "rgba(180, 150, 40, " + (0.15 + 0.25 * glowFrac) + ")";
-    ctx.lineWidth = 1; ctx.stroke();
-    ctx.save(); ctx.globalAlpha = 0.08; ctx.fillStyle = "#8B6914";
-    for (let bx = xx - half + 5; bx < xx + half - 5; bx += 6) {
-      for (let by = yy - half + 5; by < yy + half - 5; by += 6) {
-        if (bx > xx - dieH + 3 && bx < xx + dieH - 3 && by > yy - dieH + 3 && by < yy + dieH - 3) continue;
-        ctx.beginPath(); ctx.arc(bx, by, 1.2, 0, Math.PI * 2); ctx.fill();
+  // cellA: function(cell) -> alpha; batches nothing, used during the intro
+  function drawDie(cellAlpha, coreGlow, bump) {
+    const R = dieRect;
+    if (typeof cellAlpha === "function") {
+      for (const k of dieCells) {
+        const a = cellAlpha(k);
+        if (a < 0.005) continue;
+        ctx.fillStyle = k.core ? "rgba(90, 215, 255, " + a.toFixed(3) + ")" : "rgba(255, 178, 96, " + (a * 0.7).toFixed(3) + ")";
+        ctx.fillRect(k.x + 1, k.y + 1, k.w - 2, k.h - 2);
       }
+    } else {
+      // idle: two batched fills
+      ctx.fillStyle = "rgba(90, 215, 255, " + cellAlpha.toFixed(3) + ")";
+      ctx.beginPath();
+      for (const k of dieCells) if (k.core) ctx.rect(k.x + 1, k.y + 1, k.w - 2, k.h - 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255, 178, 96, " + (cellAlpha * 0.7).toFixed(3) + ")";
+      ctx.beginPath();
+      for (const k of dieCells) if (!k.core) ctx.rect(k.x + 1, k.y + 1, k.w - 2, k.h - 2);
+      ctx.fill();
     }
-    ctx.restore();
-    if (glowFrac > 0.01) {
-      const glowI = 0.3 * glowFrac + 0.12 * (mult / 2.5) + 0.06 * coreOverdrive;
+    // core: the centre cell breathes
+    const cxm = board.cx, cym = board.cy, rr = R.cell * 3.2;
+    const a = clamp(coreGlow * 0.5 + bump * 0.45, 0, 1);
+    if (a > 0.01) {
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(cxm, cym, 0, cxm, cym, rr);
+      g.addColorStop(0, "rgba(190, 245, 255, " + (0.75 * a).toFixed(3) + ")");
+      g.addColorStop(0.45, "rgba(70, 200, 255, " + (0.28 * a).toFixed(3) + ")");
+      g.addColorStop(1, "rgba(70, 200, 255, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(cxm - rr, cym - rr, rr * 2, rr * 2);
+      ctx.globalCompositeOperation = "source-over";
+    }
+  }
+
+  function baseLayer(sweepY) {
+    if (sweepY == null) { ctx.drawImage(staticCv, 0, 0, cssW, cssH); return; }
+    ctx.fillStyle = MASK; ctx.fillRect(0, 0, cssW, cssH);
+    if (sweepY > 0) {
       ctx.save();
-      ctx.strokeStyle = "rgba(56, 180, 248, " + glowI + ")";
-      ctx.lineWidth = 2.5; ctx.shadowColor = "rgba(56, 180, 248, 0.8)"; ctx.shadowBlur = 25 * glowFrac;
-      ctx.beginPath(); ctx.roundRect(xx - ihsH, yy - ihsH, ihsSize, ihsSize, 5); ctx.stroke();
+      ctx.beginPath(); ctx.rect(0, 0, cssW, sweepY); ctx.clip();
+      ctx.drawImage(staticCv, 0, 0, cssW, cssH);
       ctx.restore();
-      const bracketLen = ihsSize * 0.12, bracketInset = 4;
-      ctx.save();
-      ctx.strokeStyle = "rgba(200, 230, 255, " + (0.5 * glowFrac + 0.2 * Math.sin(t * 0.04)) + ")";
-      ctx.lineWidth = 2; ctx.shadowColor = "rgba(56, 180, 248, 0.9)"; ctx.shadowBlur = 10;
-      const corners = [
-        [xx - ihsH + bracketInset, yy - ihsH + bracketInset, 1, 1],
-        [xx + ihsH - bracketInset, yy - ihsH + bracketInset, -1, 1],
-        [xx - ihsH + bracketInset, yy + ihsH - bracketInset, 1, -1],
-        [xx + ihsH - bracketInset, yy + ihsH - bracketInset, -1, -1]
-      ];
-      for (const [bx, by, sx, sy] of corners) {
-        ctx.beginPath(); ctx.moveTo(bx + sx * bracketLen, by); ctx.lineTo(bx, by); ctx.lineTo(bx, by + sy * bracketLen); ctx.stroke();
+      if (sweepY < cssH) {
+        const g = ctx.createLinearGradient(0, sweepY - 70, 0, sweepY + 2);
+        g.addColorStop(0, "rgba(110, 225, 255, 0)");
+        g.addColorStop(1, "rgba(140, 235, 255, 0.28)");
+        ctx.fillStyle = g; ctx.fillRect(0, sweepY - 70, cssW, 72);
+        ctx.fillStyle = "rgba(200, 248, 255, 0.55)"; ctx.fillRect(0, sweepY, cssW, 1.5);
       }
-      ctx.restore();
-      const rGrad = ctx.createRadialGradient(xx, yy, 0, xx, yy, ihsSize * 1.2);
-      rGrad.addColorStop(0, "rgba(56, 180, 248, " + (glowI * 0.4) + ")");
-      rGrad.addColorStop(0.4, "rgba(100, 60, 200, " + (glowI * 0.15) + ")");
-      rGrad.addColorStop(1, "rgba(56, 180, 248, 0)");
-      ctx.fillStyle = rGrad;
-      ctx.fillRect(xx - ihsSize * 1.2, yy - ihsSize * 1.2, ihsSize * 2.4, ihsSize * 2.4);
     }
-    ctx.font = "bold " + Math.round(size * 0.22) + "px 'IBM Plex Mono',monospace";
-    ctx.fillStyle = "rgba(200, 220, 245, " + (0.4 + 0.4 * glowFrac + 0.1 * Math.sin(t * 0.03)) + ")";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("CORE", xx, yy);
-    ctx.font = "6px 'IBM Plex Mono',monospace";
-    ctx.fillStyle = "rgba(140, 150, 170, " + (0.15 * glowFrac) + ")";
-    ctx.fillText("RP-2025K", xx, yy + ihsH - 8);
-    ctx.restore();
   }
 
-  function drawTrace(tp, drawFrac, glowFrac) {
-    const { path, numTracks } = tp;
-    const { segs, totalLen } = pathMeta(path);
-    if (totalLen < 1) return;
-    const trackSpacing = 3.5;
+  // ---- one full frame ----
+  // intro: null (idle) or { t, cfg }
+  function renderScene(now, intro) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    board.frames++;
+    if (!board.S) return;
+    let sweepY = null;
+    if (intro && intro.cfg.sweep) sweepY = board.y0 + (board.H - board.y0) * easeInOut(clamp(intro.t / intro.cfg.sweep, 0, 1));
+    baseLayer(sweepY);
+
+    const mods = board.modules;
+    if (intro) {
+      const t = intro.t, cfg = intro.cfg;
+      // core + die
+      const c0 = cfg.core[0], c1 = cfg.core[1];
+      const coreOn = smooth((t - c0) / (c1 - c0));
+      const bump = t >= c0 ? clamp(1 - (t - c0) / CORE_BUMP_MS, 0, 1) : 0;
+      drawDie((k) => {
+        const start = cfg.cells[0] + k.rank * (cfg.cells[1] - cfg.cells[0]);
+        const d = t - start;
+        if (d < 0) return 0;
+        if (d < CELL_RISE_MS) return PEAK_CELL_ALPHA * d / CELL_RISE_MS;
+        return IDLE_CELL_ALPHA + (PEAK_CELL_ALPHA - IDLE_CELL_ALPHA) * (1 - clamp((d - CELL_RISE_MS) / CELL_DECAY_MS, 0, 1));
+      }, coreOn * (0.5 + 0.5 * pulseValue()), bump);
+      // modules + packets, from the time alone (seekable)
+      for (const m of mods) {
+        const meta = introMeta[m.i];
+        const d = t - meta.arrive;
+        let g = 0;
+        if (d >= 0) g = d < MODULE_RISE_MS ? d / MODULE_RISE_MS : 1 - clamp((d - MODULE_RISE_MS) / MODULE_DECAY_MS, 0, 1);
+        drawModuleGlow(m, moduleGlow(m, g));
+      }
+      for (const m of mods) {
+        const meta = introMeta[m.i];
+        m.bus.forEach((ti, kk) => {
+          const tr = board.traces[ti];
+          const s = (t - meta.launch - kk * TRACE_STAGGER_MS) * meta.speed / 1000;
+          if (s > 0 && s < tr.total + 14) drawPacket(tr, s, 1);
+        });
+      }
+      return;
+    }
+
+    // idle
+    const shimmer = QA.static || reducedMotion ? 0 : 1;
+    drawDie(IDLE_CELL_ALPHA, 0.5 + 0.5 * pulseValue() + Math.min(coreOverdrive, 6) * 0.08, state.corePulseBump);
+    if (shimmer) {
+      // a few die cells flicker
+      for (let n = 0; n < 5; n++) {
+        const k = dieCells[(Math.floor(now / 900) * 7 + n * 17) % dieCells.length];
+        const a = 0.14 * (0.5 + 0.5 * Math.sin(now * 0.004 + n * 1.9));
+        ctx.fillStyle = k.core ? "rgba(90, 215, 255, " + a.toFixed(3) + ")" : "rgba(255, 178, 96, " + a.toFixed(3) + ")";
+        ctx.fillRect(k.x + 1, k.y + 1, k.w - 2, k.h - 2);
+      }
+    }
+    for (const m of mods) drawModuleGlow(m, moduleGlow(m, 0));
+    for (const pk of state.packets) if (pk.s > 0) drawPacket(pk.tr, pk.s, pk.dir);
+  }
+
+  function pulseValue() { return 0.5 + 0.5 * Math.sin(state.pulse); }
+
+  // idle update: dt in seconds
+  function stepIdle(now, dt) {
     const mult = getAnimMult();
-    const visibleLen = drawFrac * totalLen;
-    for (let trk = 0; trk < numTracks; trk++) {
-      const offset = (trk - (numTracks - 1) / 2) * trackSpacing;
-      ctx.save(); ctx.beginPath();
-      let segTraveled = 0;
-      for (let i = 0; i < path.length; i++) {
-        if (i === 0) {
-          const perp = perpAtFrac(path, segs, totalLen, 0);
-          ctx.moveTo(path[0].x + perp.x * offset, path[0].y + perp.y * offset);
-        } else {
-          segTraveled += segs[i-1];
-          if (segTraveled > visibleLen) {
-            const overshoot = segTraveled - visibleLen;
-            const frac = 1 - overshoot / segs[i-1];
-            const px = path[i-1].x + (path[i].x - path[i-1].x) * frac;
-            const py = path[i-1].y + (path[i].y - path[i-1].y) * frac;
-            const perp = perpAtFrac(path, segs, totalLen, drawFrac);
-            ctx.lineTo(px + perp.x * offset, py + perp.y * offset);
-            break;
-          }
-          const perp = perpAtFrac(path, segs, totalLen, segTraveled / totalLen);
-          ctx.lineTo(path[i].x + perp.x * offset, path[i].y + perp.y * offset);
-        }
-      }
-      ctx.strokeStyle = "rgba(110, 90, 25, " + (0.18 + 0.12 * glowFrac) + ")";
-      ctx.lineWidth = 2.8; ctx.stroke();
-      if (glowFrac > 0.01) {
-        ctx.strokeStyle = "rgba(56, 180, 248, " + (0.12 * glowFrac + 0.04 * (mult / 2.5)) + ")";
-        ctx.lineWidth = 1.8; ctx.shadowColor = "rgba(56, 180, 248, 0.5)"; ctx.shadowBlur = 5 * glowFrac;
-        ctx.stroke(); ctx.shadowBlur = 0;
-      }
-      ctx.restore();
+    board.modules.forEach((m) => {
+      const target = m.hover ? 1 : 0;
+      m.hoverG += (target - m.hoverG) * Math.min(1, dt * HOVER_EASE_PER_S);
+      if (Math.abs(target - m.hoverG) < 0.004) m.hoverG = target;
+      m.flash = Math.max(0, m.flash - dt * FLASH_DECAY_PER_S);
+      if (m.hover && now - m.lastBurst > BURST_REPEAT_MS) burst(m, now);
+    });
+    state.corePulseBump = Math.max(0, state.corePulseBump - dt * 2.2);
+    if (QA.static) { state.packets.length = 0; state.queue.length = 0; return; }
+    if (mult <= 0) return;
+    state.pulse += dt * 1.6 * Math.max(mult, 0.4);
+    coreOverdrive = Math.max(0, coreOverdrive - 0.12 * dt);
+    // queued burst packets
+    for (let i = state.queue.length - 1; i >= 0; i--) {
+      if (state.queue[i].at <= now) { spawn(state.queue[i].ti, state.queue[i].dir, 0); state.queue.splice(i, 1); }
     }
-    if (glowFrac > 0.1 && !halted) {
-      const waveSpeed = 22 / Math.max(mult, 0.01);
-      const amplitude = trackSpacing * 0.8;
-      const numWaves = 2 + Math.floor(coreOverdrive * 0.5);
-      for (let w = 0; w < numWaves; w++) {
-        const basePhase = t / waveSpeed + w * 0.4;
-        const headFrac = ((basePhase % 1) + 1) % 1;
-        ctx.save(); ctx.beginPath();
-        let firstPt = true;
-        const waveSteps = 40;
-        const waveWindowLen = 0.15;
-        for (let s = 0; s <= waveSteps; s++) {
-          const sf = s / waveSteps;
-          const f = headFrac - waveWindowLen + sf * waveWindowLen;
-          if (f < 0 || f > drawFrac) continue;
-          const pos = posOnPath(path, segs, totalLen, f);
-          const perp = perpAtFrac(path, segs, totalLen, f);
-          const wavePhase = sf * Math.PI * 4;
-          const sinVal = Math.sin(wavePhase) * amplitude;
-          const fadeEdge = Math.sin(sf * Math.PI);
-          const px = pos.x + perp.x * sinVal * fadeEdge;
-          const py = pos.y + perp.y * sinVal * fadeEdge;
-          if (firstPt) { ctx.moveTo(px, py); firstPt = false; }
-          else ctx.lineTo(px, py);
-        }
-        ctx.strokeStyle = "rgba(180, 220, 255, " + (0.5 * glowFrac) + ")";
-        ctx.lineWidth = 1.5; ctx.shadowColor = "rgba(56, 200, 248, 0.8)"; ctx.shadowBlur = 10 * glowFrac;
-        ctx.stroke(); ctx.restore();
+    // ambient traffic
+    state.spawnAcc += dt * AMBIENT_PACKETS_PER_S * mult;
+    while (state.spawnAcc >= 1 && board.traces.length) {
+      state.spawnAcc -= 1;
+      spawn(Math.floor(rand() * board.traces.length), rand() < 0.7 ? 1 : -1, 0);
+    }
+    if (coreOverdrive > 0.8 && board.modules.length && rand() < dt * 0.6 * coreOverdrive) {
+      burst(board.modules[Math.floor(rand() * board.modules.length)], now);
+    }
+    // advance
+    const v = board.speedPx * mult;
+    for (let i = state.packets.length - 1; i >= 0; i--) {
+      const pk = state.packets[i];
+      pk.s += v * dt;
+      if (!pk.hit && pk.s >= pk.tr.total) {
+        pk.hit = true;
+        if (pk.dir > 0) { const m = board.modules.find((q) => q.i === pk.tr.mod); if (m) m.flash = 1; }
+        else state.corePulseBump = Math.min(1, state.corePulseBump + 0.35);
       }
+      if (pk.s >= pk.tr.total + 14) state.packets.splice(i, 1);
     }
   }
 
-  function generateBolt(x1, y1, x2, y2, jag) {
-    const pts = [{ x: x1, y: y1 }];
-    const segments = 6 + Math.floor(Math.random() * 4);
-    for (let i = 1; i < segments; i++) {
-      const f = i / segments;
-      pts.push({ x: x1 + (x2 - x1) * f + (Math.random() - 0.5) * jag, y: y1 + (y2 - y1) * f + (Math.random() - 0.5) * jag });
+  // ---- idle loop: <= IDLE_FPS, paused while the tab is hidden ----
+  let raf = 0, lastDraw = -1e9, lastStep = 0;
+  const FRAME_MS = 1000 / IDLE_FPS;
+
+  function loop(now) {
+    raf = 0;
+    if (document.hidden || reducedMotion || !board.introDone) return;
+    if (now - lastDraw >= FRAME_MS - 2) {
+      const dt = lastStep ? Math.min((now - lastStep) / 1000, 0.1) : 0;
+      lastStep = now; lastDraw = now;
+      const idleNow = halted && !state.dirty && !state.packets.length && !state.queue.length && !board.modules.some((m) => m.flash > 0 || m.hoverG !== (m.hover ? 1 : 0));
+      if (!idleNow) {
+        stepIdle(now, dt);
+        renderScene(now, null);
+        state.dirty = false;
+      }
     }
-    pts.push({ x: x2, y: y2 });
-    return pts;
+    raf = requestAnimationFrame(loop);
   }
 
-  function drawLightning(x1, y1, x2, y2, intensity) {
-    const mainPts = generateBolt(x1, y1, x2, y2, intensity * 18);
-    ctx.save();
-    ctx.beginPath(); ctx.moveTo(mainPts[0].x, mainPts[0].y);
-    for (let i = 1; i < mainPts.length; i++) ctx.lineTo(mainPts[i].x, mainPts[i].y);
-    ctx.strokeStyle = "rgba(220, 235, 255, 0.9)"; ctx.lineWidth = 1.8;
-    ctx.shadowColor = "rgba(100, 160, 255, 0.9)"; ctx.shadowBlur = 20; ctx.stroke();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)"; ctx.lineWidth = 0.6; ctx.shadowBlur = 8; ctx.stroke();
-    ctx.restore();
-    const numBranches = 2 + Math.floor(Math.random() * 3);
-    for (let b = 0; b < numBranches; b++) {
-      const srcIdx = Math.floor(Math.random() * (mainPts.length - 2)) + 1;
-      const src = mainPts[srcIdx];
-      const angle = Math.atan2(y2 - y1, x2 - x1) + (Math.random() - 0.5) * 1.5;
-      const branchLen = 20 + Math.random() * 40 * intensity;
-      const branchPts = generateBolt(src.x, src.y, src.x + Math.cos(angle) * branchLen, src.y + Math.sin(angle) * branchLen, intensity * 8);
-      ctx.save(); ctx.beginPath(); ctx.moveTo(branchPts[0].x, branchPts[0].y);
-      for (let i = 1; i < branchPts.length; i++) ctx.lineTo(branchPts[i].x, branchPts[i].y);
-      ctx.strokeStyle = "rgba(180, 210, 255, " + (0.4 + Math.random() * 0.3) + ")";
-      ctx.lineWidth = 0.8; ctx.shadowColor = "rgba(80, 140, 255, 0.6)"; ctx.shadowBlur = 12; ctx.stroke();
-      ctx.restore();
-    }
+  function startLoop() {
+    if (raf || reducedMotion || document.hidden) return;
+    lastStep = 0;
+    raf = requestAnimationFrame(loop);
   }
 
-  function drawPCBEdge() {
-    const m = 10;
-    ctx.save();
-    ctx.strokeStyle = "rgba(80, 100, 60, 0.25)"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(m, m, canvas.width - m*2, canvas.height - m*2, 5); ctx.stroke();
-    const fc = 28, fw = 5, fh = 12, fg = 3;
-    const totalW = fc * (fw + fg), startX = (canvas.width - totalW) / 2, fY = canvas.height - m - fh;
-    for (let i = 0; i < fc; i++) {
-      const fx = startX + i * (fw + fg);
-      const grad = ctx.createLinearGradient(fx, fY, fx, fY + fh);
-      grad.addColorStop(0, "rgba(170, 140, 35, 0.3)"); grad.addColorStop(1, "rgba(140, 110, 25, 0.25)");
-      ctx.fillStyle = grad; ctx.fillRect(fx, fY, fw, fh);
-    }
-    ctx.font = "8px 'IBM Plex Mono',monospace";
-    ctx.fillStyle = "rgba(180, 190, 160, 0.1)"; ctx.textAlign = "left";
-    ctx.fillText("PCB-RP2025-REV.C", m + 60, m + 14);
-    ctx.restore();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { if (raf) cancelAnimationFrame(raf); raf = 0; }
+    else if (board.introDone) startLoop();
+  });
+
+  // draw one idle frame now (reduced motion, resize while paused)
+  function drawNow() {
+    if (!board || !board.introDone) return;
+    renderScene(performance.now(), null);
   }
 
   // ============================================================
-  // INTRO ANIMATION STATE MACHINE
+  // 7. INTRO
   // ============================================================
 
-  const INTRO_TIMINGS = { DARK_END: 0.6, POWERON_END: 1.8, TRACEDRAW_END: 4.5, ZOOMOUT_END: 6.0 };
+  const ARRIVAL_VARS = ["--arrival-r", "--arrival-x", "--arrival-y", "--arrival-op"];
+  let introHandle = null, introOff = null, introCfg = null, introLast = 0;
 
-  function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
-
-  function updateIntro(dt) {
-    introTime += dt;
-    if (introPhase === PHASE_DARK && introTime >= INTRO_TIMINGS.DARK_END) introPhase = PHASE_POWERON;
-    if (introPhase === PHASE_POWERON && introTime >= INTRO_TIMINGS.POWERON_END) introPhase = PHASE_TRACEDRAW;
-    if (introPhase === PHASE_TRACEDRAW && introTime >= INTRO_TIMINGS.TRACEDRAW_END) introPhase = PHASE_ZOOMOUT;
-    if (introPhase === PHASE_ZOOMOUT && introTime >= INTRO_TIMINGS.ZOOMOUT_END) {
-      introPhase = PHASE_IDLE;
-      try { sessionStorage.setItem("projectsIntroPlayed", "1"); } catch (e) {}
-    }
-
-    if (introPhase <= PHASE_POWERON) introScale = 2.8;
-    else if (introPhase === PHASE_TRACEDRAW) {
-      const f = (introTime - INTRO_TIMINGS.POWERON_END) / (INTRO_TIMINGS.TRACEDRAW_END - INTRO_TIMINGS.POWERON_END);
-      introScale = 2.8 - f * 0.8;
-    } else if (introPhase === PHASE_ZOOMOUT) {
-      const f = (introTime - INTRO_TIMINGS.TRACEDRAW_END) / (INTRO_TIMINGS.ZOOMOUT_END - INTRO_TIMINGS.TRACEDRAW_END);
-      introScale = 2.0 - f * 1.0;
-    } else introScale = 1.0;
-
-    if (introPhase >= PHASE_TRACEDRAW) {
-      const f = Math.min(1, (introTime - INTRO_TIMINGS.POWERON_END) / (INTRO_TIMINGS.ZOOMOUT_END - INTRO_TIMINGS.POWERON_END));
-      traceDrawProgress = easeOutCubic(f);
-    }
-
-    if (introPhase === PHASE_IDLE && !cardsShown) { cardsShown = true; showProjectCards(); }
+  function buildIntroMeta(cfg) {
+    const maxLen = Math.max(1, ...board.traces.map((t) => t.total));
+    const speed = maxLen / (cfg.travel / 1000);   // px/s, same for every packet in the intro
+    introMeta = {};
+    board.modules.forEach((m) => {
+      const launch = cfg.launch + m.rank * cfg.stagger;
+      const minLen = Math.min(...m.bus.map((ti) => board.traces[ti].total));
+      const maxLenM = Math.max(...m.bus.map((ti) => board.traces[ti].total));
+      const arrive = launch + minLen / speed * 1000;
+      const end = launch + (m.bus.length - 1) * TRACE_STAGGER_MS + (maxLenM + 14) / speed * 1000;
+      introMeta[m.i] = { launch, speed, arrive, settled: Math.max(end, arrive + MODULE_RISE_MS + MODULE_DECAY_MS) };
+    });
+    board.introMeta = introMeta;
   }
 
-  function getCoreGlow() {
-    if (introPhase === PHASE_DARK) return 0;
-    if (introPhase === PHASE_POWERON) {
-      return easeOutCubic(Math.min(1, (introTime - INTRO_TIMINGS.DARK_END) / (INTRO_TIMINGS.POWERON_END - INTRO_TIMINGS.DARK_END)));
+  function applyIntroFrame(t, cfg, arrival) {
+    if (arrival) {
+      const c = clamp(t / cfg.collapse, 0, 1);
+      const r0 = Math.hypot(board.W, board.H);
+      root.style.setProperty("--arrival-r", (r0 * (1 - easeInOut(c))).toFixed(1) + "px");
+      root.style.setProperty("--arrival-op", c >= 1 ? "0" : "1");
     }
-    return 1;
+    cardEls.forEach((el) => {
+      const m = modById[el.id];
+      const meta = m && introMeta[m.i];
+      const o = meta ? smooth((t - meta.arrive + CARD_LEAD_MS) / CARD_FADE_MS) : 1;
+      el.style.opacity = o >= 1 ? "1" : o.toFixed(3);
+    });
+    if (board.S) renderScene(0, { t, cfg });
   }
 
-  function getModuleGlow(mod) {
-    if (introPhase < PHASE_TRACEDRAW) return 0;
-    const cx = canvas.width * 0.5, cy = canvas.height * 0.5;
-    const mx = mod.x + mod.w/2, my = mod.y + mod.h/2;
-    const dist = Math.hypot(mx - cx, my - cy);
-    const maxDist = Math.hypot(canvas.width, canvas.height) * 0.5;
-    return Math.max(0, Math.min(1, (traceDrawProgress - (dist / maxDist) * 0.6) / 0.3));
+  function finishIntro() {
+    if (introOff) { introOff(); introOff = null; }
+    introHandle = null;
+    root.classList.remove("arriving", "pj-cover");
+    ARRIVAL_VARS.forEach((k) => root.style.removeProperty(k));
+    cardEls.forEach((el) => el.style.removeProperty("opacity"));
+    board.introDone = true;
+    drawNow();
+    startLoop();
   }
 
-  function showProjectCards() {
-    const main = document.querySelector("main");
-    const header = document.querySelector("header");
-    if (main) {
-      main.style.transition = "opacity 0.8s ease-out, transform 0.8s ease-out";
-      main.style.opacity = "0"; main.style.transform = "translateY(30px)";
-      requestAnimationFrame(() => { main.style.opacity = "1"; main.style.transform = "translateY(0)"; });
+  // mode: 'arrival' | 'first' | 'skip'; arrival: { star, rgb, ts } or null
+  function playIntro(mode, arrival) {
+    if (introHandle) { introHandle.cancel(); if (introOff) introOff(); introHandle = null; introOff = null; }
+    board.mode = mode;
+    board.introMs = 0;
+    if (mode === "skip" || !T) { board.introDone = false; finishIntro(); return; }
+    T.markSeen("projects");
+    board.introDone = false;
+    if (reducedMotion) {
+      // reduced motion never gets the board sequence: at most a short fade of the arrival fill
+      renderScene(0, null);
+      introHandle = T.run(REDUCED_FADE_MS, (t) => root.style.setProperty("--arrival-op", String(1 - clamp(t / REDUCED_FADE_MS, 0, 1))), finishIntro);
+      return;
     }
-    if (header) {
-      header.style.transition = "opacity 0.6s ease-out"; header.style.opacity = "0";
-      requestAnimationFrame(() => { header.style.opacity = "1"; });
+    const isArrival = mode === "arrival";
+    const cfg = isArrival ? INTRO_ARRIVAL : INTRO_FIRST;
+    introCfg = cfg;
+    board.introMs = cfg.total;
+    buildIntroMeta(cfg);
+    if (isArrival) {
+      root.style.setProperty("--arrival-x", board.cx + "px");
+      root.style.setProperty("--arrival-y", board.cy + "px");
+      root.style.setProperty("--arrival-r", Math.hypot(board.W, board.H).toFixed(1) + "px");
     }
-    const engBtn = document.getElementById("eng-chip-toggle");
-    if (engBtn) {
-      engBtn.style.transition = "opacity 0.6s ease-out 0.5s"; engBtn.style.opacity = "0";
-      requestAnimationFrame(() => { engBtn.style.opacity = "1"; });
-    }
+    applyIntroFrame(0, cfg, isArrival);
+    introHandle = T.run(cfg.total, (t) => { introLast = t; applyIntroFrame(t, cfg, isArrival); }, finishIntro);
+    introOff = T.wireSkip(() => { if (introHandle) introHandle.finish(); });
   }
+  window.playIntro = playIntro;
 
   // ============================================================
-  // MAIN DRAW LOOP
+  // 8. WIRING: cards, package click, resize
   // ============================================================
 
-  let lastFrameTime = performance.now();
-
-  function drawScene(now) {
-    const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
-    lastFrameTime = now;
-    if (!halted || introPhase < PHASE_IDLE) updateIntro(dt);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const W = canvas.width, H = canvas.height;
-    const cx = W * 0.5, cy = H * 0.5;
-    const chipSz = Math.min(W, H) * 0.09;
-
-    ctx.save();
-    ctx.translate(cx, cy); ctx.scale(introScale, introScale); ctx.translate(-cx, -cy);
-
-    drawPCBBase(); drawPCBEdge(); drawVias(); drawSMDs();
-
-    const coreGlow = getCoreGlow();
-    for (const mod of modules) drawModule(mod, getModuleGlow(mod));
-    for (const tp of tracePaths) {
-      const tpGlow = tp.module ? getModuleGlow(tp.module) : traceDrawProgress;
-      drawTrace(tp, traceDrawProgress, coreGlow * Math.max(0.2, tpGlow));
-    }
-
-    drawCore(cx, cy, chipSz, coreGlow);
-
-    if (introPhase === PHASE_IDLE && !halted) {
-      const intensity = coreOverdrive + (isPipelineActive ? 1 : 0) + (engineeringMode ? 0.5 : 0);
-      if (intensity > 0.8 && Math.random() < 0.015 * intensity) {
-        const mod = modules[Math.floor(Math.random() * modules.length)];
-        drawLightning(cx, cy, mod.x + mod.w/2, mod.y + mod.h/2, intensity);
-      }
-    }
-
-    ctx.restore();
-
-    cpuCenter = { x: cx, y: cy }; cpuRadius = chipSz;
-    const boxSize = chipSz * 2.5 * introScale;
-    cpuHitbox.style.left = (cx - boxSize/2) + "px"; cpuHitbox.style.top = (cy - boxSize/2) + "px";
-    cpuHitbox.style.width = boxSize + "px"; cpuHitbox.style.height = boxSize + "px";
-
-    const mult = getAnimMult();
-    if (!halted) { t += 1.05 * Math.max(mult, 0.4); coreOverdrive = Math.max(0, coreOverdrive - 0.004); }
-
-    requestAnimationFrame(drawScene);
+  function cardTitle(el) {
+    const h = el.querySelector("h2");
+    if (!h) return "Project";
+    const c = h.cloneNode(true);
+    c.querySelectorAll(".status-chip").forEach((n) => n.remove());
+    return c.textContent.trim();
   }
 
-  const mainEl = document.querySelector("main");
-  const headerEl = document.querySelector("header");
-  const engBtnEl = document.getElementById("eng-chip-toggle");
-  if (mainEl) { mainEl.style.opacity = "0"; mainEl.style.transform = "translateY(30px)"; }
-  if (headerEl) { headerEl.style.opacity = "0"; }
-  if (engBtnEl) { engBtnEl.style.opacity = "0"; }
+  buildBoard();
 
-  requestAnimationFrame(drawScene);
-});
+  cardEls.forEach((el) => {
+    const mod = () => modById[el.id];
+    el.addEventListener("mouseenter", () => setHover(mod(), true));
+    el.addEventListener("mouseleave", () => setHover(mod(), false));
+    el.addEventListener("focusin", () => setHover(mod(), true));
+    el.addEventListener("focusout", () => setHover(mod(), false));
+    // artifact badges are plain links; JS plays the pipeline, then follows the href
+    el.querySelectorAll(".artifact-badge").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startPipelineLoad({ title: a.getAttribute("data-title") || cardTitle(el), url: a.getAttribute("href") });
+      });
+    });
+    // clicking the card itself plays the pipeline (and opens its first artifact, if any)
+    el.addEventListener("click", (e) => {
+      if (e.target.closest("a, summary, details, button")) return;
+      const sel = window.getSelection && window.getSelection();
+      if (sel && String(sel).length) return;
+      const first = el.querySelector(".artifact-badge");
+      burst(mod(), performance.now());
+      startPipelineLoad({ title: cardTitle(el), url: first ? first.getAttribute("href") : null });
+    });
+  });
+
+  // package click = engineering mode / overdrive (the canvas itself ignores the pointer)
+  function overPackage(e) {
+    if (!board || !board.S) return false;
+    const t = e.target;
+    if (t && t.closest && t.closest("main, header, footer, button, a, #eng-chip-toggle")) return false;
+    const P = board.pkg;
+    return e.clientX >= P.x && e.clientX <= P.x + P.s && e.clientY >= P.y && e.clientY <= P.y + P.s;
+  }
+  document.addEventListener("click", (e) => {
+    if (!board.introDone || !overPackage(e)) return;
+    if (!engineeringMode) setEngineeringMode(true, true);
+    coreOverdrive = Math.min(coreOverdrive + 1.2, 6);
+    state.corePulseBump = 1;
+    state.dirty = true;
+    if (reducedMotion) drawNow();
+  });
+  document.addEventListener("mousemove", (e) => {
+    document.body.style.cursor = board.introDone && overPackage(e) ? "pointer" : "";
+  }, { passive: true });
+
+  let resizeRaf = 0;
+  window.addEventListener("resize", () => {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      const wasDone = board.introDone;
+      buildBoard();
+      if (wasDone) { board.introDone = true; drawNow(); }
+      else if (introCfg && introHandle) { buildIntroMeta(introCfg); applyIntroFrame(introLast, introCfg, root.classList.contains("arriving")); }
+    });
+  });
+  // web fonts change label metrics: repaint the static layer once they are in
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      if (!board) return;
+      drawStatic(sctx, board);
+      if (board.introDone) drawNow();
+    });
+  }
+
+  playIntro(T ? T.getMode("projects") : "skip", window.__arrival || null);
+})();
