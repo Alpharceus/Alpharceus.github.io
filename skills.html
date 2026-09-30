@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Skills | Raman Pandey</title>
-    <meta name="description" content="Skills of Raman Pandey rendered as an 8-mode Mach-Zehnder interferometer mesh — four input channels drive a Clements lattice of couplers and phase shifters, landing on 32 skills across hardware, quantum photonics, software, and machine learning.">
+    <meta name="description" content="Skills of Raman Pandey rendered as an 8-mode Mach-Zehnder interferometer mesh — one laser input, reprogrammed per skill group to route light to 32 skills across hardware, quantum photonics, software, and machine learning.">
     <link rel="canonical" href="https://ramanpandey.com/skills.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <script type="application/ld+json">
@@ -13,7 +13,7 @@
       "@type": "WebPage",
       "name": "Skills — Raman Pandey",
       "url": "https://ramanpandey.com/skills.html",
-      "description": "Skills page rendered as an 8-mode rectangular mesh of Mach-Zehnder interferometers (Clements arrangement), reflecting the author's photonics research on electrically tuned MZI meshes — four input channels route light to 32 skill output ports.",
+      "description": "Skills page rendered as an 8-mode rectangular mesh of Mach-Zehnder interferometers (Clements arrangement), reflecting the author's photonics research on electrically tuned MZI meshes — one laser input is routed to groups of 32 skill output ports by reprogramming the mesh.",
       "about": "Photonics and technical skills",
       "isPartOf": { "@type": "WebSite", "name": "Raman Pandey — Portfolio", "url": "https://ramanpandey.com/" },
       "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
@@ -83,19 +83,78 @@
         .ch-btn.active { background: rgba(90, 160, 220, 0.08); }
 
         #mesh-scroll {
-            overflow-x: auto;
+            overflow: hidden;
             background: #0A0E16;
             border: 1px solid rgba(140, 170, 220, 0.14);
             border-radius: 14px;
             padding: 8px;
         }
 
+        .mesh-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 236px;
+        }
+
+        .mesh-stage { position: relative; min-width: 0; }
+
         #mzi-canvas {
             display: block;
-            min-width: 1040px;
             width: 100%;
             height: auto;
+            aspect-ratio: 800 / 566;
         }
+
+        #mesh-tip {
+            position: absolute;
+            z-index: 2;
+            left: 0;
+            top: 0;
+            pointer-events: none;
+            white-space: pre;
+            padding: 6px 9px;
+            border-radius: 6px;
+            border: 1px solid rgba(140, 170, 220, 0.3);
+            background: rgba(6, 10, 18, 0.94);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11.5px;
+            line-height: 1.5;
+            color: #E8EDF6;
+        }
+        #mesh-tip[hidden] { display: none; }
+
+        #port-labels { position: relative; min-width: 0; }
+
+        .port {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: var(--py);
+            transform: translateY(-50%);
+            display: block;
+            margin: 0;
+            padding: 0 0 0 10px;
+            border: 0;
+            border-left: 2px solid var(--pc);
+            background: transparent;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .port .sk {
+            display: block;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            line-height: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #8B96AB;
+        }
+
+        .port.lit .sk { color: var(--pc); }
+        .port:hover .sk { color: #E8EDF6; }
+        .port:focus-visible { outline: 2px solid var(--pc); outline-offset: 2px; }
 
         .mesh-footnote {
             margin-top: 10px;
@@ -160,8 +219,29 @@
             color: #8B96AB;
         }
 
+        @media (max-width: 1000px) {
+            .mesh-grid { grid-template-columns: minmax(0, 1fr); }
+            #port-labels {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 14px 12px;
+                padding: 6px 10px 10px;
+            }
+            .port {
+                position: static;
+                transform: none;
+                padding-top: 2px;
+                padding-bottom: 2px;
+            }
+            .port .sk { white-space: normal; line-height: 15px; }
+        }
+
         @media (max-width: 980px) {
             .skill-columns { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ch-btn { transition: none; }
         }
 
         @media (max-width: 560px) {
@@ -188,9 +268,10 @@
         <h1>Light in. Skill out.</h1>
         <p class="mesh-intro">
             An 8-mode Mach&ndash;Zehnder mesh &mdash; the same tunable building block
-            as the electrically tuned MZI meshes I work on. Select an input channel
-            and light propagates through the lattice of couplers and phase shifters,
-            landing on the skills it powers.
+            as the electrically tuned MZI meshes I work on. One laser enters the
+            lattice. Pick a skill group and the mesh is reprogrammed so the light
+            lands on that group&rsquo;s outputs, or click a single output to send
+            it all there.
         </p>
 
         <div id="channel-row" role="group" aria-label="Skill category input channels">
@@ -201,9 +282,15 @@
         </div>
 
         <div id="mesh-scroll">
-            <canvas id="mzi-canvas" width="2080" height="940" aria-label="Animated 8-mode Mach-Zehnder interferometer mesh routing light from four category input channels to 32 skill output ports"></canvas>
+            <div class="mesh-grid">
+                <div class="mesh-stage">
+                    <canvas id="mzi-canvas" width="1600" height="1132" aria-label="Animated 8-mode Mach-Zehnder interferometer mesh: one laser enters rail 3 and the mesh is reprogrammed to route light to the selected skill group's output ports"></canvas>
+                    <div id="mesh-tip" hidden></div>
+                </div>
+                <div id="port-labels" role="group" aria-label="Output ports and their skills"></div>
+            </div>
         </div>
-        <div class="mesh-footnote">8-mode rectangular mesh (Clements) · 6 columns · fixed couplers · animated transfer · click a channel or let it cycle</div>
+        <div class="mesh-footnote">8-mode rectangular (Clements) mesh · 28 MZIs · reprogrammed per channel. Each retune changes the seven splitter-tree MZIs and the output phases; hover an MZI for its settings.</div>
 
         <!-- Machine-readable skill list (mirrors the 32 output ports above) -->
         <section id="skill-list">
