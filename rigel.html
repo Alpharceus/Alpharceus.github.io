@@ -28,7 +28,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
     <link rel="stylesheet" href="css/site.css">
 </head>
-<body>
+<body class="rigel-page">
 <header class="site-bar">
     <a class="site-bar__home" href="index.html">Raman Pandey</a>
     <nav aria-label="Site">
@@ -45,20 +45,24 @@
 <main>
     <!-- Bloch sphere intro section -->
     <section id="bloch-intro">
-        <h1>Rigel — Quantum Playground</h1>
-        <p class="lead">
-            A quick tour of the Bloch sphere, then a toy quantum circuit simulator you can play with.
-        </p>
-        <canvas id="bloch-canvas" width="420" height="420"></canvas>
-        <p class="hint">Drag the sphere to rotate it. Pure states live on the surface; the center is maximally mixed.</p>
-        <label id="bloch-qubit-row" class="hidden" style="display:block;margin-top:0.6em;">
-            Show qubit on sphere:
-            <select id="bloch-qubit-select"></select>
-        </label>
-        <p class="tiny-hint">
-            The arrow is the live (reduced) state of the selected qubit from the circuit
-            below — entangle it and watch the arrow shrink toward the center.
-        </p>
+        <div class="bloch-copy">
+            <h1>Rigel — Quantum Playground</h1>
+            <p class="lead">
+                A quick tour of the Bloch sphere, then a toy quantum circuit simulator you can play with.
+            </p>
+            <p class="hint">Drag the sphere to rotate it. Pure states live on the surface; the center is maximally mixed.</p>
+            <label id="bloch-qubit-row" class="qubit-row hidden">
+                Show qubit on sphere:
+                <select id="bloch-qubit-select"></select>
+            </label>
+            <p class="tiny-hint">
+                The arrow is the live (reduced) state of the selected qubit from the circuit
+                below — entangle it and watch the arrow shrink toward the center.
+            </p>
+        </div>
+        <div class="bloch-panel">
+            <canvas id="bloch-canvas" width="420" height="420" role="img" aria-label="Bloch sphere showing the live state of the selected qubit. Drag to rotate."></canvas>
+        </div>
     </section>
 
     <!-- Circuit builder (initially hidden, revealed after intro) -->

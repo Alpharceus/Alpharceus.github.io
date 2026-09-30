@@ -1,50 +1,124 @@
-/* Basic page alignment with your theme */
-#bloch-intro {
-    text-align: center;
-    margin-top: 1.5rem;
-    margin-bottom: 2rem;
+/* rigel.css — Rigel page. Consumes the shared tokens from css/site.css
+   (--sky-0/--sky-1, --line, --ink*, --link, --betelgeuse, --font-*).
+   site.css loads after this file, so the tokens are read at use time (var()),
+   and every rule here is scoped under body.rigel-page to beat portfolio-pages.css. */
+
+body.rigel-page {
+    background: var(--sky-0, #0e101f);
+    color: var(--ink, #e6eaf7);
+    font-family: var(--font-ui, 'Space Grotesk', 'Segoe UI', sans-serif);
 }
 
-#bloch-intro h1 {
-    margin-bottom: 0.5rem;
+body.rigel-page main {
+    width: 100%;
+    max-width: 1080px;
+    box-sizing: border-box;
+    padding: 2.5rem max(24px, 4vw) 1.5rem;
 }
 
-#bloch-intro .lead {
-    color: #c8d3ff;
-    font-size: 0.95rem;
-    margin-bottom: 1rem;
+body.rigel-page footer {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 1.25rem max(24px, 4vw) 2rem;
+    color: var(--ink-muted, #858fb0);
+    font-size: 0.85rem;
+}
+
+body.rigel-page footer p { margin: 0; }
+
+body.rigel-page h1,
+body.rigel-page h2,
+body.rigel-page h3 {
+    font-family: var(--font-ui, sans-serif);
+    color: var(--ink, #e6eaf7);
+}
+
+body.rigel-page h1 {
+    font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.15;
+    margin: 0 0 0.75rem;
+}
+
+body.rigel-page h2 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 1rem;
+}
+
+/* ---- intro: copy on the left, the sphere in its panel on the right ---- */
+
+body.rigel-page #bloch-intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    margin: 0 0 2.5rem;
+    text-align: left;
+}
+
+@media (min-width: 860px) {
+    body.rigel-page #bloch-intro {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 460px);
+        gap: 3rem;
+    }
+}
+
+body.rigel-page .bloch-copy { max-width: 46ch; }
+
+body.rigel-page #bloch-intro .lead {
+    color: var(--ink-soft, #b6bfdc);
+    font-size: 1.05rem;
+    line-height: 1.55;
+    margin: 0 0 1rem;
+}
+
+body.rigel-page #bloch-intro .hint {
+    color: var(--ink-muted, #858fb0);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0 0 0.9rem;
+}
+
+body.rigel-page .qubit-row {
+    display: block;
+    margin: 0 0 0.6rem;
+    font-size: 0.9rem;
+    color: var(--ink-soft, #b6bfdc);
+}
+
+body.rigel-page .hidden { display: none; }
+
+.bloch-panel {
+    background: var(--sky-1, #151a2e);
+    border: 1px solid var(--line, rgba(130, 155, 225, 0.18));
+    border-radius: 10px;
+    padding: 0.5rem;
+    min-width: 0;
 }
 
 #bloch-canvas {
-    max-width: 420px;
+    display: block;
     width: 100%;
-    background: radial-gradient(circle at 50% 20%, #1f2937, #020617);
-    border-radius: 999px;
-    box-shadow: 0 0 40px rgba(56, 189, 248, 0.25),
-                0 0 60px rgba(59, 130, 246, 0.25);
+    height: auto;
+    aspect-ratio: 1 / 1;
     cursor: grab;
     touch-action: none; /* pointer-drag rotation on touch devices */
 }
 
-#bloch-canvas.dragging {
-    cursor: grabbing;
+#bloch-canvas.dragging { cursor: grabbing; }
+
+#bloch-canvas:focus-visible {
+    outline: 2px solid var(--link, #8fb8ff);
+    outline-offset: 2px;
 }
 
-#bloch-intro .hint {
-    color: #9ca3af;
-    font-size: 0.8rem;
-    margin-top: 0.6rem;
-}
+/* ---- circuit layout ---- */
 
-.hidden {
-    display: none;
-}
-
-/* Circuit layout */
-
-#circuit-section {
-    margin-top: 1rem;
-}
+body.rigel-page #circuit-section { margin-top: 0; }
 
 .qc-layout {
     display: flex;
@@ -55,24 +129,24 @@
 .qc-left,
 .qc-right {
     flex: 1 1 280px;
-    min-width: 260px;
+    min-width: 0;
 }
 
 .qc-block {
-    background: rgba(20, 26, 46, 0.96);
-    border-radius: 1rem;
+    background: var(--sky-1, #151a2e);
+    border: 1px solid var(--line, rgba(130, 155, 225, 0.18));
+    border-radius: 10px;
     padding: 1rem 1.2rem;
     margin-bottom: 1rem;
-    box-shadow: 0 6px 26px rgba(8, 13, 30, 0.85);
-    border: 1px solid rgba(148, 163, 184, 0.4);
 }
 
-.qc-block h3 {
-    margin-top: 0;
-    margin-bottom: 0.6rem;
+body.rigel-page .qc-block h3 {
+    margin: 0 0 0.7rem;
     font-size: 1rem;
-    color: #e5e7eb;
+    font-weight: 600;
 }
+
+body.rigel-page label { color: var(--ink-soft, #b6bfdc); }
 
 #qubit-basis-selects label {
     display: block;
@@ -80,24 +154,31 @@
     font-size: 0.85rem;
 }
 
-#qubit-basis-selects select,
-#num-qubits-select {
-    background: #020617;
-    color: #e5e7eb;
+body.rigel-page select {
+    background: var(--sky-0, #0e101f);
+    color: var(--ink, #e6eaf7);
     border-radius: 6px;
-    border: 1px solid #475569;
+    border: 1px solid var(--line, rgba(130, 155, 225, 0.18));
     padding: 0.25rem 0.4rem;
     font-size: 0.85rem;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+    max-width: 100%;
 }
 
-.tiny-hint {
-    font-size: 0.75rem;
-    color: #9ca3af;
-    margin-top: 0.5rem;
+body.rigel-page .tiny-hint {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--ink-muted, #858fb0);
+    margin: 0.5rem 0 0;
 }
 
-/* Gate palette */
+.system-preset-row {
+    display: block;
+    margin: 0.4rem 0 0.6rem 0;
+    font-size: 0.85rem;
+}
+
+/* ---- gate palette ---- */
 
 #gate-palette {
     display: flex;
@@ -105,31 +186,38 @@
     gap: 0.4rem;
 }
 
-.gate-btn {
-    border-radius: 0.6rem;
-    border: 1px solid #4b5563;
-    background: #020617;
-    color: #e5e7eb;
+body.rigel-page .gate-btn {
+    border-radius: 6px;
+    border: 1px solid var(--line, rgba(130, 155, 225, 0.18));
+    background: var(--sky-0, #0e101f);
+    color: var(--ink, #e6eaf7);
     font-size: 0.8rem;
-    padding: 0.25rem 0.55rem;
+    padding: 0.3rem 0.65rem;
     cursor: pointer;
-    font-family: 'IBM Plex Mono', monospace;
-    transition: background 0.15s ease-out, border-color 0.15s ease-out, transform 0.12s ease-out;
+    font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+    transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out;
 }
 
-.gate-btn:hover {
-    background: #111827;
-    border-color: #60a5fa;
-    transform: translateY(-1px);
+body.rigel-page .gate-btn:hover {
+    border-color: var(--link, #8fb8ff);
+    color: var(--link-hover, #d4e2ff);
 }
 
-.gate-btn.active {
-    background: #1d4ed8;
-    border-color: #93c5fd;
+body.rigel-page .gate-btn.active {
+    background: rgba(143, 184, 255, 0.16);
+    border-color: var(--link, #8fb8ff);
+    color: var(--link-hover, #d4e2ff);
 }
 
-/* Circuit grid */
+body.rigel-page .gate-btn:focus-visible,
+body.rigel-page #run-btn:focus-visible,
+body.rigel-page #clear-circuit-btn:focus-visible,
+body.rigel-page select:focus-visible {
+    outline: 2px solid var(--link, #8fb8ff);
+    outline-offset: 2px;
+}
 
+/* ---- circuit grid ---- */
 
 /* the grid is ~484px wide — scroll it inside its panel instead of overflowing */
 .circuit-grid-scroll {
@@ -150,18 +238,18 @@
 .circuit-label-cell {
     text-align: right;
     padding-right: 0.3rem;
-    color: #9ca3af;
+    color: var(--ink-muted, #858fb0);
     font-size: 0.78rem;
 }
 
 /* each qubit row gets a faint horizontal wire */
 .circuit-cell {
     height: 32px;
-    border-radius: 0.4rem;
-    border: 1px dashed transparent; /* no heavy box look by default */
+    border-radius: 6px;
+    border: 1px dashed transparent;
     background:
-        linear-gradient(to right, #4b5563 50%, #4b5563 50%) center/100% 1px no-repeat,
-        rgba(15, 23, 42, 0.9);
+        linear-gradient(to right, rgba(133, 143, 176, 0.55) 50%, rgba(133, 143, 176, 0.55) 50%) center/100% 1px no-repeat,
+        var(--sky-0, #0e101f);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -169,64 +257,67 @@
     position: relative;
 }
 
-
-
-/* when gate present, show a “brick” on the wire */
+/* when a gate is present, show a brick on the wire */
 .circuit-cell.has-gate {
     border-style: solid;
-    border-color: #60a5fa;
+    border-color: var(--link, #8fb8ff);
     background:
-        linear-gradient(to right, #4b5563 50%, #4b5563 50%) center/100% 1px no-repeat,
-        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.35), rgba(15, 23, 42, 0.95));
+        linear-gradient(to right, rgba(133, 143, 176, 0.55) 50%, rgba(133, 143, 176, 0.55) 50%) center/100% 1px no-repeat,
+        rgba(143, 184, 255, 0.14);
 }
 
 .circuit-gate-label {
     font-size: 0.78rem;
-    color: #e5e7eb;
+    color: var(--ink, #e6eaf7);
+    font-family: var(--font-mono, monospace);
 }
 
 .circuit-gate-ctl {
     font-size: 0.9rem;
-    color: #f97316;
+    color: var(--betelgeuse, #ffb46e);
 }
 
 .circuit-wire {
     position: absolute;
     left: 50%;
     width: 2px;
-    background: #4b5563;
+    background: rgba(133, 143, 176, 0.7);
 }
 
-/* Buttons */
+/* ---- buttons ---- */
 
-#run-btn,
-#clear-circuit-btn {
-    font-family: 'IBM Plex Mono', monospace;
-    border-radius: 0.6rem;
-    padding: 0.35rem 0.7rem;
+body.rigel-page #run-btn,
+body.rigel-page #clear-circuit-btn {
+    font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
     font-size: 0.85rem;
     cursor: pointer;
-    border: 1px solid #4b5563;
-    background: #020617;
-    color: #e5e7eb;
+    border: 1px solid var(--line, rgba(130, 155, 225, 0.18));
+    background: var(--sky-0, #0e101f);
+    color: var(--ink, #e6eaf7);
     margin-right: 0.3rem;
+    transition: background 0.15s ease-out, border-color 0.15s ease-out;
 }
 
-#run-btn:hover {
-    background: #16a34a;
-    border-color: #4ade80;
+body.rigel-page #run-btn {
+    border-color: var(--link, #8fb8ff);
+    color: var(--link-hover, #d4e2ff);
 }
 
-#clear-circuit-btn.secondary:hover {
-    background: #1f2937;
+body.rigel-page #run-btn:hover { background: rgba(143, 184, 255, 0.18); }
+
+body.rigel-page #clear-circuit-btn.secondary:hover {
+    background: var(--sky-1, #151a2e);
+    border-color: var(--ink-muted, #858fb0);
 }
 
-/* Output */
+/* ---- output ---- */
 
 .state-output {
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     white-space: pre-wrap;
-    color: #e5e7eb;
+    color: var(--ink, #e6eaf7);
     max-height: 320px;
     overflow-y: auto;
 }
@@ -239,26 +330,26 @@
 }
 
 .state-output .section-label {
-    color: #9ca3af;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
+    color: var(--ink-muted, #858fb0);
+    font-size: 0.8rem;
     margin: 0.7rem 0 0.2rem;
 }
 
 .state-output .gate-seq {
-    font-size: 0.75rem;
-    color: #cbd5e1;
+    font-size: 0.78rem;
+    color: var(--ink-soft, #b6bfdc);
     white-space: pre-wrap;
     margin: 0;
 }
 
+@media (max-width: 600px) {
+    body.rigel-page main { padding: 1.5rem 16px 1rem; }
+    body.rigel-page footer { padding: 1rem 16px 1.5rem; }
+    .qc-block { padding: 0.9rem 1rem; }
+}
 
-
-
-
-.system-preset-row {
-    display: block;
-    margin: 0.4rem 0 0.6rem 0;
-    font-size: 0.85rem;
+@media (prefers-reduced-motion: reduce) {
+    body.rigel-page .gate-btn,
+    body.rigel-page #run-btn,
+    body.rigel-page #clear-circuit-btn { transition: none; }
 }

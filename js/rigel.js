@@ -1,5 +1,21 @@
 // rigel.js
 
+// ================== TUNING CONSTANTS ==================
+// Everything time- or feel-related lives here so it can be tuned without reading the code.
+const SLERP_MS        = 400;    // geodesic slerp between displayed states
+const SLERP_EASE      = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2); // easeInOutCubic
+const TRAIL_MS        = 900;    // how long a trail point lives (it fades over this time)
+const TRAIL_ALPHA     = 0.85;   // trail alpha at its newest point
+const IDLE_FPS        = 30;     // redraw cap when nothing is dragged or animated
+const DPR_CAP         = 2;      // canvas backing-store scale cap
+const BACK_ALPHA      = 0.35;   // back-hemisphere lines and dashes
+const CIRCLE_SAMPLES  = 120;    // points per great circle
+const PERSPECTIVE     = 0.1;    // mild size change with depth (near = larger)
+const TIP_RADIUS      = 5;      // state-vector tip radius (CSS px) at zero depth
+const TIP_DEPTH_SIZE  = 0.45;   // tip radius scales by (1 + this * z_v)
+const TIP_ALPHA_MIN   = 0.4;    // tip alpha at the far side; 1 at the near side
+const LABEL_ALPHA_MIN = 0.3;    // axis-label alpha at the far side; 1 at the near side
+
 // ================== DOM ENTRY ==================
 document.addEventListener("DOMContentLoaded", () => {
     // Show the circuit section immediately (no 10s delay nonsense)
@@ -21,11 +37,66 @@ document.addEventListener("DOMContentLoaded", () => {
 let blochAnimId = null;
 
 // Live Bloch state shared between the circuit engine and the sphere renderer.
-// vectors[q] = { x, y, z } — the (reduced) Bloch vector of qubit q.
+// vectors[q] = { x, y, z } — the (reduced) Bloch vector of qubit q, straight from
+// the simulator. The sphere shows a *displayed* vector that slerps toward it.
 const blochState = {
     vectors: [{ x: 0, y: 0, z: 1 }], // |0⟩ before anything runs
-    selected: 0
+    selected: 0,
+    onUpdate: null,                  // set by initBlochSphere: retarget the animation
+    getDisplayed: null               // set by initBlochSphere: current displayed vectors
 };
+
+// Draw parameters of the last rendered frame (read by the test hook).
+const blochDraw = {
+    tilt: 0, phi: 0, tipZ: 0, tipRadius: 0, tipAlpha: 0,
+    trailPoints: 0, animating: false, dpr: 1, frames: 0
+};
+
+// Read-only test hook: simulator vectors, displayed (animated) vectors, draw parameters.
+window.__rigelState = () => ({
+    selected: blochState.selected,
+    vectors: blochState.vectors.map(v => ({ x: v.x, y: v.y, z: v.z })),
+    displayed: (blochState.getDisplayed ? blochState.getDisplayed() : blochState.vectors)
+        .map(v => ({ x: v.x, y: v.y, z: v.z })),
+    draw: Object.assign({}, blochDraw)
+});
+
+// Geodesic interpolation of two Bloch vectors: the direction slerps along the great
+// circle, the length interpolates linearly (so mixed states shrink/grow smoothly).
+function slerpBloch(a, b, e) {
+    const la = Math.hypot(a.x, a.y, a.z);
+    const lb = Math.hypot(b.x, b.y, b.z);
+    const len = la + (lb - la) * e;
+    if (la < 1e-6 || lb < 1e-6) {
+        // no defined direction at the maximally mixed point: plain lerp
+        return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, z: a.z + (b.z - a.z) * e };
+    }
+    const ua = { x: a.x / la, y: a.y / la, z: a.z / la };
+    const ub = { x: b.x / lb, y: b.y / lb, z: b.z / lb };
+    const dot = Math.max(-1, Math.min(1, ua.x * ub.x + ua.y * ub.y + ua.z * ub.z));
+    const th = Math.acos(dot);
+    let dir;
+    if (th < 1e-6) {
+        dir = ua;
+    } else if (th > Math.PI - 1e-6) {
+        // antipodal: any perpendicular axis is a valid geodesic; pick a stable one
+        const ref = Math.abs(ua.z) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 };
+        let m = {
+            x: ua.y * ref.z - ua.z * ref.y,
+            y: ua.z * ref.x - ua.x * ref.z,
+            z: ua.x * ref.y - ua.y * ref.x
+        };
+        const ml = Math.hypot(m.x, m.y, m.z);
+        m = { x: m.x / ml, y: m.y / ml, z: m.z / ml };
+        const c = Math.cos(Math.PI * e), s = Math.sin(Math.PI * e);
+        dir = { x: ua.x * c + m.x * s, y: ua.y * c + m.y * s, z: ua.z * c + m.z * s };
+    } else {
+        const s0 = Math.sin((1 - e) * th) / Math.sin(th);
+        const s1 = Math.sin(e * th) / Math.sin(th);
+        dir = { x: ua.x * s0 + ub.x * s1, y: ua.y * s0 + ub.y * s1, z: ua.z * s0 + ub.z * s1 };
+    }
+    return { x: dir.x * len, y: dir.y * len, z: dir.z * len };
+}
 
 function initBlochSphere() {
     const canvas = document.getElementById("bloch-canvas");
@@ -34,15 +105,71 @@ function initBlochSphere() {
         return;
     }
     const ctx = canvas.getContext("2d");
+    const reducedMq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+    const reduced = () => !!(reducedMq && reducedMq.matches);
+
+    // Site tokens (css/site.css), with fallbacks so the canvas never depends on load order
+    const css = getComputedStyle(document.documentElement);
+    const tok = (name, fallback) => (css.getPropertyValue(name) || "").trim() || fallback;
+    const COL = {
+        link: tok("--link", "#8fb8ff"),
+        ink: tok("--ink", "#e6eaf7"),
+        soft: tok("--ink-soft", "#b6bfdc"),
+        muted: tok("--ink-muted", "#858fb0"),
+        warm: tok("--betelgeuse", "#ffb46e"),
+        x: "#e8a07f",
+        y: "#86d3aa",
+        z: tok("--link", "#8fb8ff")
+    };
+    const MONO = tok("--font-mono", "'IBM Plex Mono', Menlo, Consolas, monospace");
+
+    // ---- sizing: CSS pixels for drawing, backing store scaled by DPR (capped) ----
+    let W = 420, dpr = 1;
+    let volumeLayer = null; // offscreen: sphere volume + limb, rebuilt per resize
+    let needsFrame = true;
+
+    function sphereR() { return W * 0.32; }
+
+    function buildVolumeLayer() {
+        const R = sphereR();
+        const layer = document.createElement("canvas");
+        layer.width = canvas.width;
+        layer.height = canvas.height;
+        const c = layer.getContext("2d");
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const cx = W / 2, cy = W / 2;
+        // lit from the upper left, darker toward the limb; kept low-contrast
+        const g = c.createRadialGradient(cx - R * 0.38, cy - R * 0.42, R * 0.05, cx, cy, R);
+        g.addColorStop(0, "rgba(150, 185, 255, 0.20)");
+        g.addColorStop(0.55, "rgba(70, 95, 170, 0.10)");
+        g.addColorStop(1, "rgba(8, 10, 24, 0.50)");
+        c.beginPath();
+        c.arc(cx, cy, R, 0, 2 * Math.PI);
+        c.fillStyle = g;
+        c.fill();
+        c.lineWidth = 1.25;
+        c.strokeStyle = "rgba(143, 184, 255, 0.55)";
+        c.stroke();
+        volumeLayer = layer;
+    }
 
     function resize() {
-        const rect = canvas.getBoundingClientRect();
-        const size = rect.width || 420;
-        canvas.width = size;
-        canvas.height = size; // keep it square inside your pill
+        const size = Math.round(canvas.getBoundingClientRect().width) || 420;
+        dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+        W = size;
+        canvas.width = Math.round(size * dpr);
+        canvas.height = Math.round(size * dpr); // keep it square
+        blochDraw.dpr = dpr;
+        buildVolumeLayer();
+        needsFrame = true;
     }
-    resize();
     window.addEventListener("resize", resize);
+    if (window.ResizeObserver) {
+        new ResizeObserver(() => {
+            const s = Math.round(canvas.getBoundingClientRect().width);
+            if (s && s !== W) resize();
+        }).observe(canvas);
+    }
 
     // User-controlled view (drag to rotate — no auto-spin)
     let viewTilt = 0.7;
@@ -70,14 +197,15 @@ function initBlochSphere() {
     canvas.addEventListener("pointerup", endDrag);
     canvas.addEventListener("pointercancel", endDrag);
 
+    // Returns screen x/y plus zv, the view-space depth (+ = toward the viewer).
     function project3D(x, y, z, cx, cy, R, tilt, phi) {
         // Rotate around x-axis (tilt) then around z by phi
         const ct = Math.cos(tilt);
         const st = Math.sin(tilt);
 
-        let y1 = y * ct - z * st;
-        let z1 = y * st + z * ct;
-        let x1 = x;
+        const y1 = y * ct - z * st;
+        const z1 = y * st + z * ct; // depth: unaffected by the in-plane phi turn
+        const x1 = x;
 
         const cz = Math.cos(phi);
         const sz = Math.sin(phi);
@@ -85,142 +213,331 @@ function initBlochSphere() {
         const x2 = x1 * cz - y1 * sz;
         const y2 = x1 * sz + y1 * cz;
 
-        const scale = 1 - 0.18 * z1; // mild fake perspective
+        const scale = 1 + PERSPECTIVE * z1; // mild perspective: nearer is larger
         return {
             x: cx + x2 * R * scale,
-            y: cy - y2 * R * scale
+            y: cy - y2 * R * scale,
+            zv: z1
         };
     }
 
-    function drawFrame() {
-        const R = Math.min(canvas.width, canvas.height) * 0.4;
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
+    // ---- displayed state: slerp from the previous display toward the simulator ----
+    let displayed = blochState.vectors.map(v => ({ x: v.x, y: v.y, z: v.z }));
+    let anim = null;          // { t0, from: [vec], to: [vec] }
+    let trail = [];           // [{ x, y, z, t }] path of the selected qubit's tip
+    let lastSelected = blochState.selected;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function displayedAt(now) {
+        if (!anim) return displayed;
+        const u = Math.min(1, (now - anim.t0) / SLERP_MS);
+        const e = SLERP_EASE(u);
+        return anim.to.map((to, q) => slerpBloch(anim.from[q], to, e));
+    }
+    blochState.getDisplayed = () => displayedAt(performance.now());
 
-        // Background approx to your CSS gradient
-        ctx.fillStyle = "#020617";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    function pushTrail(now, vecs) {
+        const v = vecs[blochState.selected];
+        if (v) trail.push({ x: v.x, y: v.y, z: v.z, t: now });
+    }
 
-        const tilt = viewTilt;
-        const phi = viewPhi;
+    blochState.onUpdate = function () {
+        const now = performance.now();
+        const target = blochState.vectors.map(v => ({ x: v.x, y: v.y, z: v.z }));
+        const cur = displayedAt(now);
+        const settled = anim ? anim.to : displayed;
+        const sameShape = settled.length === target.length;
+        const changed = !sameShape || target.some((t, q) =>
+            Math.hypot(t.x - settled[q].x, t.y - settled[q].y, t.z - settled[q].z) > 1e-9);
+        if (!changed) return;
 
-        // Sphere outline
-        ctx.beginPath();
-        ctx.arc(cx, cy, R, 0, 2 * Math.PI);
-        ctx.strokeStyle = "#60a5fa";
-        ctx.lineWidth = 2;
-        ctx.shadowColor = "#38bdf8";
-        ctx.shadowBlur = 16;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Equatorial great circle (Z=0)
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = "rgba(148,163,184,0.7)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let k = 0; k <= 64; k++) {
-            const a = (2 * Math.PI * k) / 64;
-            const p = project3D(Math.cos(a), Math.sin(a), 0, cx, cy, R, tilt, phi);
-            if (k === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
+        if (!sameShape || reduced() || blochState.selected !== lastSelected) {
+            // qubit count/selection changed, or reduced motion: jump, no slerp, no trail
+            displayed = target;
+            anim = null;
+            trail = [];
+            lastSelected = blochState.selected;
+        } else {
+            anim = { t0: now, from: cur.map(v => ({ x: v.x, y: v.y, z: v.z })), to: target };
+            pushTrail(now, cur);
         }
-        ctx.stroke();
-        ctx.setLineDash([]);
+        blochDraw.animating = !!anim;
+        needsFrame = true;
+    };
 
-        // Axes
-        function drawAxis(vec, color) {
-            const p0 = project3D(0, 0, 0, cx, cy, R, tilt, phi);
-            const p1 = project3D(vec.x, vec.y, vec.z, cx, cy, R, tilt, phi);
+    // ---- line helpers ----
+    function strokeRuns(runs, style, width, dashed, alpha) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = style;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dashed ? [3.5, 4] : []);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        runs.forEach(run => {
+            if (run.length < 2) return;
             ctx.beginPath();
-            ctx.moveTo(p0.x, p0.y);
-            ctx.lineTo(p1.x, p1.y);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1.2;
+            ctx.moveTo(run[0].x, run[0].y);
+            for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
             ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    // Sample a great circle and split it into front (zv >= 0) and back (zv < 0) runs,
+    // inserting the exact crossing points so the two halves meet cleanly.
+    function circleRuns(point3, cx, cy, R, tilt, phi) {
+        const pts = [];
+        for (let k = 0; k <= CIRCLE_SAMPLES; k++) {
+            const a = (2 * Math.PI * k) / CIRCLE_SAMPLES;
+            const p3 = point3(a);
+            pts.push({ p3, p: project3D(p3.x, p3.y, p3.z, cx, cy, R, tilt, phi) });
         }
-        drawAxis({ x: 1.2, y: 0,   z: 0 }, "#f97316"); // X
-        drawAxis({ x: 0,   y: 1.2, z: 0 }, "#22c55e"); // Y
-        drawAxis({ x: 0,   y: 0,   z: 1.2 }, "#38bdf8"); // Z
+        const front = [], back = [];
+        let cur = null, curFront = null;
+        const add = (isFront, p) => {
+            if (cur === null || curFront !== isFront) {
+                cur = [];
+                curFront = isFront;
+                (isFront ? front : back).push(cur);
+            }
+            cur.push(p);
+        };
+        add(pts[0].p.zv >= 0, pts[0].p);
+        for (let i = 1; i < pts.length; i++) {
+            const a = pts[i - 1], b = pts[i];
+            const fa = a.p.zv >= 0, fb = b.p.zv >= 0;
+            if (fa !== fb) {
+                const t = a.p.zv / (a.p.zv - b.p.zv);
+                let m = { x: a.p3.x + (b.p3.x - a.p3.x) * t, y: a.p3.y + (b.p3.y - a.p3.y) * t, z: a.p3.z + (b.p3.z - a.p3.z) * t };
+                const ml = Math.hypot(m.x, m.y, m.z) || 1;
+                m = { x: m.x / ml, y: m.y / ml, z: m.z / ml };
+                const pm = project3D(m.x, m.y, m.z, cx, cy, R, tilt, phi);
+                add(fa, pm);   // close the run we were in
+                add(fb, pm);   // open the next one at the same point
+            }
+            add(fb, b.p);
+        }
+        return { front, back };
+    }
 
-        // Labels
-        ctx.fillStyle = "#e5e7eb";
-        ctx.font = "12px 'IBM Plex Mono', monospace";
-        ctx.textAlign = "center";
+    // ---- one frame ----
+    function draw(now) {
+        const R = sphereR();
+        const cx = W / 2, cy = W / 2;
+        const tilt = viewTilt, phi = viewPhi;
 
-        function label(text, x, y, z) {
-            const p = project3D(x, y, z, cx, cy, R, tilt, phi);
-            ctx.fillText(text, p.x, p.y);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, W);
+        if (volumeLayer) {
+            ctx.drawImage(volumeLayer, 0, 0, canvas.width, canvas.height, 0, 0, W, W);
         }
 
-        // Z basis
-        label("|0⟩ (Z+)", 0, 0, 1);
-        label("|1⟩ (Z−)", 0, 0, -1);
-        // X basis
-        label("|+⟩ (X+)", 1, 0, 0);
-        label("|−⟩ (X−)", -1, 0, 0);
-        // Y basis
-        label("|+i⟩ (Y+)", 0, 1, 0);
-        label("|−i⟩ (Y−)", 0, -1, 0);
+        const disp = displayedAt(now);
+        if (anim && now - anim.t0 >= SLERP_MS) {
+            displayed = anim.to;   // settled exactly on the simulator vectors
+            pushTrail(now, displayed);
+            anim = null;
+        } else if (anim) {
+            pushTrail(now, disp);
+        }
+        if (blochState.selected !== lastSelected) {
+            lastSelected = blochState.selected;
+            trail = [];
+        }
+        // age out the trail
+        while (trail.length && now - trail[0].t > TRAIL_MS) trail.shift();
+        if (reduced()) trail = [];
 
-        // Maximally mixed at center
-        const pCenter = project3D(0, 0, 0, cx, cy, R, tilt, phi);
-        ctx.beginPath();
-        ctx.arc(pCenter.x, pCenter.y, 3.5, 0, 2 * Math.PI);
-        ctx.fillStyle = "#a5b4fc";
-        ctx.fill();
+        const p0 = project3D(0, 0, 0, cx, cy, R, tilt, phi);
 
-        // ---- Live state arrow (reduced Bloch vector of the selected qubit) ----
-        const vec = blochState.vectors[blochState.selected];
+        // great circles: equator (z = 0), xz meridian (y = 0), yz meridian (x = 0)
+        const circles = [
+            (a) => ({ x: Math.cos(a), y: Math.sin(a), z: 0 }),
+            (a) => ({ x: Math.cos(a), y: 0, z: Math.sin(a) }),
+            (a) => ({ x: 0, y: Math.cos(a), z: Math.sin(a) })
+        ].map(fn => circleRuns(fn, cx, cy, R, tilt, phi));
+
+        // axes: each half runs from the origin to ±1.2; the half with zv < 0 is behind
+        const axes = [
+            { dir: { x: 1, y: 0, z: 0 }, col: COL.x, pos: "|+⟩ (X+)", neg: "|−⟩ (X−)" },
+            { dir: { x: 0, y: 1, z: 0 }, col: COL.y, pos: "|+i⟩ (Y+)", neg: "|−i⟩ (Y−)" },
+            { dir: { x: 0, y: 0, z: 1 }, col: COL.z, pos: "|0⟩ (Z+)", neg: "|1⟩ (Z−)" }
+        ];
+        const AX = 1.2, LBL = 1.13;
+        const halves = [];
+        axes.forEach(ax => {
+            [[1, ax.pos], [-1, ax.neg]].forEach(([sgn, text]) => {
+                const end = project3D(sgn * AX * ax.dir.x, sgn * AX * ax.dir.y, sgn * AX * ax.dir.z, cx, cy, R, tilt, phi);
+                const lab = project3D(sgn * LBL * ax.dir.x, sgn * LBL * ax.dir.y, sgn * LBL * ax.dir.z, cx, cy, R, tilt, phi);
+                halves.push({ end, lab, text, col: ax.col, front: end.zv >= 0 });
+            });
+        });
+
+        // -- back layer: back arcs, back axis halves --
+        circles.forEach(c => strokeRuns(c.back, COL.soft, 1, true, BACK_ALPHA));
+        halves.filter(h => !h.front).forEach(h =>
+            strokeRuns([[p0, h.end]], h.col, 1.1, true, BACK_ALPHA));
+
+        // -- state vector --
+        const vec = disp[blochState.selected];
+        let tipInfo = null;
         if (vec) {
             const tip = project3D(vec.x, vec.y, vec.z, cx, cy, R, tilt, phi);
-            const len = Math.hypot(tip.x - pCenter.x, tip.y - pCenter.y);
+            const foot = project3D(vec.x, vec.y, 0, cx, cy, R, tilt, phi); // projection on the equatorial plane
+            const zc = Math.max(-1, Math.min(1, tip.zv));
+            tipInfo = {
+                tip, foot,
+                radius: TIP_RADIUS * (1 + TIP_DEPTH_SIZE * zc),
+                alpha: TIP_ALPHA_MIN + (1 - TIP_ALPHA_MIN) * (zc + 1) / 2,
+                r: Math.hypot(vec.x, vec.y, vec.z)
+            };
+        }
 
+        function drawVector() {
+            const { tip, foot, radius, alpha } = tipInfo;
+            const len = Math.hypot(tip.x - p0.x, tip.y - p0.y);
+
+            // trail (fading path of the tip)
+            if (trail.length > 1) {
+                ctx.save();
+                ctx.lineCap = "round";
+                for (let i = 1; i < trail.length; i++) {
+                    const a = trail[i - 1], b = trail[i];
+                    const age = 1 - (now - b.t) / TRAIL_MS;
+                    if (age <= 0) continue;
+                    const pa = project3D(a.x, a.y, a.z, cx, cy, R, tilt, phi);
+                    const pb = project3D(b.x, b.y, b.z, cx, cy, R, tilt, phi);
+                    ctx.globalAlpha = TRAIL_ALPHA * age * age;
+                    ctx.strokeStyle = COL.warm;
+                    ctx.lineWidth = 1.2 + 2.2 * age;
+                    ctx.beginPath();
+                    ctx.moveTo(pa.x, pa.y);
+                    ctx.lineTo(pb.x, pb.y);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // dropline to the equatorial plane + the projected point on it
+            ctx.save();
+            ctx.globalAlpha = 0.45 * alpha;
+            ctx.strokeStyle = COL.warm;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 3]);
             ctx.beginPath();
-            ctx.moveTo(pCenter.x, pCenter.y);
-            ctx.lineTo(tip.x, tip.y);
-            ctx.strokeStyle = "#fbbf24";
-            ctx.lineWidth = 2.6;
-            ctx.shadowColor = "#f59e0b";
-            ctx.shadowBlur = 10;
+            ctx.moveTo(tip.x, tip.y);
+            ctx.lineTo(foot.x, foot.y);
             ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 0.6 * alpha;
+            ctx.beginPath();
+            ctx.arc(foot.x, foot.y, 2.4, 0, 2 * Math.PI);
+            ctx.fillStyle = COL.warm;
+            ctx.fill();
+            ctx.restore();
 
-            // arrowhead (screen-space)
+            // shaft + tip
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(tip.x, tip.y);
+            ctx.strokeStyle = COL.warm;
+            ctx.lineWidth = 2.2;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
             if (len > 6) {
-                const ux = (tip.x - pCenter.x) / len;
-                const uy = (tip.y - pCenter.y) / len;
-                const ah = 10; // arrowhead size
+                // tip: size and alpha follow depth
+                ctx.shadowColor = COL.warm;
+                ctx.shadowBlur = tip.zv >= 0 ? 10 : 0;
                 ctx.beginPath();
-                ctx.moveTo(tip.x, tip.y);
-                ctx.lineTo(tip.x - ux * ah - uy * ah * 0.5, tip.y - uy * ah + ux * ah * 0.5);
-                ctx.lineTo(tip.x - ux * ah + uy * ah * 0.5, tip.y - uy * ah - ux * ah * 0.5);
-                ctx.closePath();
-                ctx.fillStyle = "#fbbf24";
+                ctx.arc(tip.x, tip.y, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = COL.warm;
                 ctx.fill();
             } else {
                 // vector at/near origin: highlight the maximally-mixed dot
                 ctx.beginPath();
-                ctx.arc(pCenter.x, pCenter.y, 5.5, 0, 2 * Math.PI);
-                ctx.strokeStyle = "#fbbf24";
+                ctx.arc(p0.x, p0.y, 5.5, 0, 2 * Math.PI);
+                ctx.strokeStyle = COL.warm;
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
             }
-
-            // |r| readout
-            const r = Math.sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-            ctx.fillStyle = "#fbbf24";
-            ctx.font = "12px 'IBM Plex Mono', monospace";
-            ctx.textAlign = "left";
-            ctx.fillText(`q${blochState.selected}  |r| = ${r.toFixed(2)}`, 10, canvas.height - 12);
+            ctx.restore();
         }
 
-        blochAnimId = requestAnimationFrame(drawFrame);
+        const tipBehind = !!tipInfo && tipInfo.tip.zv < 0;
+        if (tipBehind) drawVector();
+
+        // -- front layer: front arcs, front axis halves, centre dot --
+        circles.forEach(c => strokeRuns(c.front, COL.soft, 1.1, false, 0.85));
+        halves.filter(h => h.front).forEach(h =>
+            strokeRuns([[p0, h.end]], h.col, 1.2, false, 0.9));
+        ctx.beginPath();
+        ctx.arc(p0.x, p0.y, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = COL.link;
+        ctx.fill();
+
+        // labels: opacity follows depth, kept inside the canvas
+        ctx.font = `11px ${MONO}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        halves.forEach(h => {
+            const depth01 = (Math.max(-1, Math.min(1, h.lab.zv)) + 1) / 2;
+            const half = ctx.measureText(h.text).width / 2 + 3;
+            const lx = Math.max(half, Math.min(W - half, h.lab.x));
+            const ly = Math.max(8, Math.min(W - 8, h.lab.y));
+            ctx.globalAlpha = LABEL_ALPHA_MIN + (1 - LABEL_ALPHA_MIN) * depth01;
+            ctx.fillStyle = h.col;
+            ctx.fillText(h.text, lx, ly);
+        });
+        ctx.globalAlpha = 1;
+
+        if (tipInfo && !tipBehind) drawVector();
+
+        // |r| readout
+        if (tipInfo) {
+            ctx.fillStyle = COL.warm;
+            ctx.font = `12px ${MONO}`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillText(`q${blochState.selected}  |r| = ${tipInfo.r.toFixed(2)}`, 10, W - 12);
+            blochDraw.tipZ = tipInfo.tip.zv;
+            blochDraw.tipRadius = tipInfo.radius;
+            blochDraw.tipAlpha = tipInfo.alpha;
+        }
+        blochDraw.tilt = viewTilt;
+        blochDraw.phi = viewPhi;
+        blochDraw.trailPoints = trail.length;
+        blochDraw.animating = !!anim;
+        blochDraw.frames++;
     }
 
-    drawFrame();
+    // ---- frame loop: full rate while dragging/animating, IDLE_FPS otherwise; paused when hidden ----
+    let lastDraw = 0;
+    function frame(now) {
+        blochAnimId = null;
+        if (document.hidden) return;
+        const busy = dragging || anim || trail.length > 0 || needsFrame;
+        const minGap = 1000 / IDLE_FPS - 4; // tolerate rAF jitter around the 30 fps cadence
+        if (busy || now - lastDraw >= minGap) {
+            needsFrame = false;
+            lastDraw = now;
+            draw(now);
+        }
+        blochAnimId = requestAnimationFrame(frame);
+    }
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            if (blochAnimId !== null) { cancelAnimationFrame(blochAnimId); blochAnimId = null; }
+        } else if (blochAnimId === null) {
+            needsFrame = true;
+            blochAnimId = requestAnimationFrame(frame);
+        }
+    });
+
+    resize();
+    blochAnimId = requestAnimationFrame(frame);
 }
 
 // ================== CIRCUIT UI ==================
@@ -1043,6 +1360,7 @@ function updateQuantumState() {
 
     blochState.vectors = computeBlochVectors(state, n);
     if (blochState.selected >= n) blochState.selected = 0;
+    if (blochState.onUpdate) blochState.onUpdate();
 
     // qubit selector (visible only for n > 1)
     const row = document.getElementById("bloch-qubit-row");
