@@ -19,6 +19,27 @@
       "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
     }
     </script>
+    <script>
+    // Arrival handshake (portfolio-motion-brief.md section 2): runs before first paint.
+    (function () {
+      var root = document.documentElement;
+      try {
+        var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var a = JSON.parse(sessionStorage.getItem('arrival') || 'null');
+        if (a && Date.now() - a.ts < 4000) {
+          root.classList.add('arriving');
+          root.style.setProperty('--arrival-rgb', a.rgb.join(','));
+          window.__arrival = a;
+        } else if (!reduced && !sessionStorage.getItem('intro:skills')) {
+          root.classList.add('mesh-cover');   // first visit this session: mesh fades in
+        }
+        sessionStorage.removeItem('arrival');
+      } catch (e) {}
+      // failsafe: never leave the page covered if the intro script fails
+      setTimeout(function () { root.classList.remove('arriving', 'mesh-cover'); }, 6000);
+    }());
+    </script>
+    <script src="js/transition.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -219,6 +240,22 @@
             color: #8B96AB;
         }
 
+        /* ---- intro: arrival fill collapses to the laser emitter (driven by playIntro) ---- */
+        html.arriving body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            background: rgb(var(--arrival-rgb, 6, 10, 18));
+            transform: scale(var(--arrival-s, 1));
+            transform-origin: var(--arrival-ox, 50%) var(--arrival-oy, 50%);
+            opacity: var(--arrival-op, 1);
+        }
+        /* first visit: hide mesh + skills before paint (opacity only; content stays in the DOM) */
+        html.mesh-cover #mzi-canvas,
+        html.mesh-cover .port .sk { opacity: 0; }
+
         @media (max-width: 1000px) {
             .mesh-grid { grid-template-columns: minmax(0, 1fr); }
             #port-labels {
@@ -287,7 +324,56 @@
                     <canvas id="mzi-canvas" width="1600" height="1132" aria-label="Animated 8-mode Mach-Zehnder interferometer mesh: one laser enters rail 3 and the mesh is reprogrammed to route light to the selected skill group's output ports"></canvas>
                     <div id="mesh-tip" hidden></div>
                 </div>
-                <div id="port-labels" role="group" aria-label="Output ports and their skills"></div>
+                <div id="port-labels" role="group" aria-label="Output ports and their skills">
+                    <button type="button" class="port" data-port="0" style="--pc:rgb(255,190,77);--py:6.714%" aria-label="Send all light to output 1: FPGA design (VHDL), Verilog &amp; RTL, Embedded &amp; microcontrollers, Digital electronics">
+                        <span class="sk" data-group="0">FPGA design (VHDL)</span>
+                        <span class="sk" data-group="0">Verilog &amp; RTL</span>
+                        <span class="sk" data-group="0">Embedded &amp; microcontrollers</span>
+                        <span class="sk" data-group="0">Digital electronics</span>
+                    </button>
+                    <button type="button" class="port" data-port="1" style="--pc:rgb(255,190,77);--py:19.081%" aria-label="Send all light to output 2: Analog electronics, Lab instrumentation, LabVIEW, PCB &amp; prototyping">
+                        <span class="sk" data-group="0">Analog electronics</span>
+                        <span class="sk" data-group="0">Lab instrumentation</span>
+                        <span class="sk" data-group="0">LabVIEW</span>
+                        <span class="sk" data-group="0">PCB &amp; prototyping</span>
+                    </button>
+                    <button type="button" class="port" data-port="2" style="--pc:rgb(95,216,232);--py:31.449%" aria-label="Send all light to output 3: Photonic quantum computing, GBS systems, MZI interferometry, Single-photon detection">
+                        <span class="sk" data-group="1">Photonic quantum computing</span>
+                        <span class="sk" data-group="1">GBS systems</span>
+                        <span class="sk" data-group="1">MZI interferometry</span>
+                        <span class="sk" data-group="1">Single-photon detection</span>
+                    </button>
+                    <button type="button" class="port" data-port="3" style="--pc:rgb(95,216,232);--py:43.816%" aria-label="Send all light to output 4: Qiskit, Quantum error correction, Quantum simulation, Quantum optics">
+                        <span class="sk" data-group="1">Qiskit</span>
+                        <span class="sk" data-group="1">Quantum error correction</span>
+                        <span class="sk" data-group="1">Quantum simulation</span>
+                        <span class="sk" data-group="1">Quantum optics</span>
+                    </button>
+                    <button type="button" class="port" data-port="4" style="--pc:rgb(126,227,154);--py:56.184%" aria-label="Send all light to output 5: Python, C &amp; low-level, JavaScript &amp; creative coding, Django &amp; REST APIs">
+                        <span class="sk" data-group="2">Python</span>
+                        <span class="sk" data-group="2">C &amp; low-level</span>
+                        <span class="sk" data-group="2">JavaScript &amp; creative coding</span>
+                        <span class="sk" data-group="2">Django &amp; REST APIs</span>
+                    </button>
+                    <button type="button" class="port" data-port="5" style="--pc:rgb(126,227,154);--py:68.551%" aria-label="Send all light to output 6: Node.js, MATLAB, R &amp; statistics, Linux &amp; shell">
+                        <span class="sk" data-group="2">Node.js</span>
+                        <span class="sk" data-group="2">MATLAB</span>
+                        <span class="sk" data-group="2">R &amp; statistics</span>
+                        <span class="sk" data-group="2">Linux &amp; shell</span>
+                    </button>
+                    <button type="button" class="port" data-port="6" style="--pc:rgb(180,154,255);--py:80.919%" aria-label="Send all light to output 7: TensorFlow &amp; deep learning, Graph neural networks, Computer vision (OpenCV), NLP &amp; language modeling">
+                        <span class="sk" data-group="3">TensorFlow &amp; deep learning</span>
+                        <span class="sk" data-group="3">Graph neural networks</span>
+                        <span class="sk" data-group="3">Computer vision (OpenCV)</span>
+                        <span class="sk" data-group="3">NLP &amp; language modeling</span>
+                    </button>
+                    <button type="button" class="port" data-port="7" style="--pc:rgb(180,154,255);--py:93.286%" aria-label="Send all light to output 8: Local LLMs &amp; agents, Signal processing, Scientific computing, Data viz &amp; dashboards">
+                        <span class="sk" data-group="3">Local LLMs &amp; agents</span>
+                        <span class="sk" data-group="3">Signal processing</span>
+                        <span class="sk" data-group="3">Scientific computing</span>
+                        <span class="sk" data-group="3">Data viz &amp; dashboards</span>
+                    </button>
+                </div>
             </div>
         </div>
         <div class="mesh-footnote">8-mode rectangular (Clements) mesh · 28 MZIs · reprogrammed per channel. Each retune changes the seven splitter-tree MZIs and the output phases; hover an MZI for its settings.</div>

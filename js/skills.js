@@ -40,6 +40,20 @@
     var EPS_AMP = 1e-12;          // amplitude below which a phase is "undefined"
     var TINY_POW = 1e-22;         // subtree power below which theta is undefined
 
+    // ---------- intro timing (ms) — tune here ----------
+    // lead: arrival fill collapses to the emitter (arrival) / mesh fades in (first)
+    // prop: the pulse front runs IN_X -> PORT_X; ports: bars grow, skills type in
+    var INTRO = {
+        arrival: { lead: 450, propEnd: 1650, total: 2400 },   // <= 2.5 s
+        first: { lead: 900, propEnd: 2700, total: 3800 }      // <= 4 s
+    };
+    var INTRO_BARS_END = 0.5;     // ports phase: bars finish growing (fraction)
+    var INTRO_TYPE_SPAN = 0.4;    // ports phase: spread of typing start times
+    var INTRO_TYPE_LEN = 0.35;    // ports phase: typing time per line
+    var INTRO_DIM_START = 0.6;    // ports phase: unlit skills start fading in
+    var REDUCED_FADE_MS = 150;    // reduced motion: arrival fill fades, nothing else moves
+    var STAR_RGB_FALLBACK = [214, 230, 255];
+
     // ============================================================
     // Physics (pure; exported as MZIRouter)
     // ============================================================
@@ -271,27 +285,32 @@
     // output-port skill labels (DOM, so they can sit beside or below the mesh)
     var portEls = [], skillEls = [];
     (function () {
+        var existing = labelsEl.querySelectorAll(".port");
         for (var r = 0; r < RAILS; r++) {
-            var g = GROUPS[r >> 1];
-            var btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "port";
-            btn.setAttribute("data-port", r);
-            btn.style.setProperty("--pc", "rgb(" + g.rgb.join(",") + ")");
-            btn.style.setProperty("--py", (railY0[r] / H * 100).toFixed(3) + "%");
-            var names = [];
-            for (var s = 0; s < 4; s++) {
-                var span = document.createElement("span");
-                span.className = "sk";
-                span.setAttribute("data-group", r >> 1);
-                span.textContent = SKILLS[r * 4 + s];
-                names.push(SKILLS[r * 4 + s]);
-                btn.appendChild(span);
-                skillEls.push(span);
+            var btn = existing[r];
+            if (!btn) {                       // markup is static in skills.html; this is the fallback
+                var g = GROUPS[r >> 1];
+                btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "port";
+                btn.setAttribute("data-port", r);
+                btn.style.setProperty("--pc", "rgb(" + g.rgb.join(",") + ")");
+                btn.style.setProperty("--py", (railY0[r] / H * 100).toFixed(3) + "%");
+                var names = [];
+                for (var s = 0; s < 4; s++) {
+                    var span = document.createElement("span");
+                    span.className = "sk";
+                    span.setAttribute("data-group", r >> 1);
+                    span.textContent = SKILLS[r * 4 + s];
+                    names.push(SKILLS[r * 4 + s]);
+                    btn.appendChild(span);
+                }
+                btn.setAttribute("aria-label", "Send all light to output " + (r + 1) + ": " + names.join(", "));
+                labelsEl.appendChild(btn);
             }
-            btn.setAttribute("aria-label", "Send all light to output " + (r + 1) + ": " + names.join(", "));
+            var sks = btn.querySelectorAll(".sk");
+            for (var q = 0; q < 4; q++) skillEls.push(sks[q]);
             (function (rr) { btn.addEventListener("click", function () { selectPort(rr, true); }); })(r);
-            labelsEl.appendChild(btn);
             portEls.push(btn);
         }
     })();
@@ -325,6 +344,8 @@
     var hover = null;                     // {kind:'mzi', k} | {kind:'d', j}
     var pointer = { x: 0, y: 0 };
     var litCache = new Array(RAILS).fill(-1);
+    var introActive = false;              // intro running: no idle loop, no cycling
+    var intro = null;                     // per-frame intro state (see introFrame)
 
     function targetColor(t) { return GROUPS[t.kind === "group" ? t.idx : t.idx >> 1].rgb; }
 
@@ -361,26 +382,34 @@
     });
 
     // recompute uCur, cfg, fields and intensities for raw progress f
+    function powersOf(fs) {
+        return fs.map(function (v) {
+            var p = new Float64Array(N);
+            for (var j = 0; j < N; j++) p[j] = v.re[j] * v.re[j] + v.im[j] * v.im[j];
+            return p;
+        });
+    }
     function evaluate(f) {
         var s = smoothstep(f);
         uCur = f >= 1 ? uTo : slerp(uFrom, uTo, s);
         cfg = solve(uCur, cfg);
         fields = propagate(cfg, IN_RAIL);
-        inten = fields.map(function (v) {
-            var p = new Float64Array(N);
-            for (var j = 0; j < N; j++) p[j] = v.re[j] * v.re[j] + v.im[j] * v.im[j];
-            return p;
-        });
+        inten = powersOf(fields);
         for (var r = 0; r < RAILS; r++) outP[r] = inten[NCOLS][r];
         lightRgb = lerpRgb(colFrom, colTo, s);
         applyLabels();
     }
 
+    function portOp(r) {
+        var t = smoothstep((outP[r] - 0.02) / 0.06);
+        if (t < 0.01) t = 0; else if (t > 0.99) t = 1;
+        return DIM_ALPHA + (1 - DIM_ALPHA) * t;
+    }
+
     function applyLabels() {
+        if (introActive) return;      // the intro drives label opacity itself
         for (var r = 0; r < RAILS; r++) {
-            var t = smoothstep((outP[r] - 0.02) / 0.06);
-            if (t < 0.01) t = 0; else if (t > 0.99) t = 1;
-            var op = DIM_ALPHA + (1 - DIM_ALPHA) * t;
+            var op = portOp(r);
             var key = Math.round(op * 1e4);
             if (litCache[r] === key) continue;
             litCache[r] = key;
@@ -503,6 +532,14 @@
 
         var rgb = lightRgb, r, c, j;
 
+        // intro: rails, heaters and phase screen exist only behind the pulse front
+        if (intro) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, intro.front, H);
+            ctx.clip();
+        }
+
         // steady CW glow on each rail: gradient stops from the propagated field
         ctx.lineCap = "butt";
         for (r = 0; r < RAILS; r++) {
@@ -535,6 +572,18 @@
         for (j = 0; j < RAILS; j++) {
             ctx.fillStyle = heatColor(cfg.deltas[j]);
             ctx.fillRect(D_X - 6, railY0[j] - 2.5, 12, 5);
+        }
+        if (intro) {
+            ctx.restore();
+            // the pulse head: a bright packet on every rail that carries light at the front
+            for (r = 0; r < RAILS; r++) {
+                var Ih = intensityAt(r, intro.front);
+                if (Ih < 0.02 || intro.front <= IN_X) continue;
+                ctx.globalAlpha = Math.min(1, Ih);
+                ctx.fillStyle = "rgba(255,255,255,0.95)";
+                ctx.beginPath(); ctx.arc(intro.front, railY(r, intro.front), 1.4 + 2.6 * Math.sqrt(Ih), 0, TWO_PI); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
         }
 
         // hover ring
@@ -570,7 +619,7 @@
 
         // output bars + port glow, in each port's own group colour
         for (r = 0; r < RAILS; r++) {
-            var P = outP[r];
+            var P = outP[r] * (intro ? intro.portT : 1);
             if (P < 0.003) continue;
             var col = GROUPS[r >> 1].rgb;
             ctx.fillStyle = rgba(col, 0.95);
@@ -581,8 +630,11 @@
         }
 
         // laser emitter glow
-        ctx.fillStyle = rgba(rgb, 0.95);
-        ctx.beginPath(); ctx.arc(IN_X - 6, railY0[IN_RAIL], 2.6, 0, TWO_PI); ctx.fill();
+        var em = intro ? intro.emit : 1;
+        if (em > 0) {
+            ctx.fillStyle = rgba(rgb, 0.95 * em);
+            ctx.beginPath(); ctx.arc(IN_X - 6, railY0[IN_RAIL], 2.6 + 5 * (1 - em), 0, TWO_PI); ctx.fill();
+        }
 
         if (hover) updateTip();
     }
@@ -684,7 +736,7 @@
     }
 
     function startLoop() {
-        if (raf || reducedMotion || document.hidden) return;
+        if (raf || reducedMotion || document.hidden || introActive) return;
         lastTs = 0;
         raf = requestAnimationFrame(frame);
     }
@@ -706,6 +758,162 @@
         };
     };
 
+    // ============================================================
+    // Intro: the arrival point becomes a laser pulse on rail 3 and runs
+    // the mesh.  Every rail's intensity is MZIRouter.propagate for the
+    // initially selected group's configuration (the same cfg the idle
+    // state uses); the pulse only reveals it, column by column.
+    // ============================================================
+    var T = window.SiteTransition || null;
+    var rootEl = document.documentElement;
+    var COVER_VARS = ["--arrival-s", "--arrival-op", "--arrival-ox", "--arrival-oy"];
+    var introCfg = null, introHandle = null, introOff = null, introMode = "skip";
+    var finalRgb = GROUPS[0].rgb;
+
+    function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+    function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+    // stages the pulse has reached: 0 = input, c+1 = after column c, NCOLS+1 = after D
+    function reachedStage(front) {
+        if (front >= D_X + 7) return NCOLS + 1;
+        var n = 0;
+        for (var c = 0; c < NCOLS; c++) if (front >= colX[c] + ZONE) n = c + 1;
+        return n;
+    }
+
+    function setSkillClip(span, k) {
+        if (k >= 1) { span.style.clipPath = ""; return; }
+        var len = span.textContent.length || 1;
+        var shown = Math.floor(k * len) / len;          // monospace: a character is a fixed step
+        span.style.clipPath = "inset(0 " + ((1 - shown) * 100).toFixed(2) + "% 0 0)";
+    }
+
+    function introLabels(q) {
+        var n = 0, lines = 0, r, s;
+        for (r = 0; r < RAILS; r++) if (portOp(r) > 0.99) lines += 4;
+        var dim = easeOutCubic(clamp01((q - INTRO_DIM_START) / (1 - INTRO_DIM_START)));
+        for (r = 0; r < RAILS; r++) {
+            var lit = portOp(r) > 0.99;
+            for (s = 0; s < 4; s++) {
+                var el = skillEls[r * 4 + s];
+                if (lit) {
+                    var t0 = 0.1 + (lines > 1 ? INTRO_TYPE_SPAN * n / (lines - 1) : 0);
+                    n++;
+                    var k = clamp01((q - t0) / INTRO_TYPE_LEN);
+                    el.style.opacity = k > 0 ? "1" : "0";
+                    setSkillClip(el, k);
+                } else {
+                    el.style.opacity = String(DIM_ALPHA * dim);
+                    el.style.clipPath = "";
+                }
+            }
+        }
+    }
+
+    function introFrame(t, done) {
+        var c = introCfg, first = introMode === "first";
+        // fresh propagation for the active configuration on every frame
+        fields = propagate(cfg, IN_RAIL);
+        inten = powersOf(fields);
+        var p = clamp01((t - c.lead) / (c.propEnd - c.lead));
+        var q = clamp01((t - c.propEnd) / (c.total - c.propEnd));
+        var lead = clamp01(t / c.lead);
+        intro.t = t;
+        intro.front = IN_X + (PORT_X - IN_X) * p;
+        intro.emit = easeOutCubic(lead);
+        intro.portT = easeOutCubic(clamp01(q / INTRO_BARS_END));
+        lightRgb = lerpRgb(intro.starRgb, finalRgb, smoothstep(p));
+        if (first) canvas.style.opacity = String(easeOutCubic(lead));
+        if (introMode === "arrival") {
+            rootEl.style.setProperty("--arrival-s", String(1 - easeInOutCubic(lead)));
+        }
+        introLabels(q);
+        renderOnce();
+    }
+
+    function endIntro() {
+        if (introOff) { introOff(); introOff = null; }
+        var was = introActive;
+        introActive = false;
+        intro = null;
+        introHandle = null;
+        rootEl.classList.remove("arriving", "mesh-cover");
+        COVER_VARS.forEach(function (k) { rootEl.style.removeProperty(k); });
+        canvas.style.opacity = "";
+        skillEls.forEach(function (el) { el.style.clipPath = ""; });
+        lightRgb = finalRgb;
+        litCache.fill(-1);
+        applyLabels();
+        renderOnce();
+        if (was) {
+            var now = performance.now();
+            nextCycle = now + CYCLE_MS;       // idle cycling starts only now
+            lastPulse = now;                  // first idle pulse one period later
+        }
+        if (!reducedMotion) startLoop();
+    }
+
+    function emitterScreen() {
+        var rect = canvas.getBoundingClientRect();
+        var x = rect.left + (IN_X - 6) / W * rect.width;
+        var y = rect.top + railY0[IN_RAIL] / H * rect.height;
+        var m = 24;
+        return {
+            x: Math.max(m, Math.min(window.innerWidth - m, x)),
+            y: Math.max(m, Math.min(window.innerHeight - m, y))
+        };
+    }
+
+    // mode: 'arrival' | 'first' | 'skip'; arrival: {star, rgb, starRgb, ts} or null
+    function playIntro(mode, arrival) {
+        if (introHandle) { introHandle.cancel(); introHandle = null; }
+        if (introOff) { introOff(); introOff = null; }
+        if (mode === "skip" || !T) { introActive = false; endIntro(); return; }
+        T.markSeen("skills");
+        if (reducedMotion) {
+            // reduced motion: the mesh is already at its idle state; only the arrival fill fades
+            introActive = false;
+            rootEl.classList.remove("mesh-cover");
+            if (mode === "arrival") {
+                introHandle = T.run(REDUCED_FADE_MS, function (t) {
+                    rootEl.style.setProperty("--arrival-op", String(1 - clamp01(t / REDUCED_FADE_MS)));
+                }, function () { endIntro(); });
+            } else endIntro();
+            return;
+        }
+        introMode = mode;
+        introCfg = INTRO[mode === "arrival" ? "arrival" : "first"];
+        introActive = true;
+        intro = { t: 0, front: IN_X, emit: 0, portT: 0, starRgb: (arrival && arrival.starRgb) || STAR_RGB_FALLBACK };
+        if (mode === "arrival") {
+            var e = emitterScreen();
+            rootEl.style.setProperty("--arrival-ox", e.x.toFixed(1) + "px");
+            rootEl.style.setProperty("--arrival-oy", e.y.toFixed(1) + "px");
+        }
+        introFrame(0);                        // first frame is set before paint
+        rootEl.classList.remove("mesh-cover");
+        introHandle = T.run(introCfg.total, introFrame, function () { endIntro(); });
+        introOff = T.wireSkip(function () { if (introHandle) introHandle.finish(); });
+    }
+    window.playIntro = playIntro;
+
+    // intro state for tests and tooling: the intensities the page is drawing
+    api.getIntro = function () {
+        var reached = intro ? reachedStage(intro.front) : NCOLS + 1;
+        return {
+            active: introActive, mode: introMode, t: intro ? intro.t : null,
+            front: intro ? intro.front : null, reached: reached,
+            inRail: IN_RAIL,
+            config: {
+                thetas: Array.prototype.slice.call(cfg.thetas),
+                phis: Array.prototype.slice.call(cfg.phis),
+                deltas: Array.prototype.slice.call(cfg.deltas)
+            },
+            inten: inten.slice(0, reached + 1).map(function (v) { return Array.prototype.slice.call(v); })
+        };
+    };
+
     // ---------- boot ----------
     railPaths = [];
     buildRailPaths();
@@ -719,5 +927,5 @@
     } else {
         window.addEventListener("resize", resize);
     }
-    if (!reducedMotion) startLoop();
+    playIntro(T ? T.getMode("skills") : "skip", window.__arrival || null);
 })();
