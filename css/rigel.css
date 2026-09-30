@@ -353,3 +353,32 @@ body.rigel-page #clear-circuit-btn.secondary:hover {
     body.rigel-page #run-btn,
     body.rigel-page #clear-circuit-btn { transition: none; }
 }
+
+/* ---- intro: the sphere assembles (driven by playIntro in js/rigel.js) ---- */
+
+/* arrival fill: the last frame of the star dive, collapses to the sphere centre */
+html.arriving body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background: rgb(var(--arrival-rgb, 7, 10, 16));
+    transform-origin: var(--arrival-x, 50vw) var(--arrival-y, 50vh);
+    transform: scale(var(--arrival-s, 1));
+    opacity: var(--arrival-op, 1);
+}
+
+/* gate buttons drop in (opacity/transform only; JS drives the per-button values) */
+html.rg-intro .gate-btn { opacity: 0; }
+
+/* circuit wires: a curtain in the panel colour retracts left to right over each cell */
+html.rg-intro .circuit-cell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--sky-0, #0e101f);
+    transform-origin: right center;
+    transform: scaleX(calc(1 - var(--rg-wire, 0)));
+    pointer-events: none;
+}

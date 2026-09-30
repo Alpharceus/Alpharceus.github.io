@@ -16,8 +16,34 @@ const TIP_DEPTH_SIZE  = 0.45;   // tip radius scales by (1 + this * z_v)
 const TIP_ALPHA_MIN   = 0.4;    // tip alpha at the far side; 1 at the near side
 const LABEL_ALPHA_MIN = 0.3;    // axis-label alpha at the far side; 1 at the near side
 
+// ---- intro timing (ms from intro start): arrival <= 2.5 s, first <= 4 s ----
+// Each stage is [start, end]. In arrival mode the dive colour first collapses to the sphere centre.
+const INTRO = {
+    arrival: {
+        total: 2400,
+        collapse: [100, 600],
+        equator: [500, 1000], meridianA: [900, 1400], meridianB: [1000, 1500],
+        labels: [1400, 1800], vector: [1700, 2300],
+        wires: [1200, 1900], gates: [1400, 2200], gateDur: 260
+    },
+    first: {
+        total: 3500,
+        collapse: null,
+        equator: [300, 1000], meridianA: [900, 1600], meridianB: [1050, 1750],
+        labels: [1700, 2200], vector: [2100, 3000],
+        wires: [1800, 2700], gates: [2100, 3200], gateDur: 300
+    }
+};
+const INTRO_REDUCED_FADE_MS = 150;  // reduced motion: arrival fill fades out, nothing else
+const INTRO_GROW_SHARE      = 0.35; // share of the swing spent growing the vector out of the centre
+const INTRO_GATE_DROP_PX    = 10;   // gate buttons drop this far into place
+const INTRO_WIRE_COLS       = 8;    // matches MAX_COLS
+const INTRO_WIRE_ROW_LAG    = 0.06; // per-row lag of the wire draw (fraction of the wire stage)
+const INTRO_EASE            = (u) => 1 - Math.pow(1 - u, 3); // easeOutCubic
+const INTRO_EASE_IO         = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+
 // ================== DOM ENTRY ==================
-document.addEventListener("DOMContentLoaded", () => {
+function rigelBoot() {
     // Show the circuit section immediately (no 10s delay nonsense)
     const circuitSection = document.getElementById("circuit-section");
     if (circuitSection) {
@@ -27,10 +53,125 @@ document.addEventListener("DOMContentLoaded", () => {
     initBlochSphere();
     initCircuitUI();
 
-    // KaTeX loads with `defer`, i.e. after this script runs — re-render the
-    // state panel once everything (including KaTeX) is ready
+    // KaTeX is a blocking script in <head>, so it is loaded here and the state summary is
+    // already rendered; the intro starts only after that.
+    startIntro();
+
+    // re-render the state panel once everything (including KaTeX) is ready
     window.addEventListener("load", () => updateQuantumState());
-});
+}
+
+// ================== INTRO ==================
+// The intro is a pure function of time: introFrame(t, cfg) sets the stage progress in
+// blochIntro (read by the sphere draw loop) and on the circuit DOM (opacity/transform and
+// one custom property only, so nothing ever shifts layout).
+
+const blochIntro = {
+    active: document.documentElement.classList.contains("rg-intro"),
+    eq: 0, merA: 0, merB: 0, lab: 0, vec: 0,
+    poke: null           // set by initBlochSphere: request a redraw
+};
+
+window.__rigelIntro = { katexAtStart: null, mode: null };
+
+function introClamp01(v) { return Math.max(0, Math.min(1, v)); }
+function introStage(t, st) { return introClamp01((t - st[0]) / (st[1] - st[0])); }
+
+function introCircuitEls() {
+    return {
+        gates: Array.from(document.querySelectorAll("#gate-palette .gate-btn")),
+        cells: Array.from(document.querySelectorAll("#circuit-grid .circuit-cell"))
+    };
+}
+
+function introFrame(t, cfg, els, arrival) {
+    const root = document.documentElement;
+    if (arrival && cfg.collapse) {
+        const c = INTRO_EASE_IO(introStage(t, cfg.collapse));
+        root.style.setProperty("--arrival-s", String(Math.max(0.0001, 1 - c)));
+        root.style.setProperty("--arrival-op", c >= 1 ? "0" : "1");
+    }
+    blochIntro.eq = introStage(t, cfg.equator);
+    blochIntro.merA = introStage(t, cfg.meridianA);
+    blochIntro.merB = introStage(t, cfg.meridianB);
+    blochIntro.lab = introStage(t, cfg.labels);
+    blochIntro.vec = introStage(t, cfg.vector);
+    if (blochIntro.poke) blochIntro.poke();
+
+    // wires: each cell's curtain retracts as the wire front passes its column
+    const wp = introStage(t, cfg.wires);
+    els.cells.forEach(cell => {
+        const col = +cell.dataset.col || 0, row = +cell.dataset.row || 0;
+        const p = introClamp01(wp * (1 + INTRO_WIRE_ROW_LAG * 3) - row * INTRO_WIRE_ROW_LAG);
+        cell.style.setProperty("--rg-wire", String(introClamp01(p * INTRO_WIRE_COLS - col)));
+    });
+
+    // gate palette: small stagger, drop + fade
+    const n = els.gates.length;
+    els.gates.forEach((btn, i) => {
+        const start = cfg.gates[0] + (n > 1 ? i * (cfg.gates[1] - cfg.gates[0] - cfg.gateDur) / (n - 1) : 0);
+        const u = INTRO_EASE(introClamp01((t - start) / cfg.gateDur));
+        btn.style.opacity = String(u);
+        btn.style.transform = "translateY(" + ((1 - u) * -INTRO_GATE_DROP_PX).toFixed(2) + "px)";
+    });
+}
+
+function introFinish(els) {
+    const root = document.documentElement;
+    blochIntro.active = false;
+    blochIntro.eq = blochIntro.merA = blochIntro.merB = blochIntro.lab = blochIntro.vec = 1;
+    if (blochIntro.poke) blochIntro.poke(true);
+    els.gates.forEach(b => { b.style.removeProperty("opacity"); b.style.removeProperty("transform"); });
+    els.cells.forEach(c => c.style.removeProperty("--rg-wire"));
+    ["--arrival-s", "--arrival-op", "--arrival-rgb", "--arrival-x", "--arrival-y"]
+        .forEach(k => root.style.removeProperty(k));
+    root.classList.remove("arriving", "rg-intro");
+}
+
+// mode: 'arrival' | 'first' | 'skip'; arrival: {star, rgb, ts} or null
+function playIntro(mode, arrival) {
+    const T = window.SiteTransition;
+    const root = document.documentElement;
+    const els = introCircuitEls();
+    window.__rigelIntro.mode = mode;
+    window.__rigelIntro.katexAtStart = !!document.querySelector("#state-output .katex");
+
+    if (mode === "skip" || !T) { introFinish(els); return; }
+    T.markSeen("rigel");
+    if (T.reducedMotion()) {
+        // reduced motion: at most a short fade of the arrival fill
+        introFinish(els);
+        if (arrival) {
+            root.classList.add("arriving");
+            T.run(INTRO_REDUCED_FADE_MS,
+                t => root.style.setProperty("--arrival-op", String(1 - introClamp01(t / INTRO_REDUCED_FADE_MS))),
+                () => { root.classList.remove("arriving"); root.style.removeProperty("--arrival-op"); });
+        }
+        return;
+    }
+    const isArrival = mode === "arrival";
+    const cfg = isArrival ? INTRO.arrival : INTRO.first;
+    root.classList.add("rg-intro");
+    blochIntro.active = true;
+    if (isArrival) {
+        // the fill collapses onto the sphere centre (viewport coordinates of the canvas centre)
+        const cv = document.getElementById("bloch-canvas");
+        if (cv) {
+            const r = cv.getBoundingClientRect();
+            root.style.setProperty("--arrival-x", (r.left + r.width / 2).toFixed(1) + "px");
+            root.style.setProperty("--arrival-y", (r.top + r.height / 2).toFixed(1) + "px");
+        }
+    }
+    introFrame(0, cfg, els, isArrival);
+    const handle = T.run(cfg.total, t => introFrame(t, cfg, els, isArrival), () => { off(); introFinish(els); });
+    const off = T.wireSkip(() => handle.finish());
+}
+window.playIntro = playIntro;
+
+function startIntro() {
+    const T = window.SiteTransition;
+    playIntro(T ? T.getMode("rigel") : "skip", window.__arrival || null);
+}
 
 // ================== BLOCH SPHERE ==================
 
@@ -233,7 +374,21 @@ function initBlochSphere() {
         const e = SLERP_EASE(u);
         return anim.to.map((to, q) => slerpBloch(anim.from[q], to, e));
     }
-    blochState.getDisplayed = () => displayedAt(performance.now());
+    // Intro swing: the vector grows out of the centre along |0>, then slerps (the same
+    // geodesic used for gates) to the live simulator state. |0> is the default state, so
+    // for the default circuit the second leg is a no-op and the end state is exact.
+    function introVectors() {
+        const p = blochIntro.vec;
+        const grow = Math.min(1, p / INTRO_GROW_SHARE);
+        const swing = Math.max(0, (p - INTRO_GROW_SHARE) / (1 - INTRO_GROW_SHARE));
+        const v0 = { x: 0, y: 0, z: INTRO_EASE(grow) };
+        return blochState.vectors.map(to => slerpBloch(v0, to, SLERP_EASE(swing)));
+    }
+    blochState.getDisplayed = () => (blochIntro.active ? introVectors() : displayedAt(performance.now()));
+    // the intro redraws the sphere at the idle cap (30 fps) unless forced, like every other redraw
+    blochIntro.poke = (force) => {
+        if (force || performance.now() - lastDraw >= 1000 / IDLE_FPS - 4) needsFrame = true;
+    };
 
     function pushTrail(now, vecs) {
         const v = vecs[blochState.selected];
@@ -285,10 +440,10 @@ function initBlochSphere() {
 
     // Sample a great circle and split it into front (zv >= 0) and back (zv < 0) runs,
     // inserting the exact crossing points so the two halves meet cleanly.
-    function circleRuns(point3, cx, cy, R, tilt, phi) {
+    function circleRuns(point3, cx, cy, R, tilt, phi, frac = 1) {
         const pts = [];
         for (let k = 0; k <= CIRCLE_SAMPLES; k++) {
-            const a = (2 * Math.PI * k) / CIRCLE_SAMPLES;
+            const a = (2 * Math.PI * frac * k) / CIRCLE_SAMPLES;
             const p3 = point3(a);
             pts.push({ p3, p: project3D(p3.x, p3.y, p3.z, cx, cy, R, tilt, phi) });
         }
@@ -317,7 +472,7 @@ function initBlochSphere() {
             }
             add(fb, b.p);
         }
-        return { front, back };
+        return { front, back, end: pts[pts.length - 1].p };
     }
 
     // ---- one frame ----
@@ -328,11 +483,14 @@ function initBlochSphere() {
 
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, W, W);
+        const intro = blochIntro.active ? blochIntro : null;
         if (volumeLayer) {
+            if (intro) ctx.globalAlpha = intro.eq;
             ctx.drawImage(volumeLayer, 0, 0, canvas.width, canvas.height, 0, 0, W, W);
+            ctx.globalAlpha = 1;
         }
 
-        const disp = displayedAt(now);
+        const disp = intro ? introVectors() : displayedAt(now);
         if (anim && now - anim.t0 >= SLERP_MS) {
             displayed = anim.to;   // settled exactly on the simulator vectors
             pushTrail(now, displayed);
@@ -351,11 +509,16 @@ function initBlochSphere() {
         const p0 = project3D(0, 0, 0, cx, cy, R, tilt, phi);
 
         // great circles: equator (z = 0), xz meridian (y = 0), yz meridian (x = 0)
+        const circleFrac = intro ? [intro.eq, intro.merA, intro.merB] : [1, 1, 1];
         const circles = [
             (a) => ({ x: Math.cos(a), y: Math.sin(a), z: 0 }),
             (a) => ({ x: Math.cos(a), y: 0, z: Math.sin(a) }),
             (a) => ({ x: 0, y: Math.cos(a), z: Math.sin(a) })
-        ].map(fn => circleRuns(fn, cx, cy, R, tilt, phi));
+        ].map((fn, i) => {
+            const c = circleRuns(fn, cx, cy, R, tilt, phi, Math.max(circleFrac[i], 1e-4));
+            return circleFrac[i] <= 0 ? { front: [], back: [], end: c.end } : c;
+        });
+        const labA = intro ? intro.lab : 1;
 
         // axes: each half runs from the origin to ±1.2; the half with zv < 0 is behind
         const axes = [
@@ -375,11 +538,11 @@ function initBlochSphere() {
 
         // -- back layer: back arcs, back axis halves --
         circles.forEach(c => strokeRuns(c.back, COL.soft, 1, true, BACK_ALPHA));
-        halves.filter(h => !h.front).forEach(h =>
-            strokeRuns([[p0, h.end]], h.col, 1.1, true, BACK_ALPHA));
+        if (labA > 0) halves.filter(h => !h.front).forEach(h =>
+            strokeRuns([[p0, h.end]], h.col, 1.1, true, BACK_ALPHA * labA));
 
-        // -- state vector --
-        const vec = disp[blochState.selected];
+        // -- state vector (not drawn until the intro's swing begins) --
+        const vec = intro && intro.vec <= 0 ? null : disp[blochState.selected];
         let tipInfo = null;
         if (vec) {
             const tip = project3D(vec.x, vec.y, vec.z, cx, cy, R, tilt, phi);
@@ -471,8 +634,18 @@ function initBlochSphere() {
 
         // -- front layer: front arcs, front axis halves, centre dot --
         circles.forEach(c => strokeRuns(c.front, COL.soft, 1.1, false, 0.85));
-        halves.filter(h => h.front).forEach(h =>
-            strokeRuns([[p0, h.end]], h.col, 1.2, false, 0.9));
+        if (labA > 0) halves.filter(h => h.front).forEach(h =>
+            strokeRuns([[p0, h.end]], h.col, 1.2, false, 0.9 * labA));
+        if (intro) {
+            // pen dot at the leading end of each circle still being drawn
+            circles.forEach((c, i) => {
+                if (circleFrac[i] <= 0 || circleFrac[i] >= 1) return;
+                ctx.beginPath();
+                ctx.arc(c.end.x, c.end.y, 2.4, 0, 2 * Math.PI);
+                ctx.fillStyle = COL.link;
+                ctx.fill();
+            });
+        }
         ctx.beginPath();
         ctx.arc(p0.x, p0.y, 3, 0, 2 * Math.PI);
         ctx.fillStyle = COL.link;
@@ -487,7 +660,7 @@ function initBlochSphere() {
             const half = ctx.measureText(h.text).width / 2 + 3;
             const lx = Math.max(half, Math.min(W - half, h.lab.x));
             const ly = Math.max(8, Math.min(W - 8, h.lab.y));
-            ctx.globalAlpha = LABEL_ALPHA_MIN + (1 - LABEL_ALPHA_MIN) * depth01;
+            ctx.globalAlpha = (LABEL_ALPHA_MIN + (1 - LABEL_ALPHA_MIN) * depth01) * labA;
             ctx.fillStyle = h.col;
             ctx.fillText(h.text, lx, ly);
         });
@@ -1388,4 +1561,14 @@ function updateQuantumState() {
 
 function runCircuit() {
     updateQuantumState();
+}
+
+// ================== BOOT ==================
+// (last, so every top-level const above is initialised before the page is built)
+// rigel.js is the last element of <body>, so the whole DOM already exists: build the page
+// before the first frame (no layout shift when the circuit builder appears).
+if (document.readyState === "loading" && !document.querySelector("footer")) {
+    document.addEventListener("DOMContentLoaded", rigelBoot);
+} else {
+    rigelBoot();
 }
