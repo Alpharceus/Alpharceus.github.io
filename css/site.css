@@ -135,3 +135,17 @@ header.site-bar a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
     header.site-bar nav a { transition: none; }
 }
+
+/* ---- footer: same side gutter as the site bar on every subpage -------- */
+body > footer:not(.site-footer) {
+    padding-left: max(24px, 4vw);
+    padding-right: max(24px, 4vw);
+    box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+    body > footer:not(.site-footer) {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+}
