@@ -59,15 +59,15 @@ let lensFlareAngle = 0;
 // ---- Zoom warp ----
 let warpStars = [];
 
-// page = where the star leads; label side keeps belt labels off each other and off the lines
+// page = where the star leads (label line 2), type = what the star is (line 3); Rigel's page name repeats the star, so it carries a subtitle instead; label side keeps belt labels off each other and off the lines
 const orionStars = [
-    { name: "Betelgeuse", info: "Red supergiant, Alpha Orionis", page: "Terminal", desc: "Interactive terminal", side: "left" },
-    { name: "Bellatrix", info: "Blue giant, Gamma Orionis", page: "Projects", desc: "Research and engineering projects", side: "right" },
-    { name: "Alnilam", info: "Blue supergiant, Epsilon Orionis", page: "Papers", desc: "Journal publications", side: "above" },
-    { name: "Mintaka", info: "Blue giant, Delta Orionis", page: "Skills", desc: "Skills, routed through an MZI mesh", side: "right" },
-    { name: "Alnitak", info: "Blue supergiant, Zeta Orionis", page: "Blog", desc: "Essays on physics, computing, and AI", side: "left" },
-    { name: "Saiph", info: "Blue supergiant, Kappa Orionis", page: "Now", desc: "What I'm working on this quarter", side: "left" },
-    { name: "Rigel", info: "Blue supergiant, Beta Orionis", page: "Rigel", desc: "Quantum circuit simulator", side: "right" }
+    { name: "Betelgeuse", type: "red supergiant · α Ori", page: "Terminal", desc: "Interactive terminal", side: "left" },
+    { name: "Bellatrix", type: "blue giant · γ Ori", page: "Projects", desc: "Research and engineering projects", side: "right" },
+    { name: "Alnilam", type: "blue supergiant · ε Ori", page: "Papers", desc: "Journal publications", side: "right" },
+    { name: "Mintaka", type: "multiple star · δ Ori", page: "Skills", desc: "Skills, routed through an MZI mesh", side: "above" },
+    { name: "Alnitak", type: "triple star · ζ Ori", page: "Blog", desc: "Essays on physics, computing, and AI", side: "left" },
+    { name: "Saiph", type: "blue supergiant · κ Ori", page: "Now", desc: "What I'm working on this quarter", side: "left" },
+    { name: "Rigel", type: "blue supergiant · β Ori", page: "Rigel", sub: "Quantum playground", desc: "Quantum circuit simulator", side: "right" }
 ];
 orionStars.forEach(function (s) {
     const d = SKY.main[s.name];
@@ -648,49 +648,112 @@ function drawOrion(progress) {
     }
 }
 
-function drawLabels(ctx, pos, a, hi) {
-    const fs = width < 500 ? 10.5 : 12;
+// Three-part label: star name, the page it opens, what the star is.
+// Anchored per `side`; the block is centred on the star (left/right) or stacked upward (above).
+// On phones line 3 shows only for the hovered/tapped star so the belt stays uncluttered.
+function labelLayout(ctx, pos) {
+    const small = width < 500;
+    const f1 = small ? 10.5 : 12, f2 = small ? 10 : 11, f3 = small ? 9.5 : 10.5;
+    const fonts = [
+        "500 " + f1 + "px 'IBM Plex Mono', Menlo, monospace",
+        "500 " + f2 + "px 'Space Grotesk', sans-serif",
+        "400 " + f3 + "px 'IBM Plex Mono', Menlo, monospace"
+    ];
+    const hs = [f1 + 2, f2 + 2, f3 + 2];
+    const out = [];
     ctx.save();
-    ctx.font = "500 " + fs + "px 'IBM Plex Mono', Menlo, monospace";
-    ctx.textBaseline = "middle";
     for (let i = 0; i < orionStars.length; i++) {
         const s = orionStars[i];
+        const texts = [s.name, s.sub || s.page, s.type];
         let off = coreD(i) * 0.9 + 10;
         if (i === 0) off = Math.max(off, Math.max(48, coreD(0) * 3.4) / 2 + 8); // clear the CTA ring
-        let x = pos[i].x, y = pos[i].y;
+        const ws = texts.map(function (t, k) { ctx.font = fonts[k]; return ctx.measureText(t).width; });
+        const tw = Math.max(ws[0], ws[1], ws[2]);   // fit-check on all three lines, even when line 3 is on demand
         let side = s.side;
-        const tw = ctx.measureText(s.page).width;
-        if (side === "left" && x - off - tw < 6) side = "above";
-        if (side === "right" && x + off + tw > width - 6) side = "above";
-        if (side === "left") { ctx.textAlign = "right"; x -= off; }
-        else if (side === "right") { ctx.textAlign = "left"; x += off; }
-        else if (side === "above") { ctx.textAlign = "center"; y -= off + fs * 0.4; }
-        else { ctx.textAlign = "center"; y += off + fs * 0.4; }
-        const base = i === hi ? 1 : 0.62;
-        ctx.fillStyle = i === 0
-            ? "rgba(255,180,110," + (base * a).toFixed(3) + ")"
-            : "rgba(205,215,245," + (base * a).toFixed(3) + ")";
-        ctx.fillText(s.page, x, y);
+        const x0 = pos[i].x, y0 = pos[i].y;
+        const fitsL = x0 - off - tw >= 6, fitsR = x0 + off + tw <= width - 6;
+        if (side === "left" && !fitsL) side = fitsR ? "right" : "above";
+        else if (side === "right" && !fitsR) side = "above";
+        const total = hs[0] + hs[1] + (small ? 0 : hs[2]);
+        let top, ax, align;
+        if (side === "left") { align = "right"; ax = x0 - off; top = y0 - total / 2; }
+        else if (side === "right") { align = "left"; ax = x0 + off; top = y0 - total / 2; }
+        else if (side === "above") { align = "center"; ax = x0; top = y0 - off - total; }
+        else { align = "center"; ax = x0; top = y0 + off; }
+        const lines = [];
+        let y = top;
+        for (let k = 0; k < 3; k++) {
+            const w = ws[k];
+            const rx = align === "right" ? ax - w : align === "center" ? ax - w / 2 : ax;
+            lines.push({ text: texts[k], x: rx, y: y, w: w, h: hs[k], cx: ax, cy: y + hs[k] / 2, font: fonts[k], align: align });
+            y += hs[k];
+        }
+        if (small) {
+            // line 3 of a phone label sits just below line 2, revealed on hover
+            lines[2].y = lines[1].y + hs[1]; lines[2].cy = lines[2].y + hs[2] / 2;
+        }
+        out.push({ idx: i, side: side, lines: lines, line3OnHover: small });
     }
     ctx.restore();
+    return out;
+}
+
+function drawLabels(ctx, pos, a, hi) {
+    const layout = labelLayout(ctx, pos);
+    ctx.save();
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < layout.length; i++) {
+        const L = layout[i];
+        const base = i === hi ? 1 : 0.62;
+        const cols = [
+            i === 0 ? "rgba(255,180,110," : "rgba(205,215,245,",
+            "rgba(143,184,255,",
+            "rgba(182,191,220,"
+        ];
+        const alphas = [base * a, (i === hi ? 1 : 0.85) * a, (i === hi ? 0.9 : 0.6) * a];
+        for (let k = 0; k < 3; k++) {
+            if (k === 2 && L.line3OnHover && i !== hi) continue;
+            const ln = L.lines[k];
+            ctx.font = ln.font;
+            ctx.textAlign = ln.align;
+            // sky-coloured halo so constellation lines never cross legible text
+            ctx.strokeStyle = "rgba(14,16,31," + Math.min(1, a * 0.9).toFixed(3) + ")";
+            ctx.lineWidth = 3.5;
+            ctx.lineJoin = "round";
+            ctx.strokeText(ln.text, ln.cx, ln.cy);
+            ctx.fillStyle = cols[k] + Math.min(1, alphas[k]).toFixed(3) + ")";
+            ctx.fillText(ln.text, ln.cx, ln.cy);
+        }
+    }
+    ctx.restore();
+    // test hook: where everything was drawn this frame
+    const r0 = Math.max(24, coreD(0) * 1.7);
+    ctx.save(); ctx.font = "12px 'IBM Plex Mono', Menlo, monospace";
+    const hw = ctx.measureText("✦ start here").width; ctx.restore();
+    window.__labels = {
+        width: width, height: height,
+        stars: layout.map(function (L, i) {
+            return { name: orionStars[i].name, x: pos[i].x, y: pos[i].y, r: coreD(i) / 2, side: L.side, line3OnHover: L.line3OnHover,
+                lines: L.lines.map(function (ln) { return { text: ln.text, x: ln.x, y: ln.y, w: ln.w, h: ln.h }; }) };
+        }),
+        hint: { x: pos[0].x - hw / 2, y: pos[0].y + r0 + 8, w: hw, h: 14 }
+    };
 }
 
 function drawTooltip(ctx, i) {
     const s = orionStars[i];
-    const l1 = s.page, l2 = s.desc, l3 = s.name + " · " + s.info;
+    const l1 = s.name, l2 = s.desc;
     ctx.save();
     ctx.font = "600 15px 'Space Grotesk', sans-serif";
     const w1 = ctx.measureText(l1).width;
     ctx.font = "400 12.5px 'Space Grotesk', sans-serif";
     const w2 = ctx.measureText(l2).width;
-    ctx.font = "400 11px 'Space Grotesk', sans-serif";
-    const w3 = ctx.measureText(l3).width;
-    const w = Math.max(w1, w2, w3) + 24, h = 70;
+    const w = Math.max(w1, w2) + 24, h = 52;
     let x = mouseX + 18, y = mouseY - 34;
     if (x + w > width - 8) x = mouseX - 18 - w;
     y = constrain(y, 8, height - h - 8);
 
-    ctx.fillStyle = "rgba(18,22,40,0.92)";
+    ctx.fillStyle = "rgba(18,22,40,0.98)";
     ctx.strokeStyle = "rgba(110,140,220,0.25)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -705,9 +768,6 @@ function drawTooltip(ctx, i) {
     ctx.fillStyle = "rgb(190,200,228)";
     ctx.font = "400 12.5px 'Space Grotesk', sans-serif";
     ctx.fillText(l2, x + 12, y + 41);
-    ctx.fillStyle = "rgba(160,172,205,0.8)";
-    ctx.font = "400 11px 'Space Grotesk', sans-serif";
-    ctx.fillText(l3, x + 12, y + 59);
     ctx.restore();
 }
 
@@ -751,9 +811,10 @@ function drawBetelgeuseCTA() {
         let cursorBlink = (millis() % 1000) < 500;
 
         push();
-        textFont('IBM Plex Mono');
+        textFont("'IBM Plex Mono', Menlo, monospace");
         const fs = width < 500 ? 12 : 14;
         textSize(fs);
+        drawingContext.font = fs + "px 'IBM Plex Mono', Menlo, monospace"; // p5 quotes multi-family strings, so set the stack directly
         textAlign(CENTER, TOP);
 
         let tw_text = textWidth(ctaText) + 24;
@@ -796,8 +857,9 @@ function drawBetelgeuseHint(cycleT) {
 
     noStroke();
     fill(255, 180, 100, 230);
-    textFont('IBM Plex Mono');
+    textFont("'IBM Plex Mono', Menlo, monospace");
     textSize(12);
+    drawingContext.font = "12px 'IBM Plex Mono', Menlo, monospace";
     textAlign(CENTER, TOP);
     text("✦ start here", bx, by + r0 + 8);
     pop();
