@@ -19,6 +19,61 @@
       "author": { "@type": "Person", "name": "Raman Pandey", "url": "https://ramanpandey.com/about/" }
     }
     </script>
+    <script>
+    // Arrival handshake (portfolio-motion-brief.md section 2): runs before first paint.
+    (function () {
+      var root = document.documentElement;
+      try {
+        var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var a = JSON.parse(sessionStorage.getItem('arrival') || 'null');
+        if (a && Date.now() - a.ts < 4000) {
+          root.classList.add('arriving');
+          root.style.setProperty('--arrival-rgb', a.rgb.join(','));
+          window.__arrival = a;
+          if (!reduced) root.classList.add('spec-cover');
+        } else if (!reduced && !sessionStorage.getItem('intro:papers')) {
+          root.classList.add('spec-cover');   // first visit this session: spectrograph intro
+        }
+        sessionStorage.removeItem('arrival');
+      } catch (e) {}
+      // failsafe: never leave the page covered if the intro script fails
+      setTimeout(function () { root.classList.remove('arriving', 'spec-cover'); }, 6000);
+    }());
+    </script>
+    <script src="js/transition.js"></script>
+    <style>
+        /* ---- spectrograph intro (driven by js/papers.js) ---- */
+        #spectrum { display: block; width: 100%; height: 10px; position: relative; z-index: 61; flex: none; }
+        #spectrum-fx { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9995; pointer-events: none; }
+        /* arrival fill: the last frame of the star dive, collapses to the slit */
+        html.arriving body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            background: rgb(var(--arrival-rgb, 7, 10, 16));
+            transform-origin: var(--slit-x, 8px) 50%;
+            transform: scale(var(--arrival-s, 1));
+            opacity: var(--arrival-op, 1);
+        }
+        /* dark veil the spectrum is drawn on; fades out as the band settles */
+        html.spec-cover::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 9990;
+            pointer-events: none;
+            background: #070a10;
+            opacity: var(--spec-veil, 1);
+        }
+        /* main used to shrink-wrap its content, so it changed width when the list rendered (CLS) */
+        main { width: 100%; box-sizing: border-box; max-width: 1060px; }
+        .paper-card[data-line] { transition: box-shadow 0.2s ease; }
+        .paper-card[data-line].is-linked { box-shadow: 0 0 0 1px rgba(112, 232, 255, 0.5); }
+        @keyframes paper-drop { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: none; } }
+        .paper-card.dropping { animation: paper-drop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--drop-delay, 0ms); }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -26,6 +81,8 @@
     <link rel="stylesheet" href="css/site.css">
 </head>
 <body>
+    <canvas id="spectrum" aria-hidden="true"></canvas>
+    <canvas id="spectrum-fx" aria-hidden="true"></canvas>
     <canvas id="particles-bg"></canvas>
     <header class="site-bar">
         <a class="site-bar__home" href="index.html">Raman Pandey</a>
@@ -65,8 +122,8 @@
                 el.innerHTML = EMPTY_STATE;
                 return;
             }
-            el.innerHTML = papers.map(paper => `
-                <div class="paper-card">
+            el.innerHTML = papers.map((paper, i) => `
+                <div class="paper-card" data-paper="${i}">
                     <div class="paper-title">${paper.title}</div>
                     <div class="paper-authors">${paper.authors || ""}</div>
                     <div class="paper-journal">
@@ -77,6 +134,7 @@
                     <div class="paper-abstract">${paper.abstract || ""}</div>
                 </div>
             `).join('');
+            window.dispatchEvent(new Event('papers:rendered'));
         })
         .catch(() => {
             document.getElementById('papers-list').innerHTML = EMPTY_STATE;
