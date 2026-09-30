@@ -55,7 +55,7 @@ body.rigel-page #bloch-intro {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1.5rem;
-    align-items: center;
+    align-items: start;
     margin: 0 0 2.5rem;
     text-align: left;
 }
@@ -67,7 +67,7 @@ body.rigel-page #bloch-intro {
     }
 }
 
-body.rigel-page .bloch-copy { max-width: 46ch; }
+body.rigel-page .bloch-copy { max-width: 46ch; padding-top: 24px; }
 
 body.rigel-page #bloch-intro .lead {
     color: var(--ink-soft, #b6bfdc);
@@ -225,6 +225,23 @@ body.rigel-page select:focus-visible {
     padding-bottom: 6px;
 }
 
+/* more grid to scroll to: fade that edge so it reads as "keep scrolling" */
+.circuit-grid-scroll.grid-fade-r {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+}
+.circuit-grid-scroll.grid-fade-l:not(.grid-fade-r) {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px);
+    mask-image: linear-gradient(90deg, transparent, #000 32px);
+}
+.circuit-grid-scroll.grid-fade-l.grid-fade-r {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+
+/* Run / Clear live at the foot of the Gate Palette panel */
+.qc-actions { margin-top: 0.9rem; }
+
 #circuit-grid {
     display: grid;
     grid-template-columns: 50px repeat(8, 52px);
@@ -233,6 +250,11 @@ body.rigel-page select:focus-visible {
     font-size: 0.75rem;
     position: relative;
     width: max-content;
+}
+
+/* wide screens: slimmer cells so all eight columns fit the panel with no scrolling */
+@media (min-width: 900px) {
+    #circuit-grid { grid-template-columns: 40px repeat(8, 45px); }
 }
 
 .circuit-label-cell {

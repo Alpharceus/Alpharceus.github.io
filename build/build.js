@@ -98,15 +98,16 @@ ${JSON.stringify(jsonld, null, 2)}
       background: #0e101f; color: #d6dcf0;
       font: 400 1.05rem/1.75 Georgia, 'Times New Roman', serif;
     }
-    article { max-width: 680px; margin: 0 auto; padding: 48px 20px 80px; }
+    article { box-sizing: border-box; max-width: 640px; margin: 0 auto; padding: 48px 20px 40px; }
+    article p { font-size: 1.0625rem; line-height: 1.75; }
     h1, h2 { font-family: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif; color: #f0f3ff; line-height: 1.3; }
-    h1 { font-size: 2rem; margin-bottom: 0.3em; }
+    h1 { margin-bottom: 0.3em; }
     h2 { font-size: 1.3rem; margin-top: 2em; }
     a { color: #8fb8ff; }
     blockquote { border-left: 3px solid #4a6bb0; margin-left: 0; padding-left: 1.2em; color: #aab4d4; }
     .post-meta { font-family: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 0.9rem; color: #8b95b5; margin-bottom: 2.5em; }
     .back-nav { font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace; font-size: 0.9rem; margin-bottom: 3em; }
-    .back-nav a { color: #70bfff; text-decoration: none; }
+    .back-nav a { display: inline-block; padding: 6px 0; color: #70bfff; text-decoration: none; }
     .back-nav a:hover { color: #e2cfff; }
     hr { border: none; border-top: 1px solid #2a3050; margin: 2.5em 0; }
     img { max-width: 100%; }
@@ -115,7 +116,7 @@ ${JSON.stringify(jsonld, null, 2)}
   <link rel="stylesheet" href="../css/site.css">
   <script src="../js/site.js" defer></script>
 </head>
-<body>
+<body class="pg-title">
   <header class="site-bar">
     <a class="site-bar__home" href="../index.html">Raman Pandey</a>
     <nav aria-label="Site">
@@ -134,6 +135,7 @@ ${JSON.stringify(jsonld, null, 2)}
     <p class="post-meta">By <a href="../about/">Raman Pandey</a> &middot; <time datetime="${esc(date)}">${esc(formatDate(date))}</time></p>
 ${html}
   </article>
+  <footer>&copy; 2026 Raman Pandey</footer>
 </body>
 </html>
 `;
@@ -223,10 +225,11 @@ ${JSON.stringify(jsonld, null, 2)}
   <script src="js/transition.js"></script>
   <style>
     :root { color-scheme: dark; }
+    html { background: #0e101f; }
     * { box-sizing: border-box; }
     body {
       margin: 0; min-height: 100vh;
-      font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-family: var(--font-ui);
       color: #d6dcf0;
       background:
         radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,0.8) 50%, transparent 51%),
@@ -256,27 +259,20 @@ ${JSON.stringify(jsonld, null, 2)}
     }
     header nav a:hover { color: #e2cfff; text-shadow: 0 0 6px #79c3ff55; }
     main { max-width: 760px; margin: 0 auto; padding: 20px 24px 90px; }
-    h1 { color: #f0f3ff; font-weight: 600; letter-spacing: 0.02em; }
+    h1 { color: #f0f3ff; }
     .lede { color: #8b95b5; margin-bottom: 2.6em; }
     .post-card {
       display: block; text-decoration: none; color: inherit;
-      background: rgba(22, 26, 48, 0.72);
-      border: 1px solid rgba(120, 150, 220, 0.18);
-      border-radius: 14px;
-      padding: 22px 26px; margin-bottom: 22px;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-      backdrop-filter: blur(2px);
+      background: none;
+      border: 0; border-top: 1px solid var(--line);
+      border-radius: 0;
+      padding: 24px 0;
     }
-    .post-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(140, 180, 255, 0.45);
-      box-shadow: 0 6px 30px rgba(60, 100, 200, 0.18);
-    }
-    .post-card h2 { margin: 0 0 4px; font-size: 1.2rem; color: #eef2ff; }
+    .post-card h2 { margin: 0 0 4px; font-size: 1.2rem; color: #eef2ff; transition: color 0.2s ease; }
+    .post-card:hover h2 { color: var(--link-hover); }
     .post-card time { font-size: 0.82rem; color: #8b95b5; }
     .post-card p { color: #b8c1dd; font-size: 0.95rem; line-height: 1.6; margin: 10px 0 8px; }
     .read-more { font-size: 0.85rem; color: #8fb8ff; }
-    footer { text-align: center; color: #6b7494; font-size: 0.8rem; padding: 20px; }
 
     /* ---- book-open veil (index only; pure overlay above real content) ----
        Scene: ancient tome on display → camera slowly zooms while the cover
@@ -491,7 +487,7 @@ ${JSON.stringify(jsonld, null, 2)}
   <link rel="stylesheet" href="css/site.css">
   <script src="js/site.js" defer></script>
 </head>
-<body>
+<body class="pg-title">
   <div id="book-veil" aria-hidden="true">
     <div class="veil-stage">
       <div class="book-scene">

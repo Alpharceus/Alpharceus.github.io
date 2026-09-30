@@ -52,6 +52,7 @@ function rigelBoot() {
 
     initBlochSphere();
     initCircuitUI();
+    initGridScrollFade();
 
     // KaTeX is a blocking script in <head>, so it is loaded here and the state summary is
     // already rendered; the intro starts only after that.
@@ -655,11 +656,28 @@ function initBlochSphere() {
         ctx.font = `11px ${MONO}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        halves.forEach(h => {
-            const depth01 = (Math.max(-1, Math.min(1, h.lab.zv)) + 1) / 2;
+        const placed = halves.map(h => {
             const half = ctx.measureText(h.text).width / 2 + 3;
-            const lx = Math.max(half, Math.min(W - half, h.lab.x));
-            const ly = Math.max(8, Math.min(W - 8, h.lab.y));
+            return { h, half, lx: Math.max(half, Math.min(W - half, h.lab.x)), ly: Math.max(8, Math.min(W - 8, h.lab.y)) };
+        });
+        // nudge apart any two labels whose boxes collide (e.g. |+i⟩ (Y+) and |1⟩ (Z−) at the default view)
+        const LBL_H = 13;
+        for (let pass = 0; pass < 3; pass++) {
+            for (let i = 0; i < placed.length; i++) {
+                for (let j = i + 1; j < placed.length; j++) {
+                    const A = placed[i], B = placed[j];
+                    const ox = A.half + B.half - Math.abs(A.lx - B.lx);
+                    const oy = LBL_H - Math.abs(A.ly - B.ly);
+                    if (ox <= 0 || oy <= 0) continue;
+                    const dir = A.ly <= B.ly ? 1 : -1;      // push the upper one up, the lower one down
+                    const push = oy / 2 + 1;
+                    A.ly = Math.max(8, Math.min(W - 8, A.ly - dir * push));
+                    B.ly = Math.max(8, Math.min(W - 8, B.ly + dir * push));
+                }
+            }
+        }
+        placed.forEach(({ h, lx, ly }) => {
+            const depth01 = (Math.max(-1, Math.min(1, h.lab.zv)) + 1) / 2;
             ctx.globalAlpha = (LABEL_ALPHA_MIN + (1 - LABEL_ALPHA_MIN) * depth01) * labA;
             ctx.fillStyle = h.col;
             ctx.fillText(h.text, lx, ly);
@@ -1557,6 +1575,22 @@ function updateQuantumState() {
     }
 
     renderStateOutput(state, n);
+}
+
+// Fade the right edge of the circuit grid's scroll box while more of it remains to scroll
+// (same class-toggle approach as js/site.js does for the nav bar).
+function initGridScrollFade() {
+    const box = document.querySelector(".circuit-grid-scroll");
+    if (!box) return;
+    const update = () => {
+        const max = box.scrollWidth - box.clientWidth;
+        box.classList.toggle("grid-fade-r", max > 1 && box.scrollLeft < max - 2);
+        box.classList.toggle("grid-fade-l", max > 1 && box.scrollLeft > 2);
+    };
+    box.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    window.addEventListener("load", update);
+    update();
 }
 
 function runCircuit() {

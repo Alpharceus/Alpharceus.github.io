@@ -245,7 +245,7 @@
         style="font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:#9ca3af;">
         ENTER ENG MODE
       </div>
-      <div style="font-size:10px;color:#6b7280;">
+      <div style="font-size:11px;color:#9aa3b5;">
         tap the core for overdrive
       </div>
     </div>
@@ -278,6 +278,19 @@
   `;
   document.head.appendChild(styleTag);
   document.body.appendChild(engChipBtn);
+  // >= 900px: pinned over the board (lower left). Narrower: a static row under the
+  // "My Projects" heading so it never covers a card. Placement only; behaviour is unchanged.
+  const engChipMq = window.matchMedia("(min-width: 900px)");
+  function placeEngChip() {
+    const h1 = document.querySelector("main h1");
+    if (engChipMq.matches || !h1) {
+      if (engChipBtn.parentNode !== document.body) document.body.appendChild(engChipBtn);
+    } else if (engChipBtn.previousElementSibling !== h1) {
+      h1.insertAdjacentElement("afterend", engChipBtn);
+    }
+  }
+  placeEngChip();
+  if (engChipMq.addEventListener) engChipMq.addEventListener("change", placeEngChip);
 
   // center toast
   const engToast = document.createElement("div");
@@ -1159,6 +1172,7 @@
     root.classList.remove("arriving", "pj-cover");
     ARRIVAL_VARS.forEach((k) => root.style.removeProperty(k));
     cardEls.forEach((el) => el.style.removeProperty("opacity"));
+    canvas.classList.add("board-dim"); // narrow screens: CSS dims the board once the intro is over
     board.introDone = true;
     drawNow();
     startLoop();

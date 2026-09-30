@@ -23,6 +23,9 @@
     --font-mono: 'IBM Plex Mono', Menlo, Consolas, monospace;
     --font-read: Georgia, 'Times New Roman', serif;
     --bar-h: 56px;
+    /* shared title sizes */
+    --fs-h1: clamp(2rem, 1.35rem + 1.6vw, 2.6rem);
+    --fs-h2: 1.3rem;
 }
 
 /* ---- site bar ---------------------------------------------------------- */
@@ -112,6 +115,13 @@ header.site-bar nav a[aria-current="page"]::after {
     box-shadow: 0 0 8px rgba(143, 184, 255, 0.7);
 }
 
+/* ---- shared keyboard focus ring (zero specificity: pages can still override) ---- */
+:where(a, button, summary, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 3px;
+    border-radius: 3px;
+}
+
 header.site-bar a:focus-visible {
     outline: 2px solid var(--link);
     outline-offset: 4px;
@@ -123,6 +133,7 @@ header.site-bar a:focus-visible {
         gap: 18px;
         padding: 0 16px;
     }
+    header.site-bar nav a { padding: 12px 0; }
     header.site-bar nav {
         gap: 18px;
         font-size: 0.9rem;
@@ -138,14 +149,27 @@ header.site-bar a:focus-visible {
 
 /* ---- footer: same side gutter as the site bar on every subpage -------- */
 body > footer:not(.site-footer) {
-    padding-left: max(24px, 4vw);
-    padding-right: max(24px, 4vw);
+    padding: 40px max(24px, 4vw);
     box-sizing: border-box;
+    text-align: left;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
 }
+
+body > footer:not(.site-footer) p { margin: 0; }
 
 @media (max-width: 720px) {
     body > footer:not(.site-footer) {
         padding-left: 16px;
         padding-right: 16px;
     }
+}
+
+/* ---- page titles: one size across projects, papers, blog, rigel, about, articles ---- */
+body.pg-title h1,
+body.rigel-page h1,
+main.projects-main h1 {
+    font-size: var(--fs-h1);
+    font-weight: 600;
+    letter-spacing: -0.01em;
 }

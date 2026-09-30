@@ -414,7 +414,13 @@
             if (litCache[r] === key) continue;
             litCache[r] = key;
             portEls[r].classList.toggle("lit", op > 0.99);
-            for (var s = 0; s < 4; s++) skillEls[r * 4 + s].style.opacity = String(op);
+            // dim by colour, not opacity: --lit (0..1) mixes the port colour over the dim grey in CSS
+            var litT = (op - DIM_ALPHA) / (1 - DIM_ALPHA);
+            for (var s = 0; s < 4; s++) {
+                var el = skillEls[r * 4 + s];
+                el.style.opacity = "";
+                el.style.setProperty("--lit", litT.toFixed(3));
+            }
         }
     }
 
@@ -802,9 +808,11 @@
                     n++;
                     var k = clamp01((q - t0) / INTRO_TYPE_LEN);
                     el.style.opacity = k > 0 ? "1" : "0";
+                    el.style.setProperty("--lit", "1");
                     setSkillClip(el, k);
                 } else {
-                    el.style.opacity = String(DIM_ALPHA * dim);
+                    el.style.opacity = String(dim);
+                    el.style.setProperty("--lit", "0");
                     el.style.clipPath = "";
                 }
             }

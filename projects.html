@@ -56,7 +56,7 @@
            board). Mobile: one column; the board is a backdrop behind the cards. */
         #circuit-canvas { opacity: 1; }
         main.projects-main { max-width: none; margin: 0; padding: 1.4rem 16px 1.5rem; }
-        main.projects-main h1 { font-size: 1.7rem; margin: 0.4em 0 0.9em; }
+        main.projects-main h1 { margin: 0.4em 0 0.9em; }
         @media (min-width: 900px) {
             main.projects-main {
                 width: min(620px, 40vw);
@@ -67,12 +67,22 @@
         .project { margin-bottom: 1.2em; }
 
         /* keyboard focus is the same "look at this card" signal as hover */
-        .project:focus-within { border-color: rgba(170, 200, 255, 0.7); }
+        .project:focus-within { border-color: rgba(170, 215, 195, 0.5); }
         .project summary:focus-visible,
         .artifact-badge:focus-visible {
             outline: 2px solid #9fd7ff;
             outline-offset: 3px;
             border-radius: 6px;
+        }
+
+        /* ENG MODE chip (built by js/projects.js; its inline styles lose to !important) */
+        @media (min-width: 900px) {
+            #eng-chip-toggle { left: 24px !important; right: auto !important; bottom: 24px !important; }
+        }
+        @media (max-width: 899px) {
+            #eng-chip-toggle { position: static !important; margin: 0 0 16px !important; }
+            /* the board is a backdrop behind the text; dim it once the intro is done */
+            #circuit-canvas.board-dim { opacity: 0.4; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -136,8 +146,8 @@
 </div>
 <div class="project" id="snspd-fpga" data-short="FPGA READOUT">
   <h2>SNSPD FPGA Readout Pipeline <span class="status-chip done">Done</span></h2>
-  <p>FPGA-based readout for superconducting nanowire single-photon detectors (SNSPDs) — a precision photon-timing pipeline.</p>
-  <details><summary>Show Summary</summary><div>Designed FPGA logic to capture and timestamp SNSPD pulses in a multi-stage readout pipeline, developed from senior design into research work at UNM.</div></details>
+  <p>FPGA readout for superconducting nanowire single-photon detectors (SNSPDs).</p>
+  <details><summary>Show Summary</summary><div>FPGA readout, developed from senior design into research work at UNM.</div></details>
   <p class="project-note">Conference paper citation forthcoming. Project code is institutional and not public.</p>
 </div>
 <div class="project" id="unm-scheduler" data-short="SCHEDULER">

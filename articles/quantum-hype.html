@@ -38,15 +38,16 @@
       background: #0e101f; color: #d6dcf0;
       font: 400 1.05rem/1.75 Georgia, 'Times New Roman', serif;
     }
-    article { max-width: 680px; margin: 0 auto; padding: 48px 20px 80px; }
+    article { box-sizing: border-box; max-width: 640px; margin: 0 auto; padding: 48px 20px 40px; }
+    article p { font-size: 1.0625rem; line-height: 1.75; }
     h1, h2 { font-family: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif; color: #f0f3ff; line-height: 1.3; }
-    h1 { font-size: 2rem; margin-bottom: 0.3em; }
+    h1 { margin-bottom: 0.3em; }
     h2 { font-size: 1.3rem; margin-top: 2em; }
     a { color: #8fb8ff; }
     blockquote { border-left: 3px solid #4a6bb0; margin-left: 0; padding-left: 1.2em; color: #aab4d4; }
     .post-meta { font-family: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 0.9rem; color: #8b95b5; margin-bottom: 2.5em; }
     .back-nav { font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace; font-size: 0.9rem; margin-bottom: 3em; }
-    .back-nav a { color: #70bfff; text-decoration: none; }
+    .back-nav a { display: inline-block; padding: 6px 0; color: #70bfff; text-decoration: none; }
     .back-nav a:hover { color: #e2cfff; }
     hr { border: none; border-top: 1px solid #2a3050; margin: 2.5em 0; }
     img { max-width: 100%; }
@@ -55,7 +56,7 @@
   <link rel="stylesheet" href="../css/site.css">
   <script src="../js/site.js" defer></script>
 </head>
-<body>
+<body class="pg-title">
   <header class="site-bar">
     <a class="site-bar__home" href="../index.html">Raman Pandey</a>
     <nav aria-label="Site">
@@ -94,5 +95,6 @@
 <p>So stay skeptical, especially of us.</p>
 
   </article>
+  <footer>&copy; 2026 Raman Pandey</footer>
 </body>
 </html>

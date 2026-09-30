@@ -66,10 +66,11 @@
   <script src="js/transition.js"></script>
   <style>
     :root { color-scheme: dark; }
+    html { background: #0e101f; }
     * { box-sizing: border-box; }
     body {
       margin: 0; min-height: 100vh;
-      font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-family: var(--font-ui);
       color: #d6dcf0;
       background:
         radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,0.8) 50%, transparent 51%),
@@ -99,27 +100,20 @@
     }
     header nav a:hover { color: #e2cfff; text-shadow: 0 0 6px #79c3ff55; }
     main { max-width: 760px; margin: 0 auto; padding: 20px 24px 90px; }
-    h1 { color: #f0f3ff; font-weight: 600; letter-spacing: 0.02em; }
+    h1 { color: #f0f3ff; }
     .lede { color: #8b95b5; margin-bottom: 2.6em; }
     .post-card {
       display: block; text-decoration: none; color: inherit;
-      background: rgba(22, 26, 48, 0.72);
-      border: 1px solid rgba(120, 150, 220, 0.18);
-      border-radius: 14px;
-      padding: 22px 26px; margin-bottom: 22px;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-      backdrop-filter: blur(2px);
+      background: none;
+      border: 0; border-top: 1px solid var(--line);
+      border-radius: 0;
+      padding: 24px 0;
     }
-    .post-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(140, 180, 255, 0.45);
-      box-shadow: 0 6px 30px rgba(60, 100, 200, 0.18);
-    }
-    .post-card h2 { margin: 0 0 4px; font-size: 1.2rem; color: #eef2ff; }
+    .post-card h2 { margin: 0 0 4px; font-size: 1.2rem; color: #eef2ff; transition: color 0.2s ease; }
+    .post-card:hover h2 { color: var(--link-hover); }
     .post-card time { font-size: 0.82rem; color: #8b95b5; }
     .post-card p { color: #b8c1dd; font-size: 0.95rem; line-height: 1.6; margin: 10px 0 8px; }
     .read-more { font-size: 0.85rem; color: #8fb8ff; }
-    footer { text-align: center; color: #6b7494; font-size: 0.8rem; padding: 20px; }
 
     /* ---- book-open veil (index only; pure overlay above real content) ----
        Scene: ancient tome on display → camera slowly zooms while the cover
@@ -334,7 +328,7 @@
   <link rel="stylesheet" href="css/site.css">
   <script src="js/site.js" defer></script>
 </head>
-<body>
+<body class="pg-title">
   <div id="book-veil" aria-hidden="true">
     <div class="veil-stage">
       <div class="book-scene">

@@ -72,7 +72,7 @@
             font-size: 1.18rem; font-weight: 600;
             color: #f0f3ff;
         }
-        p, li { color: #c3cbe6; }
+        p, li { color: #c3cbe6; max-width: 68ch; }
         ul { padding-left: 1.2em; }
         li { margin-bottom: 0.45em; }
         a { color: #8fb8ff; text-underline-offset: 3px; }
@@ -82,7 +82,7 @@
     <link rel="stylesheet" href="../css/site.css">
     <script src="../js/site.js" defer></script>
 </head>
-<body>
+<body class="pg-title">
     <header class="site-bar">
       <a class="site-bar__home" href="../index.html">Raman Pandey</a>
       <nav aria-label="Site">
@@ -127,14 +127,14 @@
             <li><strong>Systems-Level Engineering for QCAP (NSF NQVL)</strong> — control, timing, and readout for a Gaussian boson sampling architecture on integrated photonics, part of the UNM-led Quantum Computing Applications of Photonics project (NSF award #2531569). Poster: R. Pandey, J. Dusch, Y. Ngenzi, B. S. Sheelam, K. Pomorski, M. Osinski.</li>
             <li><strong>Electrically tuned MZI-mesh photonic unitary</strong> — a programmable Mach&ndash;Zehnder interferometer network forming a tunable photonic unitary under FPGA-based control, developed within QCAP.</li>
             <li><strong>Deep-Learning-Assisted Scanning Probe Microscopy</strong> — graph-neural-network-assisted quantum fabrication with Tito Busani's group at UNM CHTM; real-time analysis of scanning probe microscopy data reduced overall writing time by roughly 40%.</li>
-            <li><strong>SNSPD FPGA readout pipeline</strong> — FPGA logic to capture and timestamp pulses from superconducting nanowire single-photon detectors in a multi-stage readout pipeline (institutional code, not public).</li>
+            <li><strong>SNSPD FPGA readout pipeline</strong> — FPGA readout (institutional code, not public).</li>
             <li><strong>UNM IT Scheduling Platform</strong> — a full-stack scheduling web app for UNM IT built with Django, Node.js, and REST APIs.</li>
         </ul>
         <p>Personal and creative projects:</p>
         <ul>
             <li><strong>Project Orion</strong> — a local-first, voice-controlled AI assistant with gesture recognition, persistent memory, and smart-home delegation, running entirely on local hardware.</li>
-            <li><strong>Agent Survival Simulation</strong> — an emergent-systems sandbox where agent populations evolve survival strategies against shifting climates and competition.</li>
-            <li><strong>Eons Survival</strong> — a procedural text adventure across geological eras, inspired by PBS Eons.</li>
+            <li><strong>Project Typhon</strong> — an emergent-systems sandbox where agent populations evolve survival strategies against shifting climates and competition.</li>
+            <li><strong>Chronos</strong> — a procedural text adventure across geological eras, inspired by PBS Eons.</li>
             <li><strong>Project Umbra</strong> — a distributed LAN ambient-display system turning idle screens into a coordinated information surface.</li>
             <li><strong>This website</strong> — an interactive p5.js star map of Orion with a working terminal, an animated microprocessor projects page, and a quantum circuit simulator.</li>
         </ul>
@@ -212,5 +212,6 @@
     </section>
 
     </main>
+    <footer>&copy; 2026 Raman Pandey</footer>
 </body>
 </html>

@@ -63,7 +63,7 @@ let warpStars = [];
 const orionStars = [
     { name: "Betelgeuse", info: "Red supergiant, Alpha Orionis", page: "Terminal", desc: "Interactive terminal", side: "left" },
     { name: "Bellatrix", info: "Blue giant, Gamma Orionis", page: "Projects", desc: "Research and engineering projects", side: "right" },
-    { name: "Alnilam", info: "Blue supergiant, Epsilon Orionis", page: "Papers", desc: "Journal publications", side: "below" },
+    { name: "Alnilam", info: "Blue supergiant, Epsilon Orionis", page: "Papers", desc: "Journal publications", side: "above" },
     { name: "Mintaka", info: "Blue giant, Delta Orionis", page: "Skills", desc: "Skills, routed through an MZI mesh", side: "right" },
     { name: "Alnitak", info: "Blue supergiant, Zeta Orionis", page: "Blog", desc: "Essays on physics, computing, and AI", side: "left" },
     { name: "Saiph", info: "Blue supergiant, Kappa Orionis", page: "Now", desc: "What I'm working on this quarter", side: "left" },
@@ -751,7 +751,7 @@ function drawBetelgeuseCTA() {
         let cursorBlink = (millis() % 1000) < 500;
 
         push();
-        textFont('IBM Plex Mono, monospace');
+        textFont('IBM Plex Mono');
         const fs = width < 500 ? 12 : 14;
         textSize(fs);
         textAlign(CENTER, TOP);
@@ -795,9 +795,9 @@ function drawBetelgeuseHint(cycleT) {
     ellipse(bx, by, radius * 2, radius * 2);
 
     noStroke();
-    fill(255, 180, 100, alpha);
-    textFont('IBM Plex Mono, monospace');
-    textSize(11);
+    fill(255, 180, 100, 230);
+    textFont('IBM Plex Mono');
+    textSize(12);
     textAlign(CENTER, TOP);
     text("✦ start here", bx, by + r0 + 8);
     pop();

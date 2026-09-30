@@ -69,6 +69,8 @@
         }
         /* main used to shrink-wrap its content, so it changed width when the list rendered (CLS) */
         main { width: 100%; box-sizing: border-box; max-width: 1060px; }
+        /* keep the heading legible over the particle field */
+        main h1 { text-shadow: 0 0 14px #070a10, 0 0 4px #070a10; }
         .paper-card[data-line] { transition: box-shadow 0.2s ease; }
         .paper-card[data-line].is-linked { box-shadow: 0 0 0 1px rgba(112, 232, 255, 0.5); }
         @keyframes paper-drop { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: none; } }
@@ -81,7 +83,7 @@
     <link rel="stylesheet" href="css/site.css">
     <script src="js/site.js" defer></script>
 </head>
-<body>
+<body class="pg-title">
     <canvas id="spectrum" aria-hidden="true"></canvas>
     <canvas id="spectrum-fx" aria-hidden="true"></canvas>
     <canvas id="particles-bg"></canvas>

@@ -52,7 +52,7 @@
             --green: #3ddc84;
             --amber: #ffbe4d;
             --cyan: #5fd8e8;
-            --dim: #5a6a80;
+            --dim: #7d8ca3;
             --text: #cfe6d8;
         }
         * { box-sizing: border-box; }
@@ -117,13 +117,13 @@
             margin: 18px 0 30px;
             font-size: 0.85rem;
             color: var(--amber);
-            letter-spacing: 0.12em;
+            letter-spacing: 0.04em;
         }
         .last-sync .stale-note { color: var(--dim); letter-spacing: normal; }
         h1 {
             font-size: 1rem;
             font-weight: 600;
-            letter-spacing: 0.3em;
+            letter-spacing: 0.18em;
             color: var(--cyan);
             border-bottom: 1px solid var(--line);
             padding-bottom: 10px;
@@ -151,6 +151,9 @@
             font-size: 0.88rem;
             line-height: 1.55;
         }
+        @media (min-width: 640px) {
+            .status-line { display: grid; grid-template-columns: 16ch 1fr auto; column-gap: 16px; }
+        }
         .status-line .sys { color: var(--cyan); white-space: nowrap; }
         .status-line .desc { flex: 1 1 300px; color: var(--text); }
         .status-line .state { white-space: nowrap; font-weight: 600; letter-spacing: 0.1em; font-size: 0.75rem; }
@@ -166,7 +169,7 @@
             padding-top: 16px;
             line-height: 1.7;
         }
-        footer { position: relative; z-index: 1; text-align: center; color: var(--dim); font-size: 0.75rem; padding: 16px; }
+        footer { position: relative; z-index: 1; }
 
         /* ---- CRT power-on intro (driven by playIntro via custom properties) ---- */
         /* arrival fill: the last frame of the star dive, collapses to a point */

@@ -46,8 +46,8 @@
     "id": "snspd-fpga",
     "title": "SNSPD FPGA Readout Pipeline",
     "short": "FPGA READOUT",
-    "desc": "FPGA-based readout for superconducting nanowire single-photon detectors (SNSPDs) — a precision photon-timing pipeline.",
-    "summary": "Designed FPGA logic to capture and timestamp SNSPD pulses in a multi-stage readout pipeline, developed from senior design into research work at UNM.",
+    "desc": "FPGA readout for superconducting nanowire single-photon detectors (SNSPDs).",
+    "summary": "FPGA readout, developed from senior design into research work at UNM.",
     "artifacts": {
       "code": null,
       "paper": null,
