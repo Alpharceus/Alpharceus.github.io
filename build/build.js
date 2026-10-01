@@ -423,7 +423,7 @@ ${JSON.stringify(jsonld, null, 2)}
     }
     /* arrival veil: the same book-open, compressed (whole arrival <= 2.5s).
        Timeline from html.veil-open: cover 0.2s, leaves 0.7s-1.36s, veil lifts 1.3s-1.7s */
-    html.veil-fast.veil-open .book-scene { animation: veilCamera 1.7s cubic-bezier(0.4, 0.1, 0.3, 1) forwards; }
+    html.veil-fast.veil-open .book-scene { animation: veilCamera 1.5s cubic-bezier(0.4, 0.1, 0.3, 1) forwards; }
     html.veil-fast.veil-open .book { animation: bookCenter 0.6s 0.2s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
     html.veil-fast.veil-open .book-cover { animation: coverOpen 0.6s 0.2s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
     html.veil-fast.veil-open .leaf-1 { animation: leafFlip1 0.3s 0.7s ease-in-out forwards; }
@@ -431,9 +431,9 @@ ${JSON.stringify(jsonld, null, 2)}
     html.veil-fast.veil-open .leaf-3 { animation: leafFlip3 0.3s 0.88s ease-in-out forwards; }
     html.veil-fast.veil-open .leaf-4 { animation: leafFlip4 0.3s 0.97s ease-in-out forwards; }
     html.veil-fast.veil-open .leaf-5 { animation: leafFlip5 0.3s 1.06s ease-in-out forwards; }
-    html.veil-fast.veil-open #book-veil { animation: veilLift 0.4s 1.3s ease forwards; }
+    html.veil-fast.veil-open #book-veil { animation: veilLift 0.35s 1.15s ease forwards; }
     html.veil-fast.veil-done header, html.veil-fast.veil-done main > *, html.veil-fast.veil-done footer {
-      transition: opacity 0.4s ease, transform 0.4s ease;
+      transition: opacity 0.3s ease, transform 0.3s ease;
     }
     html.veil-fast.veil-done main > *:nth-child(1) { transition-delay: 0.03s; }
     html.veil-fast.veil-done main > *:nth-child(2) { transition-delay: 0.07s; }
@@ -556,7 +556,7 @@ ${cards}
       dotPx: 5, dotEnd: 520,                           // it lands as a small dot, absorbed into the glint
       glintAt: 420,                                    // star glints as the point lands
       openAt: 560,                                     // book-open starts (veil-fast timings in CSS)
-      doneAt: 1620, total: 2300                        // content reveal, hard stop
+      doneAt: 1450, total: 2050                        // content reveal, hard stop (headroom for slow Firefox timers)
     };
     var REDUCED_FADE_MS = 150;                         // reduced-motion arrival: fill fades out
 
