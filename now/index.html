@@ -181,6 +181,7 @@
             pointer-events: none;
             background: rgb(var(--arrival-rgb, 5, 8, 15));
             transform: scale(var(--arrival-s, 1));
+            transform-origin: var(--lt-ox, 50%) var(--lt-oy, 50%);   /* collapses onto Saiph's spot */
             opacity: var(--arrival-op, 1);
         }
         /* two shutters that open vertically, and the beam between them */
@@ -216,12 +217,116 @@
         }
         html.crt-cover .console,
         html.crt-cover header.site-bar { opacity: var(--crt-flick, 1); }
+
+        /* ---- light-travel prologue: Saiph -> Earth timeline (decorative, aria-hidden, driven by playIntro) ---- */
+        #lt-stage {
+            position: fixed;
+            inset: 0;
+            z-index: 9992;               /* above the shutters, below the CRT beam */
+            pointer-events: none;
+            opacity: 0;
+            overflow: hidden;
+            color: var(--dim);
+            font-size: 0.84rem;
+            letter-spacing: 0.04em;
+        }
+        #lt-stage * { position: absolute; margin: 0; padding: 0; }
+        #lt-year {
+            left: 50%;
+            top: 38%;
+            font-size: clamp(3.2rem, 6.5vw, 6.5rem);
+            font-weight: 500;
+            line-height: 1;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            opacity: 0;
+            color: transparent;
+            /* shimmer band, scanlines, then the cyan-green face; all clipped to the digits */
+            background:
+                linear-gradient(100deg, transparent 42%, rgba(235, 255, 250, 0.7) 50%, transparent 58%) 80% 0 / 300% 100% no-repeat,
+                linear-gradient(180deg, transparent 0 2px, rgba(0, 12, 8, 0.34) 2px 3px, transparent 3px) 0 0 / 100% 4px repeat-y,
+                linear-gradient(180deg, #8ff7c8, #5fd8e8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            filter: drop-shadow(0 0 12px rgba(61, 220, 132, 0.4));
+        }
+        #lt-line { height: 1px; background: rgba(125, 140, 163, 0.38); transform-origin: 0 50%; opacity: 0; }
+        #lt-lit {
+            height: 2px;
+            background: linear-gradient(90deg, rgba(95, 216, 232, 0), #5fd8e8);
+            box-shadow: 0 0 8px rgba(95, 216, 232, 0.55);
+            transform-origin: 0 50%;
+            opacity: 0;
+        }
+        .lt-tick { width: 0; height: 0; opacity: 0; }
+        .lt-tick i { left: 0; top: -4px; width: 1px; height: 8px; background: rgba(125, 140, 163, 0.8); }
+        .lt-tick b { left: 0; top: -26px; transform: translateX(-50%); font-size: 0.72rem; font-weight: 400; letter-spacing: 0.08em; white-space: nowrap; }
+        #lt-halo {
+            width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--lt-star, 183, 201, 255), 0.55), rgba(var(--lt-star, 183, 201, 255), 0) 70%);
+            opacity: 0;
+        }
+        #lt-star {
+            width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+            background: radial-gradient(circle, #fff 0 30%, rgb(var(--lt-star, 183, 201, 255)) 65%);
+            box-shadow: 0 0 10px 2px rgba(var(--lt-star, 183, 201, 255), 0.7);
+            opacity: 0;
+        }
+        #lt-earth {
+            width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+            border: 1px solid rgba(95, 216, 232, 0.8);
+            background: radial-gradient(circle, rgba(95, 216, 232, 0.5) 0 35%, transparent 40%);
+            opacity: 0;
+        }
+        #lt-photon { left: 0; top: 0; width: 0; height: 0; }
+        #lt-trail {
+            left: -72px; top: -1px; width: 72px; height: 2px;
+            background: linear-gradient(90deg, rgba(95, 216, 232, 0), rgba(190, 250, 255, 0.95));
+            transform-origin: 100% 50%;
+        }
+        #lt-head {
+            left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%;
+            background: #f2ffff;
+            box-shadow: 0 0 8px 2px rgba(130, 235, 245, 0.9), 0 0 22px 6px rgba(95, 216, 232, 0.4);
+        }
+        #lt-photon { opacity: 0; }
+        #lt-stage #lt-dy { position: static; }
+        .lt-tag { white-space: nowrap; opacity: 0; }
+        .lt-tag.r { transform: translateX(-100%); }
+        .lt-tag.c { transform: translateX(-50%); }
+        #lt-tag-depart { color: var(--cyan); }
+        #lt-tag-ago { color: var(--text); }
+        @media (max-width: 639px) {
+            #lt-stage { font-size: 0.68rem; letter-spacing: 0.02em; }
+            .lt-tick b { font-size: 0.62rem; }
+        }
     </style>
     <link rel="stylesheet" href="../css/site.css">
     <script src="../js/site.js" defer></script>
 </head>
 <body>
     <canvas id="waveform-bg" aria-hidden="true"></canvas>
+
+    <div id="lt-stage" aria-hidden="true">
+        <div id="lt-year">2026</div>
+        <div id="lt-line"></div>
+        <div id="lt-lit"></div>
+        <div class="lt-tick"><i></i><b></b></div>
+        <div class="lt-tick"><i></i><b></b></div>
+        <div class="lt-tick"><i></i><b></b></div>
+        <div class="lt-tick"><i></i><b></b></div>
+        <div class="lt-tick"><i></i><b></b></div>
+        <div class="lt-tick"><i></i><b></b></div>
+        <div id="lt-halo"></div>
+        <div id="lt-star"></div>
+        <div id="lt-earth"></div>
+        <p class="lt-tag" id="lt-tag-depart">light leaves Saiph · ~<span id="lt-dy">1376</span> CE</p>
+        <p class="lt-tag r" id="lt-tag-earth">Earth · now</p>
+        <p class="lt-tag c" id="lt-tag-dist">distance 198 ± 9 pc ≈ 650 ± 30 ly</p>
+        <p class="lt-tag c" id="lt-tag-ago">you see Saiph as it was ~650 years ago</p>
+        <div id="lt-photon"><i id="lt-trail"></i><i id="lt-head"></i></div>
+    </div>
 
     <header class="site-bar">
         <a class="site-bar__home" href="../index.html">Raman Pandey</a>
@@ -306,27 +411,34 @@
     <script>
     (function () {
         "use strict";
-        // ---- CRT intro timing (ms, from intro start) and easings: tune here ----
-        var CRT = {
-            arrival: {
-                hold: 120, collapse: 380,                  // star-colour fill holds, then collapses to a point
-                dotFade: 0, lineStart: 500, lineEnd: 850,  // dot stretches to a horizontal line
-                openStart: 850, openEnd: 1400,             // shutters open vertically
-                flickerEnd: 1650,                          // brief scanline flicker after opening
-                rollStart: 900, rollEnd: 1800,             // clock digits roll, then settle
-                rowStart: 1300, rowStep: 130, rowType: 260, blink: 180,
-                total: 2400
-            },
-            first: {
-                hold: 0, collapse: 0,
-                dotFade: 300, lineStart: 700, lineEnd: 1100,
-                openStart: 1100, openEnd: 1750,
-                flickerEnd: 2050,
-                rollStart: 1200, rollEnd: 2500,
-                rowStart: 1700, rowStep: 250, rowType: 400, blink: 200,
-                total: 3600
-            }
+        // ---- intro timing (ms, from intro start) and easings: tune here ----
+        // Light-travel prologue (Saiph -> Earth), then the CRT power-on. Arrival and first share one clock;
+        // arrival additionally collapses the dive's fill onto Saiph's spot during the first ~0.5 s.
+        var LT = {
+            total: 5000,
+            hold: 120, collapse: 380,                  // arrival only: star-colour fill holds, then collapses onto Saiph
+            starStart: 150, starEnd: 800,              // Saiph condenses (halo contracts, core grows)
+            lineIn: [500, 1100],                       // timeline draws left to right
+            yearIn: [500, 900],                        // holographic counter fades in
+            departTagIn: [600, 1000], earthIn: [700, 1100],
+            photonFlash: [550, 800],                   // photon is born at Saiph
+            tickIn: [900, 1400],
+            travelStart: 800, travelEnd: 3000,         // photon crosses; counter rolls with it
+            distTagIn: [1150, 1550], agoTagIn: [1800, 2200],
+            arrive: [3000, 3600],                      // counter collapses to the CRT dot at screen centre
+            photonOut: [3050, 3300], earthPulse: [3000, 3350],
+            fadeOut: [3050, 3500],                     // timeline, ticks, tags, star leave
+            counterOut: [3450, 3600],
+            beamIn: [3300, 3600],                      // CRT dot appears where the counter collapsed
+            lineStart: 3600, lineEnd: 3900,            // dot stretches to a horizontal line
+            openStart: 3900, openEnd: 4350,            // shutters open vertically
+            flickerEnd: 4550,                          // brief scanline flicker after opening
+            rollStart: 3800, rollEnd: 4600,            // clock digits roll, then settle
+            rowStart: 3950, rowStep: 100, rowType: 280
         };
+        var LIGHT_YEARS = 650;         // Saiph's light-travel time, ~198 pc (650 +/- 30 ly)
+        var MAX_TICKS = 6;             // century ticks on the timeline
+        var SHIMMER_FROM = 80, SHIMMER_TO = 20;   // counter shimmer sweep (background-position %)
         var REDUCED_FADE_MS = 150;     // reduced-motion arrival: fill fades out
         var DOT_WIDTH_PX = 8;          // beam dot before it stretches
         var LINE_THIN = 0.35;          // beam thickness (fraction) once stretched
@@ -447,7 +559,7 @@
 
         // ---- CRT power-on intro ----
         var root = document.documentElement;
-        var VARS = ["--arrival-s", "--arrival-op", "--arrival-rgb", "--crt-open", "--crt-lx", "--crt-ly", "--crt-lo", "--crt-flick"];
+        var VARS = ["--arrival-s", "--arrival-op", "--arrival-rgb", "--lt-ox", "--lt-oy", "--lt-star", "--crt-open", "--crt-lx", "--crt-ly", "--crt-lo", "--crt-flick"];
         var rows = [];
         Array.prototype.forEach.call(document.querySelectorAll(".status-line"), function (el) {
             var desc = el.querySelector(".desc");
@@ -513,15 +625,18 @@
             });
         }
 
+        function seg(t, r) { return clamp01((t - r[0]) / (r[1] - r[0])); }
+        function easeSine(x) { return 0.5 - 0.5 * Math.cos(Math.PI * x); }
+
         function crtFrame(t, cfg, arrival) {
-            // fill collapses to a point
+            // fill collapses onto Saiph's spot
             if (arrival) {
                 var c = clamp01((t - cfg.hold) / cfg.collapse);
                 setVar("--arrival-s", Math.max(0.0001, 1 - T.easeInOutCubic(c)));
                 setVar("--arrival-op", c >= 1 ? 0 : 1);
             }
-            // beam: dot -> line -> gone as shutters open
-            var lo = arrival ? 1 : clamp01(t / cfg.dotFade);
+            // beam: dot (appears as the counter collapses) -> line -> gone as shutters open
+            var lo = seg(t, cfg.beamIn);
             var u = T.easeInOutCubic(clamp01((t - cfg.lineStart) / (cfg.lineEnd - cfg.lineStart)));
             var v = T.easeInOutCubic(clamp01((t - cfg.openStart) / (cfg.openEnd - cfg.openStart)));
             var dotW = DOT_WIDTH_PX / Math.max(window.innerWidth, 1);
@@ -539,8 +654,113 @@
             typeRows(t, cfg);
         }
 
+        // ---- light-travel prologue ----
+        var stage = document.getElementById("lt-stage");
+        var ltYear = document.getElementById("lt-year");
+        var ltLine = document.getElementById("lt-line");
+        var ltLit = document.getElementById("lt-lit");
+        var ltTicks = Array.prototype.slice.call(stage.querySelectorAll(".lt-tick"));
+        var ltHalo = document.getElementById("lt-halo");
+        var ltStar = document.getElementById("lt-star");
+        var ltEarth = document.getElementById("lt-earth");
+        var ltPhoton = document.getElementById("lt-photon");
+        var ltTrail = document.getElementById("lt-trail");
+        var ltHead = document.getElementById("lt-head");
+        var tagDepart = document.getElementById("lt-tag-depart");
+        var tagEarth = document.getElementById("lt-tag-earth");
+        var tagDist = document.getElementById("lt-tag-dist");
+        var tagAgo = document.getElementById("lt-tag-ago");
+
+        // departYear comes from the live (UTC) date, same clock as the master clock
+        var curYear = new Date().getUTCFullYear();
+        var departYear = curYear - LIGHT_YEARS;
+        document.getElementById("lt-dy").textContent = String(departYear);
+        ltYear.textContent = String(departYear);
+        var tickYears = [];
+        for (var yy = Math.ceil((departYear + 1) / 100) * 100; yy <= curYear; yy += 100) tickYears.push(yy);
+        tickYears = tickYears.slice(-MAX_TICKS);
+        ltTicks.forEach(function (el, i) {
+            el.querySelector("b").textContent = i < tickYears.length ? String(tickYears[i]) : "";
+        });
+
+        var G = { x0: 0, x1: 0, L: 1, y: 0, cy: 0, H: 0 };   // timeline geometry (px)
+        function place(el, x, y) { el.style.left = x + "px"; el.style.top = y + "px"; }
+        function layout() {
+            var W = window.innerWidth, H = window.innerHeight, mobile = W < 640;
+            G.H = H;
+            G.x0 = mobile ? 44 : Math.round(W * 0.14);
+            G.x1 = W - G.x0;
+            G.L = G.x1 - G.x0;
+            G.cy = Math.round(H * 0.38);
+            ltYear.style.top = G.cy + "px";
+            G.y = Math.round(G.cy + ltYear.offsetHeight / 2 + (mobile ? 46 : 62));
+            place(ltLine, G.x0, G.y); ltLine.style.width = G.L + "px";
+            place(ltLit, G.x0, G.y - 1); ltLit.style.width = G.L + "px";
+            ltTicks.forEach(function (el, i) {
+                if (i < tickYears.length) place(el, G.x0 + (tickYears[i] - departYear) / LIGHT_YEARS * G.L, G.y);
+            });
+            place(ltHalo, G.x0, G.y); place(ltStar, G.x0, G.y); place(ltEarth, G.x1, G.y);
+            var rowA = G.y + (mobile ? 20 : 28), rowB = G.y + (mobile ? 54 : 70), rowC = G.y + (mobile ? 74 : 96);
+            place(tagDepart, G.x0 - 5, rowA);
+            place(tagEarth, G.x1 + 5, rowA);
+            place(tagDist, W / 2, rowB);
+            place(tagAgo, W / 2, rowC);
+        }
+        window.addEventListener("resize", layout);
+        layout();
+
+        function ltFrame(t, cfg) {
+            var f = 1 - seg(t, cfg.fadeOut);
+            stage.style.opacity = "1";
+            // Saiph condenses
+            var s = T.easeOutCubic(clamp01((t - cfg.starStart) / (cfg.starEnd - cfg.starStart)));
+            ltStar.style.opacity = String(s * f);
+            ltStar.style.transform = "scale(" + (0.2 + 0.8 * s) + ")";
+            ltHalo.style.opacity = String((0.2 + 0.8 * s) * s * f);
+            ltHalo.style.transform = "scale(" + (4.5 - 3.5 * s) + ")";
+            // timeline + ticks + Earth
+            var li = seg(t, cfg.lineIn);
+            ltLine.style.opacity = String(f);
+            ltLine.style.transform = "scaleX(" + T.easeInOutCubic(li) + ")";
+            var p = easeSine(seg(t, [cfg.travelStart, cfg.travelEnd]));
+            ltLit.style.opacity = String(f * li);
+            ltLit.style.transform = "scaleX(" + p + ")";
+            var ti = seg(t, cfg.tickIn);
+            ltTicks.forEach(function (el, i) {
+                if (i >= tickYears.length) return;
+                var tp = (tickYears[i] - departYear) / LIGHT_YEARS;
+                var lit = clamp01((p - tp) / 0.04);
+                el.style.opacity = String(f * ti * (0.5 + 0.5 * lit));
+            });
+            var pulse = Math.sin(Math.PI * seg(t, cfg.earthPulse));
+            ltEarth.style.opacity = String(seg(t, cfg.earthIn) * f);
+            ltEarth.style.transform = "scale(" + (1 + 1.2 * pulse) + ")";
+            // photon
+            var x = G.x0 + p * G.L;
+            var born = seg(t, cfg.photonFlash);
+            var po = born * (1 - seg(t, cfg.photonOut));
+            ltPhoton.style.opacity = String(po);
+            ltPhoton.style.transform = "translate(" + x.toFixed(2) + "px," + G.y + "px)";
+            ltHead.style.transform = "scale(" + (0.3 + 0.7 * born) + ")";
+            ltTrail.style.transform = "scaleX(" + Math.min(1, (x - G.x0) / 72) + ")";
+            // counter: rolls with the photon, then collapses into the CRT dot at screen centre
+            var yr = departYear + Math.round(p * LIGHT_YEARS);
+            if (ltYear.textContent !== String(yr)) ltYear.textContent = String(yr);
+            var e = T.easeInOutCubic(seg(t, cfg.arrive));
+            var dy = (G.H / 2 - G.cy) * e;
+            ltYear.style.opacity = String(seg(t, cfg.yearIn) * (1 - seg(t, cfg.counterOut)));
+            ltYear.style.transform = "translate(-50%,-50%) translateY(" + dy.toFixed(2) + "px) scale(" + Math.max(0.02, 1 - e).toFixed(4) + ")";
+            ltYear.style.backgroundPosition = (SHIMMER_FROM + (SHIMMER_TO - SHIMMER_FROM) * p) + "% 0, 0 0, 0 0";
+            // tags
+            tagDepart.style.opacity = String(seg(t, cfg.departTagIn) * f);
+            tagEarth.style.opacity = String(seg(t, cfg.earthIn) * f);
+            tagDist.style.opacity = String(seg(t, cfg.distTagIn) * f);
+            tagAgo.style.opacity = String(seg(t, cfg.agoTagIn) * f);
+        }
+
         function finishIntro() {
             root.classList.remove("arriving", "crt-cover");
+            stage.style.removeProperty("opacity");
             VARS.forEach(function (k) { root.style.removeProperty(k); });
             restoreRows();
             clockRolling = false;
@@ -557,10 +777,13 @@
                 return;
             }
             var isArrival = mode === "arrival";
-            var cfg = isArrival ? CRT.arrival : CRT.first;
+            var cfg = LT;
+            var sr = (arrival && arrival.starRgb) || [183, 201, 255];   // Saiph #B7C9FF unless the dive says otherwise
+            setVar("--lt-star", sr.join(","));
+            if (isArrival) { setVar("--lt-ox", G.x0 + "px"); setVar("--lt-oy", G.y + "px"); }
             clockRolling = true;
             armRows();
-            var handle = T.run(cfg.total, function (t) { crtFrame(t, cfg, isArrival); }, function () {
+            var handle = T.run(cfg.total, function (t) { crtFrame(t, cfg, isArrival); ltFrame(t, cfg); }, function () {
                 off();
                 finishIntro();
             });
