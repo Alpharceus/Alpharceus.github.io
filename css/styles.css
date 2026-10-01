@@ -139,7 +139,9 @@ html.js body:not(.intro-done) .site-footer .social-links {
     clip: rect(0 0 0 0);
     clip-path: inset(50%);
     white-space: nowrap;
+    color: #dde3f5;            /* readable whenever it is revealed (focus / no-JS) */
 }
+#site-summary a { color: #70bfff; }
 
 /* ====== INTRO OVERLAY ====== */
 #intro-overlay {
