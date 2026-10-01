@@ -16,6 +16,15 @@ const TIP_DEPTH_SIZE  = 0.45;   // tip radius scales by (1 + this * z_v)
 const TIP_ALPHA_MIN   = 0.4;    // tip alpha at the far side; 1 at the near side
 const LABEL_ALPHA_MIN = 0.3;    // axis-label alpha at the far side; 1 at the near side
 
+// ---- multi-sphere layout and enter/leave ----
+const BLOCH_ASPECT          = 0.8;   // canvas height / width: fixed for every qubit count, so the page never shifts
+const BLOCH_FULL_LABELS_MIN = 340;   // cell side (px) for full axis labels, e.g. "|+⟩ (X+)"
+const BLOCH_SHORT_LABELS_MIN = 200;  // below this only |0⟩ and |1⟩ are labelled
+const SPHERE_APPEAR_MS      = 300;   // a sphere fades/scales in or out over this long
+const SPHERE_SCALE_MIN      = 0.72;  // scale of a sphere at appear = 0
+const SPHERE_FADE_EASE      = (u) => 1 - Math.pow(1 - u, 3);
+const SPHERE_REFLOW_TAU_MS  = 70;    // cells glide to their new layout with this time constant
+
 // ---- intro timing (ms from intro start): arrival <= 2.5 s, first <= 4 s ----
 // Each stage is [start, end]. In arrival mode the dive colour first collapses to the sphere centre.
 const INTRO = {
@@ -34,6 +43,7 @@ const INTRO = {
         wires: [1800, 2700], gates: [2100, 3200], gateDur: 300
     }
 };
+const INTRO_SPHERE_STAGGER  = 90;    // ms between one sphere's intro and the next (the last still ends on cfg.total)
 const INTRO_REDUCED_FADE_MS = 150;  // reduced motion: arrival fill fades out, nothing else
 const INTRO_GROW_SHARE      = 0.35; // share of the swing spent growing the vector out of the centre
 const INTRO_GATE_DROP_PX    = 10;   // gate buttons drop this far into place
@@ -52,7 +62,6 @@ function rigelBoot() {
 
     initBlochSphere();
     initCircuitUI();
-    initGridScrollFade();
 
     // KaTeX is a blocking script in <head>, so it is loaded here and the state summary is
     // already rendered; the intro starts only after that.
@@ -69,9 +78,23 @@ function rigelBoot() {
 
 const blochIntro = {
     active: document.documentElement.classList.contains("rg-intro"),
-    eq: 0, merA: 0, merB: 0, lab: 0, vec: 0,
+    t: 0, cfg: null,     // intro clock (ms) and the stage table in use
     poke: null           // set by initBlochSphere: request a redraw
 };
+
+// Stage progress (0..1) of sphere q: the same sequence for every sphere, each started a
+// little later than the one before, time-scaled so the last sphere still ends on cfg.total.
+function blochIntroStages(q) {
+    const b = blochIntro, cfg = b.cfg;
+    if (!cfg) return { eq: 0, merA: 0, merB: 0, lab: 0, vec: 0 };
+    const n = Math.max(1, blochState.vectors.length);
+    const span = Math.max(1, cfg.total - (n - 1) * INTRO_SPHERE_STAGGER);
+    const ti = (b.t - q * INTRO_SPHERE_STAGGER) * cfg.total / span;
+    return {
+        eq: introStage(ti, cfg.equator), merA: introStage(ti, cfg.meridianA), merB: introStage(ti, cfg.meridianB),
+        lab: introStage(ti, cfg.labels), vec: introStage(ti, cfg.vector)
+    };
+}
 
 window.__rigelIntro = { katexAtStart: null, mode: null };
 
@@ -92,11 +115,8 @@ function introFrame(t, cfg, els, arrival) {
         root.style.setProperty("--arrival-s", String(Math.max(0.0001, 1 - c)));
         root.style.setProperty("--arrival-op", c >= 1 ? "0" : "1");
     }
-    blochIntro.eq = introStage(t, cfg.equator);
-    blochIntro.merA = introStage(t, cfg.meridianA);
-    blochIntro.merB = introStage(t, cfg.meridianB);
-    blochIntro.lab = introStage(t, cfg.labels);
-    blochIntro.vec = introStage(t, cfg.vector);
+    blochIntro.cfg = cfg;
+    blochIntro.t = t;
     if (blochIntro.poke) blochIntro.poke();
 
     // wires: each cell's curtain retracts as the wire front passes its column
@@ -120,7 +140,6 @@ function introFrame(t, cfg, els, arrival) {
 function introFinish(els) {
     const root = document.documentElement;
     blochIntro.active = false;
-    blochIntro.eq = blochIntro.merA = blochIntro.merB = blochIntro.lab = blochIntro.vec = 1;
     if (blochIntro.poke) blochIntro.poke(true);
     els.gates.forEach(b => { b.style.removeProperty("opacity"); b.style.removeProperty("transform"); });
     els.cells.forEach(c => c.style.removeProperty("--rg-wire"));
@@ -174,32 +193,35 @@ function startIntro() {
     playIntro(T ? T.getMode("rigel") : "skip", window.__arrival || null);
 }
 
-// ================== BLOCH SPHERE ==================
+// ================== BLOCH SPHERES ==================
+// One canvas, one rAF loop, one shared camera, one sphere per qubit.
 
 let blochAnimId = null;
 
 // Live Bloch state shared between the circuit engine and the sphere renderer.
 // vectors[q] = { x, y, z } — the (reduced) Bloch vector of qubit q, straight from
-// the simulator. The sphere shows a *displayed* vector that slerps toward it.
+// the simulator. Each sphere shows a *displayed* vector that slerps toward it.
 const blochState = {
     vectors: [{ x: 0, y: 0, z: 1 }], // |0⟩ before anything runs
-    selected: 0,
     onUpdate: null,                  // set by initBlochSphere: retarget the animation
-    getDisplayed: null               // set by initBlochSphere: current displayed vectors
+    getDisplayed: null,              // set by initBlochSphere: current displayed vectors
+    getSpheres: null                 // set by initBlochSphere: per-sphere draw parameters
 };
 
-// Draw parameters of the last rendered frame (read by the test hook).
+// Draw parameters of the last rendered frame (read by the test hook). tipZ / tipRadius /
+// tipAlpha / trailPoints mirror sphere q0; every sphere's own values are in __rigelState().spheres.
 const blochDraw = {
     tilt: 0, phi: 0, tipZ: 0, tipRadius: 0, tipAlpha: 0,
-    trailPoints: 0, animating: false, dpr: 1, frames: 0
+    trailPoints: 0, animating: false, dpr: 1, frames: 0, width: 0, height: 0
 };
 
-// Read-only test hook: simulator vectors, displayed (animated) vectors, draw parameters.
+// Read-only test hook: simulator vectors, displayed (animated) vectors, per-sphere draw
+// parameters (visible spheres only), and the shared camera.
 window.__rigelState = () => ({
-    selected: blochState.selected,
     vectors: blochState.vectors.map(v => ({ x: v.x, y: v.y, z: v.z })),
     displayed: (blochState.getDisplayed ? blochState.getDisplayed() : blochState.vectors)
         .map(v => ({ x: v.x, y: v.y, z: v.z })),
+    spheres: blochState.getSpheres ? blochState.getSpheres() : [],
     draw: Object.assign({}, blochDraw)
 });
 
@@ -240,6 +262,18 @@ function slerpBloch(a, b, e) {
     return { x: dir.x * len, y: dir.y * len, z: dir.z * len };
 }
 
+// Cell for each of n spheres inside a W x H canvas: 1 = whole panel, 2 = side by side,
+// 3-4 = 2x2 (the lone third sphere is centred on the bottom row).
+function blochLayout(n, W, H) {
+    if (n <= 1) return [{ x: 0, y: 0, w: W, h: H }];
+    if (n === 2) return [{ x: 0, y: 0, w: W / 2, h: H }, { x: W / 2, y: 0, w: W / 2, h: H }];
+    const w = W / 2, h = H / 2;
+    const rects = [{ x: 0, y: 0, w, h }, { x: w, y: 0, w, h }];
+    if (n === 3) rects.push({ x: w / 2, y: h, w, h });
+    else rects.push({ x: 0, y: h, w, h }, { x: w, y: h, w, h });
+    return rects;
+}
+
 function initBlochSphere() {
     const canvas = document.getElementById("bloch-canvas");
     if (!canvas) {
@@ -266,20 +300,31 @@ function initBlochSphere() {
     const MONO = tok("--font-mono", "'IBM Plex Mono', Menlo, Consolas, monospace");
 
     // ---- sizing: CSS pixels for drawing, backing store scaled by DPR (capped) ----
-    let W = 420, dpr = 1;
-    let volumeLayer = null; // offscreen: sphere volume + limb, rebuilt per resize
+    let W = 420, H = 336, dpr = 1;
+    let volumeLayer = null, volumeR = 0; // offscreen sphere volume + limb, rebuilt when the radius changes
     let needsFrame = true;
+    let lastNow = 0;
+    let lastDraw = 0;
 
-    function sphereR() { return W * 0.32; }
+    function cellMode(rect) {
+        const m = Math.min(rect.w, rect.h);
+        return m >= BLOCH_FULL_LABELS_MIN ? "full" : m >= BLOCH_SHORT_LABELS_MIN ? "short" : "min";
+    }
+    function sphereRadius(rect) {
+        const f = { full: 0.36, short: 0.38, min: 0.40 }[cellMode(rect)];
+        return f * Math.min(rect.w, rect.h);
+    }
 
-    function buildVolumeLayer() {
-        const R = sphereR();
+    function buildVolumeLayer(R) {
+        volumeR = R;
+        const D = Math.ceil(2 * R + 6);
         const layer = document.createElement("canvas");
-        layer.width = canvas.width;
-        layer.height = canvas.height;
+        layer.width = Math.round(D * dpr);
+        layer.height = Math.round(D * dpr);
+        layer.dataset.d = String(D);
         const c = layer.getContext("2d");
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const cx = W / 2, cy = W / 2;
+        const cx = D / 2, cy = D / 2;
         // lit from the upper left, darker toward the limb; kept low-contrast
         const g = c.createRadialGradient(cx - R * 0.38, cy - R * 0.42, R * 0.05, cx, cy, R);
         g.addColorStop(0, "rgba(150, 185, 255, 0.20)");
@@ -295,25 +340,57 @@ function initBlochSphere() {
         volumeLayer = layer;
     }
 
-    function resize() {
-        const size = Math.round(canvas.getBoundingClientRect().width) || 420;
-        dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
-        W = size;
-        canvas.width = Math.round(size * dpr);
-        canvas.height = Math.round(size * dpr); // keep it square
-        blochDraw.dpr = dpr;
-        buildVolumeLayer();
+    // ---- spheres: one per qubit; leaving ones fade out before they are dropped ----
+    // { q, rect (animated cell), tgt (target cell), appear 0..1, want 1|0, trail, vec, draw }
+    let spheres = [];
+    let sphereCount = 0;
+
+    function syncSpheres(n, instant) {
+        sphereCount = n;
+        const rects = blochLayout(n, W, H);
+        const R0 = sphereRadius(rects[0]);
+        if (!volumeLayer || Math.abs(R0 - volumeR) > 0.5) buildVolumeLayer(R0);
+        for (let q = 0; q < n; q++) {
+            let s = spheres.find(x => x.q === q);
+            if (!s) {
+                s = { q, rect: Object.assign({}, rects[q]), tgt: rects[q], appear: instant ? 1 : 0, want: 1, trail: [], vec: null, draw: {} };
+                spheres.push(s);
+            }
+            s.want = 1;
+            s.tgt = rects[q];
+            if (instant) { s.rect = Object.assign({}, rects[q]); s.appear = 1; }
+        }
+        spheres.forEach(s => { if (s.q >= n) s.want = 0; });
+        if (instant) spheres = spheres.filter(s => s.want);
+        spheres.sort((a, b) => a.q - b.q);
+        canvas.setAttribute("aria-label",
+            "Bloch spheres: one per qubit (" + n + "), each showing that qubit's live reduced state. Drag to rotate all of them together.");
         needsFrame = true;
+    }
+
+    function resize() {
+        const box = canvas.getBoundingClientRect();
+        const w = Math.round(box.width) || 420;
+        const h = Math.round(box.height) || Math.round(w * BLOCH_ASPECT);
+        dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+        W = w; H = h;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        blochDraw.dpr = dpr;
+        blochDraw.width = W;
+        blochDraw.height = H;
+        volumeLayer = null;
+        syncSpheres(sphereCount || blochState.vectors.length, true);
     }
     window.addEventListener("resize", resize);
     if (window.ResizeObserver) {
         new ResizeObserver(() => {
-            const s = Math.round(canvas.getBoundingClientRect().width);
-            if (s && s !== W) resize();
+            const b = canvas.getBoundingClientRect();
+            if (Math.round(b.width) && (Math.round(b.width) !== W || Math.round(b.height) !== H)) resize();
         }).observe(canvas);
     }
 
-    // User-controlled view (drag to rotate — no auto-spin)
+    // Shared camera: dragging any sphere rotates all of them (the canvas is one drag surface).
     let viewTilt = 0.7;
     let viewPhi = 0.55;
     let dragging = false;
@@ -366,8 +443,6 @@ function initBlochSphere() {
     // ---- displayed state: slerp from the previous display toward the simulator ----
     let displayed = blochState.vectors.map(v => ({ x: v.x, y: v.y, z: v.z }));
     let anim = null;          // { t0, from: [vec], to: [vec] }
-    let trail = [];           // [{ x, y, z, t }] path of the selected qubit's tip
-    let lastSelected = blochState.selected;
 
     function displayedAt(now) {
         if (!anim) return displayed;
@@ -375,25 +450,29 @@ function initBlochSphere() {
         const e = SLERP_EASE(u);
         return anim.to.map((to, q) => slerpBloch(anim.from[q], to, e));
     }
-    // Intro swing: the vector grows out of the centre along |0>, then slerps (the same
+    // Intro swing: each vector grows out of the centre along |0>, then slerps (the same
     // geodesic used for gates) to the live simulator state. |0> is the default state, so
     // for the default circuit the second leg is a no-op and the end state is exact.
     function introVectors() {
-        const p = blochIntro.vec;
-        const grow = Math.min(1, p / INTRO_GROW_SHARE);
-        const swing = Math.max(0, (p - INTRO_GROW_SHARE) / (1 - INTRO_GROW_SHARE));
-        const v0 = { x: 0, y: 0, z: INTRO_EASE(grow) };
-        return blochState.vectors.map(to => slerpBloch(v0, to, SLERP_EASE(swing)));
+        return blochState.vectors.map((to, q) => {
+            const p = blochIntroStages(q).vec;
+            const grow = Math.min(1, p / INTRO_GROW_SHARE);
+            const swing = Math.max(0, (p - INTRO_GROW_SHARE) / (1 - INTRO_GROW_SHARE));
+            const v0 = { x: 0, y: 0, z: INTRO_EASE(grow) };
+            return slerpBloch(v0, to, SLERP_EASE(swing));
+        });
     }
     blochState.getDisplayed = () => (blochIntro.active ? introVectors() : displayedAt(performance.now()));
-    // the intro redraws the sphere at the idle cap (30 fps) unless forced, like every other redraw
+    // the intro redraws the spheres at the idle cap (30 fps) unless forced, like every other redraw
     blochIntro.poke = (force) => {
         if (force || performance.now() - lastDraw >= 1000 / IDLE_FPS - 4) needsFrame = true;
     };
 
-    function pushTrail(now, vecs) {
-        const v = vecs[blochState.selected];
-        if (v) trail.push({ x: v.x, y: v.y, z: v.z, t: now });
+    function pushTrails(now, vecs) {
+        spheres.forEach(s => {
+            const v = s.want && vecs[s.q];
+            if (v) s.trail.push({ x: v.x, y: v.y, z: v.z, t: now });
+        });
     }
 
     blochState.onUpdate = function () {
@@ -406,19 +485,33 @@ function initBlochSphere() {
             Math.hypot(t.x - settled[q].x, t.y - settled[q].y, t.z - settled[q].z) > 1e-9);
         if (!changed) return;
 
-        if (!sameShape || reduced() || blochState.selected !== lastSelected) {
-            // qubit count/selection changed, or reduced motion: jump, no slerp, no trail
+        if (!sameShape || reduced()) {
+            // qubit count changed, or reduced motion: jump, no slerp, no trail
             displayed = target;
             anim = null;
-            trail = [];
-            lastSelected = blochState.selected;
+            spheres.forEach(s => { s.trail = []; });
+            if (!sameShape) syncSpheres(target.length, reduced() || blochDraw.frames === 0);
         } else {
             anim = { t0: now, from: cur.map(v => ({ x: v.x, y: v.y, z: v.z })), to: target };
-            pushTrail(now, cur);
+            pushTrails(now, cur);
         }
         blochDraw.animating = !!anim;
         needsFrame = true;
     };
+
+    // per-sphere draw parameters for the test hook (visible spheres only)
+    blochState.getSpheres = () => spheres.filter(s => s.want).map(s => ({
+        q: s.q,
+        rect: { x: s.tgt.x, y: s.tgt.y, w: s.tgt.w, h: s.tgt.h },
+        appear: s.appear,
+        mode: cellMode(s.tgt),
+        radius: sphereRadius(s.tgt),
+        vec: s.vec ? { x: s.vec.x, y: s.vec.y, z: s.vec.z } : null,
+        r: s.draw.r === undefined ? null : s.draw.r,
+        tipZ: s.draw.tipZ, tipRadius: s.draw.tipRadius, tipAlpha: s.draw.tipAlpha,
+        trailPoints: s.trail.length,
+        label: s.draw.label
+    }));
 
     // ---- line helpers ----
     function strokeRuns(runs, style, width, dashed, alpha) {
@@ -476,41 +569,40 @@ function initBlochSphere() {
         return { front, back, end: pts[pts.length - 1].p };
     }
 
-    // ---- one frame ----
-    function draw(now) {
-        const R = sphereR();
-        const cx = W / 2, cy = W / 2;
+    // Axis halves; label text per density: full (|+⟩ (X+)), short (|+⟩) or min (|0⟩ and |1⟩ only)
+    const AXES = [
+        { dir: { x: 1, y: 0, z: 0 }, col: COL.x, pos: ["|+⟩ (X+)", "|+⟩"], neg: ["|−⟩ (X−)", "|−⟩"] },
+        { dir: { x: 0, y: 1, z: 0 }, col: COL.y, pos: ["|+i⟩ (Y+)", "|+i⟩"], neg: ["|−i⟩ (Y−)", "|−i⟩"] },
+        { dir: { x: 0, y: 0, z: 1 }, col: COL.z, pos: ["|0⟩ (Z+)", "|0⟩"], neg: ["|1⟩ (Z−)", "|1⟩"], primary: true }
+    ];
+
+    // ---- one sphere, clipped to its cell; `fade` is the enter/leave multiplier ----
+    function drawSphere(s, vecIn, now, intro, st) {
+        const rect = s.rect;
+        const mode = cellMode(s.tgt);
+        const fade = SPHERE_FADE_EASE(s.appear);
+        const scale = SPHERE_SCALE_MIN + (1 - SPHERE_SCALE_MIN) * fade;
+        const R = sphereRadius(s.tgt) * scale;
+        const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
         const tilt = viewTilt, phi = viewPhi;
 
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, W, W);
-        const intro = blochIntro.active ? blochIntro : null;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(rect.x, rect.y, rect.w, rect.h);
+        ctx.clip();
+
         if (volumeLayer) {
-            if (intro) ctx.globalAlpha = intro.eq;
-            ctx.drawImage(volumeLayer, 0, 0, canvas.width, canvas.height, 0, 0, W, W);
+            const D = +volumeLayer.dataset.d, k = R / volumeR;
+            ctx.globalAlpha = (intro ? st.eq : 1) * fade;
+            ctx.drawImage(volumeLayer, 0, 0, volumeLayer.width, volumeLayer.height,
+                cx - (D / 2) * k, cy - (D / 2) * k, D * k, D * k);
             ctx.globalAlpha = 1;
         }
-
-        const disp = intro ? introVectors() : displayedAt(now);
-        if (anim && now - anim.t0 >= SLERP_MS) {
-            displayed = anim.to;   // settled exactly on the simulator vectors
-            pushTrail(now, displayed);
-            anim = null;
-        } else if (anim) {
-            pushTrail(now, disp);
-        }
-        if (blochState.selected !== lastSelected) {
-            lastSelected = blochState.selected;
-            trail = [];
-        }
-        // age out the trail
-        while (trail.length && now - trail[0].t > TRAIL_MS) trail.shift();
-        if (reduced()) trail = [];
 
         const p0 = project3D(0, 0, 0, cx, cy, R, tilt, phi);
 
         // great circles: equator (z = 0), xz meridian (y = 0), yz meridian (x = 0)
-        const circleFrac = intro ? [intro.eq, intro.merA, intro.merB] : [1, 1, 1];
+        const circleFrac = intro ? [st.eq, st.merA, st.merB] : [1, 1, 1];
         const circles = [
             (a) => ({ x: Math.cos(a), y: Math.sin(a), z: 0 }),
             (a) => ({ x: Math.cos(a), y: 0, z: Math.sin(a) }),
@@ -519,31 +611,29 @@ function initBlochSphere() {
             const c = circleRuns(fn, cx, cy, R, tilt, phi, Math.max(circleFrac[i], 1e-4));
             return circleFrac[i] <= 0 ? { front: [], back: [], end: c.end } : c;
         });
-        const labA = intro ? intro.lab : 1;
+        const labA = (intro ? st.lab : 1) * fade;
 
         // axes: each half runs from the origin to ±1.2; the half with zv < 0 is behind
-        const axes = [
-            { dir: { x: 1, y: 0, z: 0 }, col: COL.x, pos: "|+⟩ (X+)", neg: "|−⟩ (X−)" },
-            { dir: { x: 0, y: 1, z: 0 }, col: COL.y, pos: "|+i⟩ (Y+)", neg: "|−i⟩ (Y−)" },
-            { dir: { x: 0, y: 0, z: 1 }, col: COL.z, pos: "|0⟩ (Z+)", neg: "|1⟩ (Z−)" }
-        ];
         const AX = 1.2, LBL = 1.13;
         const halves = [];
-        axes.forEach(ax => {
-            [[1, ax.pos], [-1, ax.neg]].forEach(([sgn, text]) => {
+        AXES.forEach(ax => {
+            [[1, ax.pos], [-1, ax.neg]].forEach(([sgn, txt]) => {
                 const end = project3D(sgn * AX * ax.dir.x, sgn * AX * ax.dir.y, sgn * AX * ax.dir.z, cx, cy, R, tilt, phi);
                 const lab = project3D(sgn * LBL * ax.dir.x, sgn * LBL * ax.dir.y, sgn * LBL * ax.dir.z, cx, cy, R, tilt, phi);
-                halves.push({ end, lab, text, col: ax.col, front: end.zv >= 0 });
+                halves.push({
+                    end, lab, text: mode === "full" ? txt[0] : txt[1], col: ax.col, front: end.zv >= 0,
+                    showLabel: mode !== "min" || !!ax.primary
+                });
             });
         });
 
         // -- back layer: back arcs, back axis halves --
-        circles.forEach(c => strokeRuns(c.back, COL.soft, 1, true, BACK_ALPHA));
+        circles.forEach(c => strokeRuns(c.back, COL.soft, 1, true, BACK_ALPHA * fade));
         if (labA > 0) halves.filter(h => !h.front).forEach(h =>
             strokeRuns([[p0, h.end]], h.col, 1.1, true, BACK_ALPHA * labA));
 
-        // -- state vector (not drawn until the intro's swing begins) --
-        const vec = intro && intro.vec <= 0 ? null : disp[blochState.selected];
+        // -- state vector (not drawn until this sphere's intro swing begins) --
+        const vec = intro && st.vec <= 0 ? null : vecIn;
         let tipInfo = null;
         if (vec) {
             const tip = project3D(vec.x, vec.y, vec.z, cx, cy, R, tilt, phi);
@@ -558,20 +648,21 @@ function initBlochSphere() {
         }
 
         function drawVector() {
-            const { tip, foot, radius, alpha } = tipInfo;
+            const { tip, foot, radius } = tipInfo;
+            const alpha = tipInfo.alpha * fade;
             const len = Math.hypot(tip.x - p0.x, tip.y - p0.y);
 
             // trail (fading path of the tip)
-            if (trail.length > 1) {
+            if (s.trail.length > 1) {
                 ctx.save();
                 ctx.lineCap = "round";
-                for (let i = 1; i < trail.length; i++) {
-                    const a = trail[i - 1], b = trail[i];
+                for (let i = 1; i < s.trail.length; i++) {
+                    const a = s.trail[i - 1], b = s.trail[i];
                     const age = 1 - (now - b.t) / TRAIL_MS;
                     if (age <= 0) continue;
                     const pa = project3D(a.x, a.y, a.z, cx, cy, R, tilt, phi);
                     const pb = project3D(b.x, b.y, b.z, cx, cy, R, tilt, phi);
-                    ctx.globalAlpha = TRAIL_ALPHA * age * age;
+                    ctx.globalAlpha = TRAIL_ALPHA * age * age * fade;
                     ctx.strokeStyle = COL.warm;
                     ctx.lineWidth = 1.2 + 2.2 * age;
                     ctx.beginPath();
@@ -634,34 +725,42 @@ function initBlochSphere() {
         if (tipBehind) drawVector();
 
         // -- front layer: front arcs, front axis halves, centre dot --
-        circles.forEach(c => strokeRuns(c.front, COL.soft, 1.1, false, 0.85));
+        circles.forEach(c => strokeRuns(c.front, COL.soft, 1.1, false, 0.85 * fade));
         if (labA > 0) halves.filter(h => h.front).forEach(h =>
             strokeRuns([[p0, h.end]], h.col, 1.2, false, 0.9 * labA));
         if (intro) {
             // pen dot at the leading end of each circle still being drawn
             circles.forEach((c, i) => {
                 if (circleFrac[i] <= 0 || circleFrac[i] >= 1) return;
+                ctx.globalAlpha = fade;
                 ctx.beginPath();
                 ctx.arc(c.end.x, c.end.y, 2.4, 0, 2 * Math.PI);
                 ctx.fillStyle = COL.link;
                 ctx.fill();
             });
         }
+        ctx.globalAlpha = fade;
         ctx.beginPath();
         ctx.arc(p0.x, p0.y, 3, 0, 2 * Math.PI);
         ctx.fillStyle = COL.link;
         ctx.fill();
 
-        // labels: opacity follows depth, kept inside the canvas
-        ctx.font = `11px ${MONO}`;
+        // labels: opacity follows depth, kept inside the cell, de-overlapped
+        const fontPx = mode === "full" ? 11 : 10;
+        ctx.font = fontPx + "px " + MONO;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const placed = halves.map(h => {
+        const top = rect.y + 24, bot = rect.y + rect.h - 22;
+        const placed = halves.filter(h => h.showLabel).map(h => {
             const half = ctx.measureText(h.text).width / 2 + 3;
-            return { h, half, lx: Math.max(half, Math.min(W - half, h.lab.x)), ly: Math.max(8, Math.min(W - 8, h.lab.y)) };
+            return {
+                h, half,
+                lx: Math.max(rect.x + half, Math.min(rect.x + rect.w - half, h.lab.x)),
+                ly: Math.max(top, Math.min(bot, h.lab.y))
+            };
         });
         // nudge apart any two labels whose boxes collide (e.g. |+i⟩ (Y+) and |1⟩ (Z−) at the default view)
-        const LBL_H = 13;
+        const LBL_H = fontPx + 2;
         for (let pass = 0; pass < 3; pass++) {
             for (let i = 0; i < placed.length; i++) {
                 for (let j = i + 1; j < placed.length; j++) {
@@ -671,8 +770,8 @@ function initBlochSphere() {
                     if (ox <= 0 || oy <= 0) continue;
                     const dir = A.ly <= B.ly ? 1 : -1;      // push the upper one up, the lower one down
                     const push = oy / 2 + 1;
-                    A.ly = Math.max(8, Math.min(W - 8, A.ly - dir * push));
-                    B.ly = Math.max(8, Math.min(W - 8, B.ly + dir * push));
+                    A.ly = Math.max(top, Math.min(bot, A.ly - dir * push));
+                    B.ly = Math.max(top, Math.min(bot, B.ly + dir * push));
                 }
             }
         }
@@ -686,35 +785,105 @@ function initBlochSphere() {
 
         if (tipInfo && !tipBehind) drawVector();
 
-        // |r| readout
+        // qubit name (top left) and |r| readout (bottom left) of this sphere
+        const labelPx = mode === "min" ? 11 : 12;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.font = "600 " + labelPx + "px " + MONO;
+        ctx.globalAlpha = fade;
+        ctx.fillStyle = COL.soft;
+        ctx.fillText("q" + s.q, rect.x + 10, rect.y + 6 + labelPx);
         if (tipInfo) {
+            ctx.font = labelPx + "px " + MONO;
             ctx.fillStyle = COL.warm;
-            ctx.font = `12px ${MONO}`;
-            ctx.textAlign = "left";
-            ctx.textBaseline = "alphabetic";
-            ctx.fillText(`q${blochState.selected}  |r| = ${tipInfo.r.toFixed(2)}`, 10, W - 12);
-            blochDraw.tipZ = tipInfo.tip.zv;
-            blochDraw.tipRadius = tipInfo.radius;
-            blochDraw.tipAlpha = tipInfo.alpha;
+            ctx.fillText("|r| = " + tipInfo.r.toFixed(2), rect.x + 10, rect.y + rect.h - 10);
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        s.vec = vecIn ? { x: vecIn.x, y: vecIn.y, z: vecIn.z } : null;
+        s.draw = tipInfo
+            ? { r: tipInfo.r, tipZ: tipInfo.tip.zv, tipRadius: tipInfo.radius, tipAlpha: tipInfo.alpha, label: "q" + s.q }
+            : { r: undefined, tipZ: 0, tipRadius: 0, tipAlpha: 0, label: "q" + s.q };
+    }
+
+    // ---- one frame ----
+    function stepSpheres(now) {
+        const dt = Math.min(64, Math.max(0, now - (lastNow || now)));
+        lastNow = now;
+        const snap = reduced();
+        const k = 1 - Math.exp(-dt / SPHERE_REFLOW_TAU_MS);
+        let moving = false;
+        spheres.forEach(s => {
+            ["x", "y", "w", "h"].forEach(key => {
+                const d = s.tgt[key] - s.rect[key];
+                if (snap || Math.abs(d) < 0.25) s.rect[key] = s.tgt[key];
+                else { s.rect[key] += d * k; moving = true; }
+            });
+            const goal = s.want ? 1 : 0;
+            if (snap) s.appear = goal;
+            else if (s.appear !== goal) {
+                const step = dt / SPHERE_APPEAR_MS;
+                s.appear = goal > s.appear ? Math.min(goal, s.appear + step) : Math.max(goal, s.appear - step);
+                moving = true;
+            }
+        });
+        spheres = spheres.filter(s => s.want || s.appear > 0);
+        return moving;
+    }
+
+    function draw(now) {
+        const moving = stepSpheres(now);
+        if (moving) needsFrame = true;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        const intro = blochIntro.active;
+
+        const disp = intro ? introVectors() : displayedAt(now);
+        if (anim && now - anim.t0 >= SLERP_MS) {
+            displayed = anim.to;   // settled exactly on the simulator vectors
+            pushTrails(now, displayed);
+            anim = null;
+        } else if (anim) {
+            pushTrails(now, disp);
+        }
+        // age out the trails
+        spheres.forEach(s => {
+            while (s.trail.length && now - s.trail[0].t > TRAIL_MS) s.trail.shift();
+            if (reduced()) s.trail = [];
+        });
+
+        spheres.forEach(s => {
+            const v = disp[s.q] || s.vec || { x: 0, y: 0, z: 1 };
+            drawSphere(s, v, now, intro, intro ? blochIntroStages(s.q) : null);
+        });
+
+        const s0 = spheres.find(s => s.q === 0);
+        if (s0) {
+            blochDraw.tipZ = s0.draw.tipZ;
+            blochDraw.tipRadius = s0.draw.tipRadius;
+            blochDraw.tipAlpha = s0.draw.tipAlpha;
+            blochDraw.trailPoints = s0.trail.length;
         }
         blochDraw.tilt = viewTilt;
         blochDraw.phi = viewPhi;
-        blochDraw.trailPoints = trail.length;
         blochDraw.animating = !!anim;
         blochDraw.frames++;
     }
 
     // ---- frame loop: full rate while dragging/animating, IDLE_FPS otherwise; paused when hidden ----
-    let lastDraw = 0;
     function frame(now) {
         blochAnimId = null;
         if (document.hidden) return;
-        const busy = dragging || anim || trail.length > 0 || needsFrame;
+        const busy = dragging || anim || needsFrame || spheres.some(s => s.trail.length > 0);
         const minGap = 1000 / IDLE_FPS - 4; // tolerate rAF jitter around the 30 fps cadence
         if (busy || now - lastDraw >= minGap) {
             needsFrame = false;
             lastDraw = now;
             draw(now);
+        } else {
+            lastNow = now;
         }
         blochAnimId = requestAnimationFrame(frame);
     }
@@ -723,10 +892,12 @@ function initBlochSphere() {
             if (blochAnimId !== null) { cancelAnimationFrame(blochAnimId); blochAnimId = null; }
         } else if (blochAnimId === null) {
             needsFrame = true;
+            lastNow = 0;
             blochAnimId = requestAnimationFrame(frame);
         }
     });
 
+    sphereCount = blochState.vectors.length;
     resize();
     blochAnimId = requestAnimationFrame(frame);
 }
@@ -744,7 +915,7 @@ const GATE_DEFS = [
     { id: "S",   label: "S",   kind: "single", family: "phase",  name: "S (quarter-turn phase)" },
     { id: "T",   label: "T",   kind: "single", family: "phase",  name: "T (eighth-turn phase)" },
     { id: "CX",  label: "CX",  kind: "two",    family: "ctrl",   name: "Controlled-X (CNOT)" },
-    { id: "CZ",  label: "CZ",  kind: "two",    family: "ctrl",   name: "Controlled-Z" },
+    { id: "CZ",  label: "CZ",  kind: "two",    family: "ctrl",   name: "Controlled-Z (symmetric; also drawn as two dots)" },
     { id: "CY",  label: "CY",  kind: "two",    family: "ctrl",   name: "Controlled-Y" },
     { id: "CCX", label: "CCX", kind: "three",  family: "ctrl",   name: "Toffoli (CCX)" }
 ];
@@ -825,12 +996,6 @@ function initCircuitUI() {
         systemPresetSelect.addEventListener("change", () => { updateWireLabels(); updateQuantumState(); });
     }
     basisContainer.addEventListener("change", () => { updateWireLabels(); updateQuantumState(); });
-    const blochQubitSelect = document.getElementById("bloch-qubit-select");
-    if (blochQubitSelect) {
-        blochQubitSelect.addEventListener("change", () => {
-            blochState.selected = parseInt(blochQubitSelect.value, 10) || 0;
-        });
-    }
 
     // ---------- gate palette ----------
     GATE_GROUPS.forEach(grp => {
@@ -1084,6 +1249,7 @@ function initCircuitUI() {
             const labelCell = document.createElement("div");
             labelCell.className = "circuit-label-cell";
             labelCell.dataset.qubit = q;
+            labelCell.style.gridArea = `${q + 1} / 1`;   // explicit placement: the connectors share the grid
             labelCell.innerHTML = `<span class="wire-q">q${q}</span><span class="wire-ket">|0⟩</span>`;
             circuitGrid.appendChild(labelCell);
 
@@ -1092,6 +1258,7 @@ function initCircuitUI() {
                 cell.className = "circuit-cell";
                 cell.dataset.row = q;
                 cell.dataset.col = col;
+                cell.style.gridArea = `${q + 1} / ${col + 2}`;
                 cell.tabIndex = (focusSlot.row === q && focusSlot.col === col) ? 0 : -1;
                 cell.setAttribute("role", "button");
                 cell.innerHTML = `<span class="slot-idx" aria-hidden="true">${col + 1}</span><span class="slot-ghost" aria-hidden="true"></span>`;
@@ -1160,8 +1327,8 @@ function initCircuitUI() {
         cell.classList.add("has-gate");
         cell.insertAdjacentHTML("beforeend", html);
     }
-    const tileHtml = (label, fam, role) =>
-        `<span class="gate-tile gate-fam-${fam}" data-role="${role}" data-gate="${label}">${label}</span>`;
+    const tileHtml = (label, fam, role, op) =>
+        `<span class="gate-tile gate-fam-${fam}" data-role="${role}" data-gate="${label}"${op ? ` data-op="${op}"` : ""}>${label}</span>`;
     const ctlDot = (role = "control") => `<span class="ctl-dot" data-role="${role}"></span>`;
     const xorTarget = () => `<span class="tgt-xor" data-role="target-xor"></span>`;
 
@@ -1173,23 +1340,20 @@ function initCircuitUI() {
         const tCell = cellAt(g.target, col);
         const cCell = cellAt(g.control, col);
         if (g.id === "CX") putMark(tCell, xorTarget());
-        else if (g.id === "CZ") putMark(tCell, ctlDot("target-dot"));
-        else putMark(tCell, tileHtml(g.id.slice(1), "ctrl", "target-box"));
+        else putMark(tCell, tileHtml(g.id.slice(1), "ctrl", "target-box", g.id));   // CZ: dot + Z box, CY: dot + Y box
         putMark(cCell, ctlDot());
         if (tCell && cCell) appendWire([cCell, tCell]);
     }
 
-    // Vertical connector positioned from the actual cell geometry
-    // (offsetLeft/offsetTop are relative to #circuit-grid, its offsetParent)
+    // Vertical connector, placed by grid line so it scales with the diagram: it spans the rows
+    // from the top to the bottom qubit, trimmed by half a row at each end (centre to centre).
     function appendWire(cells) {
-        const centersY = cells.map(c => c.offsetTop + c.offsetHeight / 2);
-        const top = Math.min(...centersY);
-        const bottom = Math.max(...centersY);
+        const rows = cells.map(c => +c.dataset.row);
+        const top = Math.min(...rows), bottom = Math.max(...rows);
         const wire = document.createElement("div");
         wire.className = "circuit-wire";
-        wire.style.left   = `${cells[0].offsetLeft + cells[0].offsetWidth / 2 - 1}px`;
-        wire.style.top    = `${top}px`;
-        wire.style.height = `${bottom - top}px`;
+        wire.style.gridColumn = String(+cells[0].dataset.col + 2);
+        wire.style.gridRow = `${top + 1} / ${bottom + 2}`;
         circuitGrid.appendChild(wire);
     }
 
@@ -1453,6 +1617,10 @@ function applyCircuit(state, n) {
     for (let col = 0; col < MAX_COLS; col++) {
         const gates = circuit[col];
         for (const g of gates) {
+            // gates left on wires that are no longer shown (qubit count lowered) are skipped;
+            // an out-of-range qubit would otherwise make the bit shifts below run away
+            const rows = [g.target, g.control].concat(g.controls || []).filter(r => r !== undefined);
+            if (rows.some(r => r >= n)) continue;
             switch (g.id) {
                 case "X":
                     applySingleQubitGate(state, n, b(g.target), U_X); break;
@@ -1681,47 +1849,9 @@ function updateQuantumState() {
     applyCircuit(state, n);
 
     blochState.vectors = computeBlochVectors(state, n);
-    if (blochState.selected >= n) blochState.selected = 0;
     if (blochState.onUpdate) blochState.onUpdate();
 
-    // qubit selector (visible only for n > 1)
-    const row = document.getElementById("bloch-qubit-row");
-    const sel = document.getElementById("bloch-qubit-select");
-    if (row && sel) {
-        if (n > 1) {
-            row.classList.remove("hidden");
-            if (sel.options.length !== n) {
-                sel.innerHTML = "";
-                for (let q = 0; q < n; q++) {
-                    const opt = document.createElement("option");
-                    opt.value = String(q);
-                    opt.textContent = "q" + q;
-                    sel.appendChild(opt);
-                }
-                sel.value = String(blochState.selected);
-            }
-        } else {
-            row.classList.add("hidden");
-        }
-    }
-
     renderStateOutput(state, n);
-}
-
-// Fade the right edge of the circuit grid's scroll box while more of it remains to scroll
-// (same class-toggle approach as js/site.js does for the nav bar).
-function initGridScrollFade() {
-    const box = document.querySelector(".circuit-grid-scroll");
-    if (!box) return;
-    const update = () => {
-        const max = box.scrollWidth - box.clientWidth;
-        box.classList.toggle("grid-fade-r", max > 1 && box.scrollLeft < max - 2);
-        box.classList.toggle("grid-fade-l", max > 1 && box.scrollLeft > 2);
-    };
-    box.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    window.addEventListener("load", update);
-    update();
 }
 
 function runCircuit() {

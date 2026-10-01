@@ -83,13 +83,6 @@ body.rigel-page #bloch-intro .hint {
     margin: 0 0 0.9rem;
 }
 
-body.rigel-page .qubit-row {
-    display: block;
-    margin: 0 0 0.6rem;
-    font-size: 0.9rem;
-    color: var(--ink-soft, #b6bfdc);
-}
-
 body.rigel-page .hidden { display: none; }
 
 .bloch-panel {
@@ -98,13 +91,20 @@ body.rigel-page .hidden { display: none; }
     border-radius: 10px;
     padding: 0.5rem;
     min-width: 0;
+    max-width: 520px;
+    margin-inline: auto;
 }
 
+@media (min-width: 860px) {
+    .bloch-panel { margin-inline: 0; max-width: none; }
+}
+
+/* one canvas for every sphere; its aspect never changes with the qubit count (BLOCH_ASPECT in rigel.js) */
 #bloch-canvas {
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 5 / 4;
     cursor: grab;
     touch-action: none; /* pointer-drag rotation on touch devices */
 }
@@ -363,27 +363,14 @@ body.rigel-page select:focus-visible {
 
 /* ---- circuit diagram ---- */
 
-/* the diagram is ~480px wide: scroll it inside its panel instead of overflowing */
-.circuit-grid-scroll {
-    overflow-x: auto;
-    padding: 12px 14px 12px 0;
+/* The diagram always shows the full 4 x 8 grid and scales to the panel: no scrolling, ever.
+   The frame is a size container so the grid can size itself in cqw. */
+.circuit-frame {
+    container-type: inline-size;
+    padding: 12px 8px 12px 6px;
     background: var(--sky-0, #0e101f);
     border: 1px solid var(--line, rgba(130, 155, 225, 0.18));
     border-radius: 10px;
-}
-
-/* more circuit to scroll to: fade that edge so it reads as "keep scrolling" */
-.circuit-grid-scroll.grid-fade-r {
-    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
-}
-.circuit-grid-scroll.grid-fade-l:not(.grid-fade-r) {
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px);
-    mask-image: linear-gradient(90deg, transparent, #000 32px);
-}
-.circuit-grid-scroll.grid-fade-l.grid-fade-r {
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
 }
 
 /* Run / Clear live at the foot of the Gate Palette panel */
@@ -394,14 +381,19 @@ body.rigel-page select:focus-visible {
 }
 
 #circuit-grid {
-    --cw: 50px;
-    --rh: 52px;
+    --lw: clamp(30px, 9cqw, 56px);                          /* label column */
+    --cw: min(60px, calc((100cqw - var(--lw)) / 8));        /* slot width (= row height) */
+    --rh: var(--cw);
+    --tile: min(54px, calc(var(--cw) - clamp(1px, var(--cw) * 0.05, 6px)));
     display: grid;
-    grid-template-columns: 64px repeat(8, var(--cw));
+    grid-template-columns: var(--lw) repeat(8, var(--cw));
     grid-auto-rows: var(--rh);
+    align-content: start;
     align-items: stretch;
     position: relative;
-    width: max-content;
+    width: calc(var(--lw) + 8 * var(--cw));
+    min-height: calc(4 * var(--rh));                        /* room for all four wires: nothing shifts when the qubit count changes */
+    margin-inline: auto;
 }
 
 .circuit-label-cell {
@@ -410,19 +402,19 @@ body.rigel-page select:focus-visible {
     align-items: flex-end;
     justify-content: center;
     gap: 1px;
-    padding-right: 12px;
+    padding-right: clamp(3px, 1.6cqw, 10px);
     line-height: 1.15;
 }
 
 .circuit-label-cell .wire-q {
     font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-    font-size: 0.68rem;
+    font-size: clamp(9px, 2.2cqw, 11px);
     color: var(--ink-muted, #858fb0);
 }
 
 .circuit-label-cell .wire-ket {
     font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-    font-size: 0.85rem;
+    font-size: clamp(10px, 2.6cqw, 13.6px);
     color: var(--ink, #e6eaf7);
     white-space: nowrap;
 }
@@ -485,15 +477,15 @@ body.rigel-page select:focus-visible {
     z-index: 2;
     display: none;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: var(--tile);
+    height: var(--tile);
     box-sizing: border-box;
-    border-radius: 9px;
+    border-radius: calc(var(--tile) * 0.25);
     border: 1px dashed rgba(var(--fam), 0.6);
     background: rgba(14, 16, 31, 0.92);
     color: rgba(var(--fam), 0.85);
     font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-    font-size: 0.95rem;
+    font-size: calc(var(--tile) * 0.42);
     font-weight: 600;
     pointer-events: none;
 }
@@ -523,15 +515,15 @@ body.rigel-page select:focus-visible {
     z-index: 2;
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: var(--tile);
+    height: var(--tile);
     box-sizing: border-box;
-    border-radius: 9px;
+    border-radius: calc(var(--tile) * 0.25);
     border: 1px solid rgba(var(--fam), 0.65);
     background: linear-gradient(rgba(var(--fam), 0.17), rgba(var(--fam), 0.17)), var(--sky-0, #0e101f);
     color: rgb(var(--fam));
     font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-    font-size: 0.95rem;
+    font-size: calc(var(--tile) * 0.42);
     font-weight: 600;
     line-height: 1;
     box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.7);
@@ -541,18 +533,18 @@ body.rigel-page select:focus-visible {
 .ctl-dot {
     position: relative;
     z-index: 2;
-    width: 12px;
-    height: 12px;
+    width: max(8px, calc(var(--tile) * 0.3));
+    height: max(8px, calc(var(--tile) * 0.3));
     border-radius: 50%;
     background: rgb(var(--fam-ctrl));
-    box-shadow: 0 0 0 3px var(--sky-0, #0e101f);
+    box-shadow: 0 0 0 max(2px, calc(var(--tile) * 0.06)) var(--sky-0, #0e101f);
 }
 
 .tgt-xor {
     position: relative;
     z-index: 2;
-    width: 26px;
-    height: 26px;
+    width: calc(var(--tile) * 0.7);
+    height: calc(var(--tile) * 0.7);
     box-sizing: border-box;
     border-radius: 50%;
     border: 2px solid rgb(var(--fam-ctrl));
@@ -567,10 +559,13 @@ body.rigel-page select:focus-visible {
 .tgt-xor::before { left: 50%; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; }
 .tgt-xor::after  { top: 50%; left: -2px; right: -2px; height: 2px; margin-top: -1px; }
 
+/* placed by grid lines from JS; trimmed half a row at each end so it runs centre to centre */
 .circuit-wire {
-    position: absolute;
+    position: relative;
     z-index: 1;
+    justify-self: center;
     width: 2px;
+    margin-block: calc(var(--rh) / 2);
     background: rgba(var(--fam-ctrl), 0.9);
     pointer-events: none;
 }
@@ -663,6 +658,14 @@ body.rigel-page #clear-circuit-btn.secondary:hover {
     body.rigel-page footer { padding: 1rem 16px 1.5rem; }
     .qc-block { padding: 1rem 1rem 1.1rem; }
     .field { grid-template-columns: 104px minmax(0, 1fr); }
+}
+
+/* phones: spend every pixel on the circuit so 8 slots stay >= 28px wide at 320 px */
+@media (max-width: 420px) {
+    body.rigel-page main { padding-inline: 12px; }
+    body.rigel-page footer { padding-inline: 12px; }
+    .qc-block:has(.circuit-frame) { padding-inline: 10px; }
+    .circuit-frame { padding: 10px 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

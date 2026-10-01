@@ -74,17 +74,14 @@
                 A quick tour of the Bloch sphere, then a toy quantum circuit simulator you can play with.
             </p>
             <p class="hint">Drag the sphere to rotate it. Pure states live on the surface; the center is maximally mixed.</p>
-            <label id="bloch-qubit-row" class="qubit-row hidden">
-                Show qubit on sphere:
-                <select id="bloch-qubit-select"></select>
-            </label>
             <p class="tiny-hint">
-                The arrow is the live (reduced) state of the selected qubit from the circuit
-                below — entangle it and watch the arrow shrink toward the center.
+                Each sphere is the live (reduced) state of one qubit from the circuit
+                below, labelled q0, q1 and so on. Entangle two qubits and watch both arrows
+                shrink toward the center.
             </p>
         </div>
         <div class="bloch-panel">
-            <canvas id="bloch-canvas" width="420" height="420" role="img" aria-label="Bloch sphere showing the live state of the selected qubit. Drag to rotate."></canvas>
+            <canvas id="bloch-canvas" width="420" height="336" role="img" aria-label="Bloch spheres, one per qubit, showing each qubit's live state. Drag to rotate them together."></canvas>
         </div>
     </section>
 
@@ -146,7 +143,7 @@
             <div class="qc-right">
                 <div class="qc-block">
                     <h3>Circuit</h3>
-                    <div class="circuit-grid-scroll">
+                    <div class="circuit-frame">
                         <div id="circuit-grid" role="group" aria-label="Quantum circuit: one row per qubit, one slot per step"></div>
                     </div>
                     <p class="tiny-hint circuit-hint">Pick a gate, then click a slot on a wire. Right-click or press Delete to remove a gate. Arrow keys move between slots.</p>
