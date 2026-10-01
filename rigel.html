@@ -95,30 +95,32 @@
             <div class="qc-left">
 <div class="qc-block">
     <h3>Qubits &amp; Input States</h3>
-    <label>
-        Number of qubits:
-        <select id="num-qubits-select">
-            <option value="1">1</option>
-            <option value="2" selected>2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-        </select>
-    </label>
+    <div class="field-list">
+        <label class="field">
+            <span class="field-label">Qubits</span>
+            <select id="num-qubits-select">
+                <option value="1">1</option>
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </label>
 
-    <label class="system-preset-row">
-        System preset:
-        <select id="system-preset-select">
-            <option value="none" selected>None (product state)</option>
-            <option value="bell-phi-plus">Bell |Φ+⟩ = (|00⟩ + |11⟩)/√2</option>
-            <option value="bell-phi-minus">Bell |Φ-⟩ = (|00⟩ - |11⟩)/√2</option>
-            <option value="bell-psi-plus">Bell |Ψ+⟩ = (|01⟩ + |10⟩)/√2</option>
-            <option value="bell-psi-minus">Bell |Ψ-⟩ = (|01⟩ - |10⟩)/√2</option>
-            <option value="ghz-3">GHZ_3 = (|000⟩ + |111⟩)/√2</option>
-            <option value="ghz-4">GHZ_4 = (|0000⟩ + |1111⟩)/√2</option>
-        </select>
-    </label>
+        <label class="field system-preset-row">
+            <span class="field-label">System preset</span>
+            <select id="system-preset-select">
+                <option value="none" selected>None (product state)</option>
+                <option value="bell-phi-plus">Bell |Φ+⟩ = (|00⟩ + |11⟩)/√2</option>
+                <option value="bell-phi-minus">Bell |Φ-⟩ = (|00⟩ - |11⟩)/√2</option>
+                <option value="bell-psi-plus">Bell |Ψ+⟩ = (|01⟩ + |10⟩)/√2</option>
+                <option value="bell-psi-minus">Bell |Ψ-⟩ = (|01⟩ - |10⟩)/√2</option>
+                <option value="ghz-3">GHZ_3 = (|000⟩ + |111⟩)/√2</option>
+                <option value="ghz-4">GHZ_4 = (|0000⟩ + |1111⟩)/√2</option>
+            </select>
+        </label>
 
-    <div id="qubit-basis-selects"></div>
+        <div id="qubit-basis-selects" class="field-list"></div>
+    </div>
     <p class="tiny-hint">
         Local presets: |0⟩, |1⟩, |+⟩, |−⟩, |+i⟩, |−i⟩. System presets override these.
     </p>
@@ -127,16 +129,16 @@
 
                 <div class="qc-block">
                     <h3>Gate Palette</h3>
-                    <div id="gate-palette">
-                        <!-- buttons created in JS -->
+                    <div id="gate-palette" role="group" aria-label="Gate palette">
+                        <!-- grouped buttons created in JS -->
                     </div>
-                    <p class="tiny-hint">
-                        Click a gate, then click on the grid to place it.<br>
-                        For CNOT: click control, then target in the same column.
-                    </p>
+                    <div id="placement-status" class="placement" role="status" aria-live="polite">
+                        <ol class="placement-steps" aria-hidden="true"></ol>
+                        <p class="placement-text"></p>
+                    </div>
                     <div class="qc-actions">
-                        <button id="run-btn">Run Circuit</button>
-                        <button id="clear-circuit-btn" class="secondary">Clear Circuit</button>
+                        <button id="run-btn" type="button" class="primary">Run Circuit</button>
+                        <button id="clear-circuit-btn" type="button" class="secondary">Clear Circuit</button>
                     </div>
                 </div>
             </div>
@@ -145,8 +147,9 @@
                 <div class="qc-block">
                     <h3>Circuit</h3>
                     <div class="circuit-grid-scroll">
-                        <div id="circuit-grid"></div>
+                        <div id="circuit-grid" role="group" aria-label="Quantum circuit: one row per qubit, one slot per step"></div>
                     </div>
+                    <p class="tiny-hint circuit-hint">Pick a gate, then click a slot on a wire. Right-click or press Delete to remove a gate. Arrow keys move between slots.</p>
                 </div>
 
                 <div class="qc-block">

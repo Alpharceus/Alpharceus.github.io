@@ -737,17 +737,30 @@ const MAX_QUBITS = 4;
 const MAX_COLS   = 8;
 
 const GATE_DEFS = [
-    { id: "X",   label: "X",   kind: "single" },
-    { id: "Y",   label: "Y",   kind: "single" },
-    { id: "Z",   label: "Z",   kind: "single" },
-    { id: "H",   label: "H",   kind: "single" },
-    { id: "S",   label: "S",   kind: "single" },
-    { id: "T",   label: "T",   kind: "single" },
-    { id: "CX",  label: "CX",  kind: "two"    },
-    { id: "CZ",  label: "CZ",  kind: "two"    },
-    { id: "CY",  label: "CY",  kind: "two"    },
-    { id: "CCX", label: "CCX", kind: "three"  }
+    { id: "X",   label: "X",   kind: "single", family: "pauli",  name: "Pauli-X (NOT)" },
+    { id: "Y",   label: "Y",   kind: "single", family: "pauli",  name: "Pauli-Y" },
+    { id: "Z",   label: "Z",   kind: "single", family: "pauli",  name: "Pauli-Z" },
+    { id: "H",   label: "H",   kind: "single", family: "had",    name: "Hadamard" },
+    { id: "S",   label: "S",   kind: "single", family: "phase",  name: "S (quarter-turn phase)" },
+    { id: "T",   label: "T",   kind: "single", family: "phase",  name: "T (eighth-turn phase)" },
+    { id: "CX",  label: "CX",  kind: "two",    family: "ctrl",   name: "Controlled-X (CNOT)" },
+    { id: "CZ",  label: "CZ",  kind: "two",    family: "ctrl",   name: "Controlled-Z" },
+    { id: "CY",  label: "CY",  kind: "two",    family: "ctrl",   name: "Controlled-Y" },
+    { id: "CCX", label: "CCX", kind: "three",  family: "ctrl",   name: "Toffoli (CCX)" }
 ];
+
+// palette groups (display only)
+const GATE_GROUPS = [
+    { title: "Pauli",      ids: ["X", "Y", "Z"] },
+    { title: "Hadamard",   ids: ["H"] },
+    { title: "Phase",      ids: ["S", "T"] },
+    { title: "Controlled", ids: ["CX", "CZ", "CY", "CCX"] }
+];
+
+function gateFamily(id) {
+    const d = GATE_DEFS.find(g => g.id === id);
+    return d ? d.family : "pauli";
+}
 
 // circuit[col] = array of gate objects
 let circuit           = [];
@@ -783,9 +796,10 @@ function initCircuitUI() {
         basisContainer.innerHTML = "";
         for (let q = 0; q < n; q++) {
             const label = document.createElement("label");
+            label.className = "field";
             label.innerHTML = `
-                q${q}:
-                <select data-qubit="${q}">
+                <span class="field-label">q${q}</span>
+                <select data-qubit="${q}" aria-label="Input state of qubit ${q}">
                     <option value="0">|0⟩</option>
                     <option value="1">|1⟩</option>
                     <option value="+">|+⟩</option>
@@ -800,15 +814,17 @@ function initCircuitUI() {
 
     numQubitsSelect.addEventListener("change", () => {
         renderBasisSelectors();
+        pendingTwo = null;
+        pendingThree = null;
         renderCircuitGrid();
     });
     renderBasisSelectors();
 
     // state-affecting inputs outside the grid
     if (systemPresetSelect) {
-        systemPresetSelect.addEventListener("change", updateQuantumState);
+        systemPresetSelect.addEventListener("change", () => { updateWireLabels(); updateQuantumState(); });
     }
-    basisContainer.addEventListener("change", updateQuantumState);
+    basisContainer.addEventListener("change", () => { updateWireLabels(); updateQuantumState(); });
     const blochQubitSelect = document.getElementById("bloch-qubit-select");
     if (blochQubitSelect) {
         blochQubitSelect.addEventListener("change", () => {
@@ -817,21 +833,106 @@ function initCircuitUI() {
     }
 
     // ---------- gate palette ----------
-    GATE_DEFS.forEach(g => {
-        const btn = document.createElement("button");
-        btn.className = "gate-btn";
-        btn.textContent = g.label;
-        btn.dataset.gateId = g.id;
-        btn.addEventListener("click", () => {
-            currentGateId = g.id;
-            pendingTwo = null;
-            pendingThree = null;
-            document.querySelectorAll(".gate-btn")
-                .forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
+    GATE_GROUPS.forEach(grp => {
+        const wrap = document.createElement("div");
+        wrap.className = "gate-group";
+        const title = document.createElement("span");
+        title.className = "gate-group-title";
+        title.textContent = grp.title;
+        wrap.appendChild(title);
+        const row = document.createElement("div");
+        row.className = "gate-group-row";
+        grp.ids.forEach(id => {
+            const g = GATE_DEFS.find(d => d.id === id);
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "gate-btn gate-fam-" + g.family;
+            btn.textContent = g.label;
+            btn.dataset.gateId = g.id;
+            btn.title = `${g.label}: ${g.name}`;
+            btn.setAttribute("aria-label", `${g.label} gate, ${g.name}`);
+            btn.setAttribute("aria-pressed", "false");
+            btn.addEventListener("click", () => {
+                currentGateId = g.id;
+                pendingTwo = null;
+                pendingThree = null;
+                document.querySelectorAll(".gate-btn").forEach(b => {
+                    b.classList.remove("active");
+                    b.setAttribute("aria-pressed", "false");
+                });
+                btn.classList.add("active");
+                btn.setAttribute("aria-pressed", "true");
+                updatePlacementUI();
+            });
+            row.appendChild(btn);
         });
-        gatePalette.appendChild(btn);
+        wrap.appendChild(row);
+        gatePalette.appendChild(wrap);
     });
+
+    // ---------- placement step indicator ----------
+    // Reflects currentGateId / pendingTwo / pendingThree (display only; never changes them).
+    function updatePlacementUI() {
+        const status = document.getElementById("placement-status");
+        const def = GATE_DEFS.find(g => g.id === currentGateId);
+        let steps = [], done = 0, text = "", ghost = "";
+        if (!def) {
+            text = "Select a gate, then click a slot on a wire.";
+        } else if (def.kind === "single") {
+            steps = ["Place"];
+            text = `${def.label}: ${def.name}. Click a slot on a wire to place it.`;
+            ghost = def.label;
+        } else if (def.kind === "two") {
+            steps = ["Control", "Target"];
+            done = pendingTwo ? 1 : 0;
+            text = pendingTwo
+                ? `Now click the target qubit in step ${pendingTwo.col + 1} (same column).`
+                : `${def.label}: ${def.name}. Click the control qubit first.`;
+            ghost = pendingTwo ? (def.id === "CX" ? "⊕" : def.id.slice(1)) : "●";
+        } else {
+            steps = ["Control 1", "Control 2", "Target"];
+            done = pendingThree ? pendingThree.rows.length : 0;
+            text = done === 0 ? `${def.label}: ${def.name}. Click the first control qubit.`
+                : done === 1 ? `Click the second control qubit in step ${pendingThree.col + 1}.`
+                : `Now click the target qubit in step ${pendingThree.col + 1}.`;
+            ghost = done < 2 ? "●" : "⊕";
+        }
+        if (status) {
+            const ol = status.querySelector(".placement-steps");
+            ol.innerHTML = "";
+            steps.forEach((label, i) => {
+                const li = document.createElement("li");
+                li.textContent = label;
+                li.dataset.state = steps.length === 1 ? "active" : (i < done ? "done" : i === done ? "active" : "todo");
+                ol.appendChild(li);
+            });
+            ol.hidden = steps.length < 2;
+            status.querySelector(".placement-text").textContent = text;
+            status.dataset.pending = (pendingTwo || pendingThree) ? "1" : "0";
+        }
+        circuitGrid.style.setProperty("--ghost", ghost ? `"${ghost}"` : '""');
+        circuitGrid.dataset.armed = def ? "1" : "0";
+        circuitGrid.dataset.family = def ? def.family : "";
+        const pend = pendingTwo ? [[pendingTwo.controlRow, pendingTwo.col]]
+            : pendingThree ? pendingThree.rows.map(r => [r, pendingThree.col]) : [];
+        circuitGrid.querySelectorAll(".circuit-cell.pending").forEach(c => c.classList.remove("pending"));
+        pend.forEach(([r, c]) => {
+            const cell = circuitGrid.querySelector(`.circuit-cell[data-row="${r}"][data-col="${c}"]`);
+            if (cell) cell.classList.add("pending");
+        });
+    }
+
+    // wire labels show the input ket of each qubit (or |psi> when a system preset overrides them)
+    function updateWireLabels() {
+        const preset = systemPresetSelect && systemPresetSelect.value !== "none";
+        circuitGrid.querySelectorAll(".circuit-label-cell[data-qubit]").forEach(el => {
+            const q = el.dataset.qubit;
+            const sel = basisContainer.querySelector(`select[data-qubit="${q}"]`);
+            const ket = preset ? "|ψ⟩" : (sel ? sel.options[sel.selectedIndex].textContent : "|0⟩");
+            const k = el.querySelector(".wire-ket");
+            if (k) k.textContent = ket;
+        });
+    }
 
     // ---------- gate placing / deleting ----------
     function deleteGateAt(row, col) {
@@ -847,6 +948,11 @@ function initCircuitUI() {
     }
 
     function handleCellClick(row, col) {
+        placeAt(row, col);
+        updatePlacementUI();
+    }
+
+    function placeAt(row, col) {
         if (!currentGateId) return;
         const gateDef = GATE_DEFS.find(g => g.id === currentGateId);
         if (!gateDef) return;
@@ -945,27 +1051,40 @@ function initCircuitUI() {
     }
 
     // ---------- circuit grid rendering ----------
+    // Slots are .circuit-cell[data-row][data-col] (invisible until hovered/focused); wires,
+    // gate tiles, control dots and connectors are drawn inside/over them.
+    let focusSlot = null; // {row, col}: the slot that is the roving tab stop
+    function cellAt(row, col) {
+        return circuitGrid.querySelector(`.circuit-cell[data-row="${row}"][data-col="${col}"]`);
+    }
+    function gateAtSlot(row, col) {
+        return circuit[col].find(g => g.target === row || g.control === row || (g.controls && g.controls.includes(row)));
+    }
+    function slotLabel(row, col) {
+        const g = gateAtSlot(row, col);
+        let what = "empty";
+        if (g) {
+            const role = g.target === row ? "target" : "control";
+            what = (g.control === undefined && !g.controls) ? `${g.id} gate` : `${g.id} ${role}`;
+        }
+        return `Qubit ${row}, step ${col + 1}: ${what}`;
+    }
+
     function renderCircuitGrid() {
         const n = parseInt(numQubitsSelect.value, 10);
+        const ae = document.activeElement;
+        const hadFocus = !!(ae && ae.classList && ae.classList.contains("circuit-cell") && circuitGrid.contains(ae));
+        if (hadFocus) focusSlot = { row: +ae.dataset.row, col: +ae.dataset.col };
+        if (!focusSlot || focusSlot.row >= n) focusSlot = { row: 0, col: 0 };
         circuitGrid.innerHTML = "";
-
-        // top header row
-        const corner = document.createElement("div");
-        corner.className = "circuit-label-cell";
-        circuitGrid.appendChild(corner);
-
-        for (let col = 0; col < MAX_COLS; col++) {
-            const h = document.createElement("div");
-            h.className = "circuit-label-cell";
-            h.textContent = col;
-            circuitGrid.appendChild(h);
-        }
+        circuitGrid.style.setProperty("--rows", n);
 
         // rows q0..q(n-1)
         for (let q = 0; q < n; q++) {
             const labelCell = document.createElement("div");
             labelCell.className = "circuit-label-cell";
-            labelCell.textContent = `q${q}`;
+            labelCell.dataset.qubit = q;
+            labelCell.innerHTML = `<span class="wire-q">q${q}</span><span class="wire-ket">|0⟩</span>`;
             circuitGrid.appendChild(labelCell);
 
             for (let col = 0; col < MAX_COLS; col++) {
@@ -973,18 +1092,43 @@ function initCircuitUI() {
                 cell.className = "circuit-cell";
                 cell.dataset.row = q;
                 cell.dataset.col = col;
+                cell.tabIndex = (focusSlot.row === q && focusSlot.col === col) ? 0 : -1;
+                cell.setAttribute("role", "button");
+                cell.innerHTML = `<span class="slot-idx" aria-hidden="true">${col + 1}</span><span class="slot-ghost" aria-hidden="true"></span>`;
 
                 cell.addEventListener("click", () => handleCellClick(q, col));
                 cell.addEventListener("contextmenu", e => {
                     e.preventDefault();
                     deleteGateAt(q, col);
                 });
+                cell.addEventListener("keydown", e => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleCellClick(q, col);
+                    } else if (e.key === "Delete" || e.key === "Backspace") {
+                        e.preventDefault();
+                        deleteGateAt(q, col);
+                    } else {
+                        const d = { ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] }[e.key];
+                        if (!d) return;
+                        e.preventDefault();
+                        const r2 = Math.max(0, Math.min(n - 1, q + d[0]));
+                        const c2 = Math.max(0, Math.min(MAX_COLS - 1, col + d[1]));
+                        const next = cellAt(r2, c2);
+                        if (next) {
+                            circuitGrid.querySelectorAll(".circuit-cell[tabindex='0']").forEach(x => { x.tabIndex = -1; });
+                            next.tabIndex = 0;
+                            focusSlot = { row: r2, col: c2 };
+                            next.focus();
+                        }
+                    }
+                });
 
                 circuitGrid.appendChild(cell);
             }
         }
 
-        // now draw the gates and control wires
+        // now draw the gates and control connectors
         for (let col = 0; col < MAX_COLS; col++) {
             circuit[col].forEach(g => {
                 if (g.id === "CX" || g.id === "CZ" || g.id === "CY") {
@@ -996,40 +1140,46 @@ function initCircuitUI() {
                 }
             });
         }
+        circuitGrid.querySelectorAll(".circuit-cell").forEach(cell => {
+            cell.setAttribute("aria-label", slotLabel(+cell.dataset.row, +cell.dataset.col));
+        });
 
-        // every grid re-render corresponds to a circuit edit → refresh the sphere
+        if (hadFocus) {
+            const f = cellAt(focusSlot.row, focusSlot.col);
+            if (f) f.focus();
+        }
+
+        updateWireLabels();
+        updatePlacementUI();
+        // every grid re-render corresponds to a circuit edit -> refresh the sphere
         updateQuantumState();
     }
 
-    function renderSingleGate(g, col) {
-        const sel = `.circuit-cell[data-row="${g.target}"][data-col="${col}"]`;
-        const cell = circuitGrid.querySelector(sel);
+    function putMark(cell, html) {
         if (!cell) return;
         cell.classList.add("has-gate");
-        cell.innerHTML = `<span class="circuit-gate-label">${g.id}</span>`;
+        cell.insertAdjacentHTML("beforeend", html);
+    }
+    const tileHtml = (label, fam, role) =>
+        `<span class="gate-tile gate-fam-${fam}" data-role="${role}" data-gate="${label}">${label}</span>`;
+    const ctlDot = (role = "control") => `<span class="ctl-dot" data-role="${role}"></span>`;
+    const xorTarget = () => `<span class="tgt-xor" data-role="target-xor"></span>`;
+
+    function renderSingleGate(g, col) {
+        putMark(cellAt(g.target, col), tileHtml(g.id, gateFamily(g.id), "gate"));
     }
 
     function renderControlledGate(g, col) {
-        const tSel = `.circuit-cell[data-row="${g.target}"][data-col="${col}"]`;
-        const cSel = `.circuit-cell[data-row="${g.control}"][data-col="${col}"]`;
-        const tCell = circuitGrid.querySelector(tSel);
-        const cCell = circuitGrid.querySelector(cSel);
-
-        if (tCell) {
-            tCell.classList.add("has-gate");
-            tCell.innerHTML = `<span class="circuit-gate-label">${g.id.slice(1)}</span>`;
-        }
-        if (cCell) {
-            cCell.classList.add("has-gate");
-            cCell.innerHTML = `<span class="circuit-gate-ctl">●</span>`;
-        }
-
-        if (tCell && cCell) {
-            appendWire([cCell, tCell]);
-        }
+        const tCell = cellAt(g.target, col);
+        const cCell = cellAt(g.control, col);
+        if (g.id === "CX") putMark(tCell, xorTarget());
+        else if (g.id === "CZ") putMark(tCell, ctlDot("target-dot"));
+        else putMark(tCell, tileHtml(g.id.slice(1), "ctrl", "target-box"));
+        putMark(cCell, ctlDot());
+        if (tCell && cCell) appendWire([cCell, tCell]);
     }
 
-    // Vertical control wire positioned from the actual cell geometry
+    // Vertical connector positioned from the actual cell geometry
     // (offsetLeft/offsetTop are relative to #circuit-grid, its offsetParent)
     function appendWire(cells) {
         const centersY = cells.map(c => c.offsetTop + c.offsetHeight / 2);
@@ -1046,29 +1196,10 @@ function initCircuitUI() {
     function renderCCXGate(g, col) {
         const [c1, c2] = g.controls;
         const rows = [c1, c2, g.target].sort((a, b) => a - b);
-
-        const tSel = `.circuit-cell[data-row="${g.target}"][data-col="${col}"]`;
-        const tCell = circuitGrid.querySelector(tSel);
-        if (tCell) {
-            tCell.classList.add("has-gate");
-            tCell.innerHTML = `<span class="circuit-gate-label">X</span>`;
-        }
-
-        [c1, c2].forEach(r => {
-            const cSel = `.circuit-cell[data-row="${r}"][data-col="${col}"]`;
-            const cCell = circuitGrid.querySelector(cSel);
-            if (cCell) {
-                cCell.classList.add("has-gate");
-                cCell.innerHTML = `<span class="circuit-gate-ctl">●</span>`;
-            }
-        });
-
-        const endCells = [rows[0], rows[2]]
-            .map(r => circuitGrid.querySelector(`.circuit-cell[data-row="${r}"][data-col="${col}"]`))
-            .filter(Boolean);
-        if (endCells.length === 2) {
-            appendWire(endCells);
-        }
+        putMark(cellAt(g.target, col), xorTarget());
+        [c1, c2].forEach(r => putMark(cellAt(r, col), ctlDot()));
+        const endCells = [rows[0], rows[2]].map(r => cellAt(r, col)).filter(Boolean);
+        if (endCells.length === 2) appendWire(endCells);
     }
 
     renderCircuitGrid();
