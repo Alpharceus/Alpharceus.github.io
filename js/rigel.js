@@ -24,6 +24,8 @@ const SPHERE_APPEAR_MS      = 300;   // a sphere fades/scales in or out over thi
 const SPHERE_SCALE_MIN      = 0.72;  // scale of a sphere at appear = 0
 const SPHERE_FADE_EASE      = (u) => 1 - Math.pow(1 - u, 3);
 const SPHERE_REFLOW_TAU_MS  = 70;    // cells glide to their new layout with this time constant
+const VIEW_TILT0            = 0.7;   // default camera (every sphere starts here; double-click resets to it)
+const VIEW_PHI0             = 0.55;
 
 // ---- intro timing (ms from intro start): arrival <= 2.5 s, first <= 4 s ----
 // Each stage is [start, end]. In arrival mode the dive colour first collapses to the sphere centre.
@@ -194,7 +196,7 @@ function startIntro() {
 }
 
 // ================== BLOCH SPHERES ==================
-// One canvas, one rAF loop, one shared camera, one sphere per qubit.
+// One canvas, one rAF loop, one sphere per qubit, each with its own camera (tilt, phi).
 
 let blochAnimId = null;
 
@@ -216,7 +218,7 @@ const blochDraw = {
 };
 
 // Read-only test hook: simulator vectors, displayed (animated) vectors, per-sphere draw
-// parameters (visible spheres only), and the shared camera.
+// parameters (visible spheres only, each with its own tilt/phi). draw.tilt/phi mirror sphere q0.
 window.__rigelState = () => ({
     vectors: blochState.vectors.map(v => ({ x: v.x, y: v.y, z: v.z })),
     displayed: (blochState.getDisplayed ? blochState.getDisplayed() : blochState.vectors)
@@ -353,7 +355,8 @@ function initBlochSphere() {
         for (let q = 0; q < n; q++) {
             let s = spheres.find(x => x.q === q);
             if (!s) {
-                s = { q, rect: Object.assign({}, rects[q]), tgt: rects[q], appear: instant ? 1 : 0, want: 1, trail: [], vec: null, draw: {} };
+                s = { q, rect: Object.assign({}, rects[q]), tgt: rects[q], appear: instant ? 1 : 0, want: 1, trail: [], vec: null, draw: {},
+                      tilt: VIEW_TILT0, phi: VIEW_PHI0 };
                 spheres.push(s);
             }
             s.want = 1;
@@ -364,7 +367,7 @@ function initBlochSphere() {
         if (instant) spheres = spheres.filter(s => s.want);
         spheres.sort((a, b) => a.q - b.q);
         canvas.setAttribute("aria-label",
-            "Bloch spheres: one per qubit (" + n + "), each showing that qubit's live reduced state. Drag to rotate all of them together.");
+            "Bloch spheres: one per qubit (" + n + "), each showing that qubit's live reduced state. Drag a sphere to rotate it on its own; double-click to reset its view.");
         needsFrame = true;
     }
 
@@ -390,13 +393,28 @@ function initBlochSphere() {
         }).observe(canvas);
     }
 
-    // Shared camera: dragging any sphere rotates all of them (the canvas is one drag surface).
-    let viewTilt = 0.7;
-    let viewPhi = 0.55;
+    // Per-sphere cameras: the pointer-down location picks the sphere under it, and that
+    // same sphere keeps rotating for the whole drag, even if the pointer leaves its cell.
     let dragging = false;
+    let dragSphere = null;
     let lastX = 0, lastY = 0;
 
+    function sphereAt(e) {
+        const b = canvas.getBoundingClientRect();
+        const px = (e.clientX - b.left) * (W / (b.width || W));
+        const py = (e.clientY - b.top) * (H / (b.height || H));
+        return spheres.find(s => s.want &&
+            px >= s.tgt.x && px < s.tgt.x + s.tgt.w && py >= s.tgt.y && py < s.tgt.y + s.tgt.h) || null;
+    }
+    function resetView(s) {
+        s.tilt = VIEW_TILT0;
+        s.phi = VIEW_PHI0;
+        needsFrame = true;
+    }
+
     canvas.addEventListener("pointerdown", (e) => {
+        dragSphere = sphereAt(e);
+        if (!dragSphere) return;
         dragging = true;
         lastX = e.clientX;
         lastY = e.clientY;
@@ -405,16 +423,34 @@ function initBlochSphere() {
         e.preventDefault();
     });
     canvas.addEventListener("pointermove", (e) => {
-        if (!dragging) return;
-        viewPhi += (e.clientX - lastX) * 0.008;
-        viewTilt += (e.clientY - lastY) * 0.008;
-        viewTilt = Math.max(-1.45, Math.min(1.45, viewTilt));
+        if (!dragging || !dragSphere) return;
+        dragSphere.phi += (e.clientX - lastX) * 0.008;
+        dragSphere.tilt += (e.clientY - lastY) * 0.008;
+        dragSphere.tilt = Math.max(-1.45, Math.min(1.45, dragSphere.tilt));
         lastX = e.clientX;
         lastY = e.clientY;
     });
-    const endDrag = () => { dragging = false; canvas.classList.remove("dragging"); };
+    const endDrag = () => { dragging = false; dragSphere = null; canvas.classList.remove("dragging"); };
     canvas.addEventListener("pointerup", endDrag);
     canvas.addEventListener("pointercancel", endDrag);
+    // double-click (a double-tap on touch also fires dblclick) resets the sphere under it
+    canvas.addEventListener("dblclick", (e) => {
+        const s = sphereAt(e);
+        if (s) resetView(s);
+    });
+    // double-tap fallback for touch browsers that suppress dblclick on a touch-action:none surface
+    let lastTap = { t: 0, x: 0, y: 0 };
+    canvas.addEventListener("pointerup", (e) => {
+        if (e.pointerType !== "touch") return;
+        const now = performance.now();
+        if (now - lastTap.t < 350 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24) {
+            const s = sphereAt(e);
+            if (s) resetView(s);
+            lastTap.t = 0;
+        } else {
+            lastTap = { t: now, x: e.clientX, y: e.clientY };
+        }
+    });
 
     // Returns screen x/y plus zv, the view-space depth (+ = toward the viewer).
     function project3D(x, y, z, cx, cy, R, tilt, phi) {
@@ -502,6 +538,7 @@ function initBlochSphere() {
     // per-sphere draw parameters for the test hook (visible spheres only)
     blochState.getSpheres = () => spheres.filter(s => s.want).map(s => ({
         q: s.q,
+        tilt: s.tilt, phi: s.phi,
         rect: { x: s.tgt.x, y: s.tgt.y, w: s.tgt.w, h: s.tgt.h },
         appear: s.appear,
         mode: cellMode(s.tgt),
@@ -584,7 +621,7 @@ function initBlochSphere() {
         const scale = SPHERE_SCALE_MIN + (1 - SPHERE_SCALE_MIN) * fade;
         const R = sphereRadius(s.tgt) * scale;
         const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
-        const tilt = viewTilt, phi = viewPhi;
+        const tilt = s.tilt, phi = s.phi;
 
         ctx.save();
         ctx.beginPath();
@@ -866,8 +903,7 @@ function initBlochSphere() {
             blochDraw.tipAlpha = s0.draw.tipAlpha;
             blochDraw.trailPoints = s0.trail.length;
         }
-        blochDraw.tilt = viewTilt;
-        blochDraw.phi = viewPhi;
+        if (s0) { blochDraw.tilt = s0.tilt; blochDraw.phi = s0.phi; }
         blochDraw.animating = !!anim;
         blochDraw.frames++;
     }
@@ -953,7 +989,6 @@ function initCircuitUI() {
     systemPresetSelect  = document.getElementById("system-preset-select");
     circuitGrid         = document.getElementById("circuit-grid");
     const gatePalette   = document.getElementById("gate-palette");
-    const runBtn        = document.getElementById("run-btn");
     const clearBtn      = document.getElementById("clear-circuit-btn");
 
     if (!numQubitsSelect || !basisContainer || !circuitGrid || !gatePalette) {
@@ -1369,11 +1404,6 @@ function initCircuitUI() {
     renderCircuitGrid();
 
     // ---------- buttons ----------
-    if (runBtn) {
-        runBtn.addEventListener("click", () => {
-            runCircuit();
-        });
-    }
     if (clearBtn) {
         clearBtn.addEventListener("click", () => {
             circuit = Array.from({ length: MAX_COLS }, () => []);
@@ -1852,10 +1882,6 @@ function updateQuantumState() {
     if (blochState.onUpdate) blochState.onUpdate();
 
     renderStateOutput(state, n);
-}
-
-function runCircuit() {
-    updateQuantumState();
 }
 
 // ================== BOOT ==================

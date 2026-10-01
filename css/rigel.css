@@ -278,7 +278,6 @@ body.rigel-page .gate-btn.active {
 }
 
 body.rigel-page .gate-btn:focus-visible,
-body.rigel-page #run-btn:focus-visible,
 body.rigel-page #clear-circuit-btn:focus-visible,
 body.rigel-page select:focus-visible {
     outline: 2px solid var(--link, #8fb8ff);
@@ -373,9 +372,11 @@ body.rigel-page select:focus-visible {
     border-radius: 10px;
 }
 
-/* Run / Clear live at the foot of the Gate Palette panel */
+/* Clear lives at the foot of the Gate Palette panel, right-aligned as a ghost button
+   (the circuit re-simulates live, so there is no Run) */
 .qc-actions {
     display: flex;
+    justify-content: flex-end;
     gap: 0.6rem;
     margin-top: 1.1rem;
 }
@@ -572,31 +573,18 @@ body.rigel-page select:focus-visible {
 
 /* ---- buttons ---- */
 
-body.rigel-page #run-btn,
 body.rigel-page #clear-circuit-btn {
-    flex: 1 1 0;
-    height: 40px;
+    flex: 0 0 auto;
+    height: 34px;
     box-sizing: border-box;
     font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     border-radius: 9px;
     padding: 0 1rem;
     margin: 0;
     cursor: pointer;
     transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out;
-}
-
-body.rigel-page #run-btn {
-    border: 1px solid var(--link, #8fb8ff);
-    background: var(--link, #8fb8ff);
-    color: var(--sky-0, #0e101f);
-    font-weight: 600;
-}
-
-body.rigel-page #run-btn:hover {
-    background: var(--link-hover, #d4e2ff);
-    border-color: var(--link-hover, #d4e2ff);
 }
 
 body.rigel-page #clear-circuit-btn {
@@ -670,7 +658,6 @@ body.rigel-page #clear-circuit-btn.secondary:hover {
 
 @media (prefers-reduced-motion: reduce) {
     body.rigel-page .gate-btn,
-    body.rigel-page #run-btn,
     body.rigel-page #clear-circuit-btn,
     body.rigel-page select,
     .placement,
