@@ -22,3 +22,7 @@ portfolio-steps-4-5-brief.md
 
 # AI-assistant rules: local only, never deploy
 CLAUDE.md
+
+# editor / assistant config: never commit
+.claude/
+.vscode/
