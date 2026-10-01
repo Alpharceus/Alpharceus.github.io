@@ -26,3 +26,4 @@ CLAUDE.md
 # editor / assistant config: never commit
 .claude/
 .vscode/
+.impeccable/
