@@ -3,7 +3,8 @@
 //
 // Phases: approach (parallax flight) -> system reveal (real hierarchy, log
 // orbit/disc scales) -> close-up (limb-darkened, spinning down) -> hand-off
-// (flood to the destination colour, then navigate).
+// (flood to the destination colour, then navigate; Betelgeuse floods to the terminal's
+// background and opens the terminal on the home page instead).
 //
 // All astrophysical numbers come from .workers/specs/ref/orion-systems.md.
 // Nothing here draws planets: none are known for any of these stars.
@@ -61,7 +62,10 @@
     var AU_PER_RSUN = 0.00465047;
     function S(id, sp, teff, R, M, hex, o) {
         o = o || {};
-        return { kind: "star", id: id, sp: sp, teff: teff, R: R, Rshow: o.Rshow, M: M, Mshow: o.Mshow, hex: hex, col: hexRgb(hex), tags: o.tags || [], name: o.name || id };
+        return {
+        kind: "star", id: id, sp: sp, teff: teff, R: R, Rshow: o.Rshow, M: M, Mshow: o.Mshow, hex: hex, col: hexRgb(hex), tags: o.tags || [], name: o.name || id,
+        u: o.u, rpxFrac: o.rpxFrac, cand: !!o.cand
+    };
     }
     function P(o) { o.kind = "pair"; return o; }
 
@@ -116,8 +120,27 @@
         period: "P ≈ 24,000 yr (est.)", tags: ["illustrative orbit"], c: [RigA, RigBC]
     });
 
+    // Betelgeuse: A is a red supergiant; B "Siwarha" is a CANDIDATE only (confirmation expected late 2027).
+    // a = 8.8 AU vs R = 764 R-sun (3.55 AU): the orbit lies just outside the photosphere, inside the extended atmosphere.
+    var BetA = S("A", "M1–M2 Ia–ab", 3700, 764, 16.5, "#FFCD98", { name: "α Ori A", Mshow: "14–19" });
+    var BetB = S("B", "α Ori B", null, undefined, 2, "#FFE3C8", {
+        name: "Siwarha", Mshow: "~1–3", u: 0, rpxFrac: 0.12, cand: true, tags: ["candidate · confirmation expected late 2027"]
+    });
+    var BetRoot = P({
+        a: 8.8, e: 0, Pd: 5.8 * 365.25, q: 0.62, rot: -0.35, M0: 0.6, advance: false, draw: "dashed", aStar: true,
+        period: "P ≈ 5.8 yr · a ≈ 8.8 AU", tags: ["position illustrative"], c: [BetA, BetB]
+    });
+
     // index = star-map orionStars index
     var SYS = {
+        0: {
+            name: "Betelgeuse", bayer: "α Orionis", type: "M1–M2 Ia–ab red supergiant · candidate companion", dist: "168 pc (uncertain)",
+            note: "companion orbit lies inside the extended atmosphere · log scale", u: 0.75, hex: "#FFCD98", root: BetRoot,
+            primary: "A", incl: 60, inclTag: "illustrative", Prot: "30–36 yr", Pd: 33 * 365.25, Pyr: 33,
+            rotNote: "illustrative (rotation signal debated)", wind: 0.9, spinTag: "",
+            terminal: true, soft: true, cells: 6, envelope: true, boost: 1.8, texAmp: 0.27, limbCol: [200, 86, 40], orbitRgb: [232, 186, 146],
+            fact: "2019–20 Great Dimming · not depicted"
+        },
         1: {
             name: "Bellatrix", bayer: "γ Orionis", type: "B2 III blue giant · single", dist: "77 ± 3 pc · 250 ly",
             note: "single star · GRAVITY: no companion", u: 0.32, hex: "#B9CBFF", root: S("A", "B2 III", 22000, 6.2, 8.4, "#B9CBFF"),
@@ -229,14 +252,17 @@
         textureContrast: function () {
             if (!D) return null;
             var sp = D.sph, a = new Uint8ClampedArray(sp.img.data);
-            renderSphere(sp, 0.7, 0); var plain = new Uint8ClampedArray(sp.img.data);
-            renderSphere(sp, 0.7, TEX_AMP); var tex = sp.img.data, mx = 0;
+            var amp = D.sys.cells ? D.sys.texAmp : TEX_AMP;
+            renderSphere(sp, 0.7, 0, 0); var plain = new Uint8ClampedArray(sp.img.data);
+            renderSphere(sp, 0.7, amp, 0); var tex = sp.img.data, mx = 0;
             for (var i = 0; i < sp.n; i++) { var o = sp.idx[i] + 2; if (plain[o] > 60) mx = Math.max(mx, Math.abs(tex[o] - plain[o]) / plain[o]); }
             return mx;
         },
         hudRects: function () { return D ? hudRects() : []; },
         leaders: function () { return D ? D.hud.tags.map(function (t) { return { ids: t.ids, p0: t.p0, p1: { x: t.p1w.x + D.C.x, y: t.p1w.y + D.C.y }, rect: t.rect ? { x: t.rect.x, y: t.rect.y, w: t.rect.w, h: t.rect.h } : null }; }) : []; },
         discs: function () { return D ? discList() : []; },
+        cells: 0, cellsVisible: function () { return D && D.sys.cells ? visibleCells(angleAt(testHook.t)) : 0; },
+        candidates: [], handoff: null,
         droppedLabels: []
     };
     window.__dive = testHook;
@@ -283,7 +309,7 @@
     }
 
     function buildLayout(sys, W, H, jd, mobile) {
-        var sc = clamp(Math.min(W, H) / 800, 0.55, 1.3);
+        var sc = clamp(Math.min(W, H) / 800, 0.55, 1.3) * (sys.boost || 1);
         var stars = allStars(sys.root), pairs = allPairs(sys.root);
         var primary = stars.filter(function (s) { return s.id === sys.primary; })[0];
         var d0 = Math.max(0.5 * primary.R * AU_PER_RSUN, 0.01);
@@ -297,6 +323,9 @@
         var st = { k: 1, rotAll: rotAll };
         var L = { sc: sc, stars: stars, pairs: pairs, primary: primary, rotAll: rotAll, d0: d0, W: W, H: H };
         stars.forEach(function (s) { s._rpx = discRadius(s.R || 2.5, sc); });
+        stars.forEach(function (s) { if (s.rpxFrac) s._rpx = Math.max(3.5 * sc, s.rpxFrac * primary._rpx); });   // candidate companion: a small dot
+        // companion orbit given in AU vs the primary's real radius: screen separation = real ratio x the primary's screen radius
+        pairs.forEach(function (p) { if (p.aStar) p._fixedPx = (p.a / AU_PER_RSUN) / p.c[0].R * p.c[0]._rpx; });
         // Eclipsing pair (real geometry known): screen separation = real separation x (screen radii / real radii),
         // so the discs overlap on screen exactly when they overlap in the real projection.
         pairs.forEach(function (p) {
@@ -360,12 +389,30 @@
     // =====================================================================
     // SPRITES
     // =====================================================================
-    function discSprite(col, u, rpx, dpr) {
+    function lum(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+    // disc colour at limb-darkening intensity I and cosine mu: cooler limbs are redder; luminance stays exactly I x centre
+    function limbColour(col, limb, mu, I) {
+        var w = Math.pow(1 - mu, 1.5), c = [lerp(col[0], limb[0], w), lerp(col[1], limb[1], w), lerp(col[2], limb[2], w)];
+        var k = I * lum(col) / lum(c);
+        return [c[0] * k, c[1] * k, c[2] * k];
+    }
+
+    function discSprite(col, u, rpx, dpr, soft, limb) {
         var sr = Math.max(10, Math.ceil(rpx * dpr * 1.6));
         var c = document.createElement("canvas");
         c.width = c.height = sr * 2 + 4;
         var g = c.getContext("2d");
         var grad = g.createRadialGradient(sr + 2, sr + 2, 0, sr + 2, sr + 2, sr);
+        if (soft) {   // extended atmosphere: strong limb darkening and an edge that fades out
+            for (var k = 0; k <= 14; k++) {
+                var rr = k / 14, m2 = Math.sqrt(Math.max(0, 1 - rr * rr)), I2 = 1 - u * (1 - m2);
+                var cc = limb ? limbColour(col, limb, m2, I2 * 0.8) : [col[0] * I2, col[1] * I2, col[2] * I2];
+                grad.addColorStop(rr, "rgba(" + Math.round(cc[0]) + "," + Math.round(cc[1]) + "," + Math.round(cc[2]) + "," + (1 - smooth((rr - 0.95) / 0.05)).toFixed(3) + ")");
+            }
+            g.fillStyle = grad;
+            g.beginPath(); g.arc(sr + 2, sr + 2, sr, 0, 7); g.fill();
+            return { c: c, half: sr + 2, r: sr };
+        }
         var N = 11;
         for (var i = 0; i <= N; i++) {
             var r = i / N * 0.97;
@@ -391,6 +438,7 @@
         var obl = plain ? 1 : (sys.oblate || 1);
         var bp = obl > 1 ? Math.sqrt((1 / (obl * obl)) * sinI * sinI + cosI * cosI) : 1;   // projected polar semi-axis (units of Re)
         var sPA = Math.sin(PA), cPA = Math.cos(PA);
+        var cells = !!sys.cells, gain = cells ? 0.8 : 1, pr = [], pg = [], pb = [];
         var idx = [], tx0 = [], row = [], base = [], alpha = [], rho = [], tw = [];
         for (var py = 0; py < SPH; py++) {
             for (var px = 0; px < SPH; px++) {
@@ -411,9 +459,13 @@
                 idx.push((py * SPH + px) * 4);
                 tx0.push(lon / (2 * Math.PI) * TEX_W);
                 row.push(clamp(Math.round((lat + Math.PI / 2) / Math.PI * (TEX_H - 1)), 0, TEX_H - 1));
-                base.push(I);
+                base.push(I * gain);
+                if (cells) {   // colour at unit intensity (luminance-normalised), reddening toward the limb
+                    var uc2 = sys.limbCol ? limbColour(primary.col, sys.limbCol, mu, 1) : primary.col;
+                    pr.push(uc2[0]); pg.push(uc2[1]); pb.push(uc2[2]);
+                }
                 tw.push(1 - smooth((Math.abs(lat) - 1.1) / 0.4));   // texture fades toward the poles (no pinching)
-                alpha.push(clamp((1 - rh) * SR + 0.5, 0, 1));
+                alpha.push(clamp((1 - rh) * SR + 0.5, 0, 1) * (sys.soft && !plain ? 1 - smooth((rh - 0.95) / 0.05) : 1));
                 rho.push(rh);
             }
         }
@@ -424,11 +476,13 @@
         return {
             cv: cv, g: g, img: img, SR: SR, n: idx.length,
             idx: Int32Array.from(idx), tx0: Float32Array.from(tx0), row: Int16Array.from(row),
-            base: Float32Array.from(base), tw: Float32Array.from(tw), alpha: Float32Array.from(alpha), col: primary.col
+            base: Float32Array.from(base), tw: Float32Array.from(tw), alpha: Float32Array.from(alpha), col: primary.col, cells: cells,
+            pr: Float32Array.from(pr), pg: Float32Array.from(pg), pb: Float32Array.from(pb)
         };
     }
 
-    function renderSphere(sp, angle, amp) {
+    function renderSphere(sp, angle, amp, evo) {
+        if (sp.cells) { renderCells(sp, angle, amp, evo || 0); return; }
         var tex = buildTexture();
         var data = sp.img.data, col = sp.col;
         var cr = col[0], cg = col[1], cb = col[2];
@@ -447,6 +501,69 @@
         sp.g.putImageData(sp.img, 0, 0);
     }
 
+    // ---- Betelgeuse: a few giant convection cells (brighter / darker irregular regions), slowly evolving ----
+    // Six giant cells (Voronoi regions on the sphere): each with its own brightness, separated by darker lanes.
+    var CELL_LON = [12, 74, 131, 192, 251, 312], CELL_LAT = [38, 22, 34, 12, 40, 26];
+    var CELL_BRIGHT = [0.9, 0.55, 0.75, 0.4, 0.85, 0.5];
+    var cellTex = null;
+    function buildCellTex(variant) {
+        var t = new Float32Array(TEX_W * TEX_H), D2R = Math.PI / 180, mx = 1e-6, N = CELL_LON.length;
+        var cx = [], cy = [], cz = [], br = [];
+        for (var k = 0; k < N; k++) {
+            var lon = (CELL_LON[k] + (variant ? (k % 2 ? -13 : 10) : 0)) * D2R, lat = (CELL_LAT[k] + (variant ? (k % 3 ? 6 : -8) : 0)) * D2R;
+            cx.push(Math.cos(lat) * Math.cos(lon)); cy.push(Math.cos(lat) * Math.sin(lon)); cz.push(Math.sin(lat));
+            br.push(CELL_BRIGHT[k] * (variant ? (k % 2 ? 0.75 : 1.2) : 1) + (variant ? (k % 2 ? 0.15 : -0.1) : 0));
+        }
+        for (var j = 0; j < TEX_H; j++) {
+            var la = j / (TEX_H - 1) * Math.PI - Math.PI / 2, cl = Math.cos(la), sl = Math.sin(la);
+            for (var i = 0; i < TEX_W; i++) {
+                var lo = i / TEX_W * 2 * Math.PI, dx = cl * Math.cos(lo), dy = cl * Math.sin(lo);
+                var wn = vnoise(i / TEX_W * 9 + (variant ? 3.1 : 0), j / TEX_H * 4.5, 9) - 0.5;   // irregular cell edges
+                var d1 = 9, d2 = 9, k1 = 0;
+                for (var q = 0; q < N; q++) {
+                    var d = Math.acos(clamp(dx * cx[q] + dy * cy[q] + sl * cz[q], -1, 1)) * (1 + 0.55 * wn * (q % 2 ? 1 : -1));
+                    if (d < d1) { d2 = d1; d1 = d; k1 = q; } else if (d < d2) d2 = d;
+                }
+                // broad bright patch; a narrow soft lane where two cells meet; dim granulated surface outside every cell
+                var g = (d2 - d1) / 0.06, lane = Math.exp(-g * g);
+                var out = smooth((d1 - 0.5) / 0.16);
+                var body = br[k1] * (1 - out) - 0.3 * out;
+                var v = body * (1 - lane) - 0.5 * lane + 0.14 * (vnoise(i / TEX_W * 12, j / TEX_H * 6, 12) - 0.5);
+                t[j * TEX_W + i] = v;
+                if (Math.abs(v) > mx) mx = Math.abs(v);
+            }
+        }
+        for (var n = 0; n < t.length; n++) t[n] = clamp(t[n] / mx, -1, 1);
+        return t;
+    }
+    function renderCells(sp, angle, amp, evo) {
+        if (!cellTex) cellTex = [buildCellTex(0), buildCellTex(1)];
+        var tA = cellTex[0], tB = cellTex[1];
+        var data = sp.img.data, pr = sp.pr, pg = sp.pg, pb = sp.pb;
+        var shift = angle / (2 * Math.PI) * TEX_W;
+        var n = sp.n, idx = sp.idx, tx0 = sp.tx0, row = sp.row, base = sp.base, al = sp.alpha, tw = sp.tw;
+        for (var i = 0; i < n; i++) {
+            var x = tx0[i] + shift, fl = Math.floor(x), f = x - fl;
+            var i0 = ((fl % TEX_W) + TEX_W) % TEX_W, i1 = (i0 + 1) % TEX_W, ro = row[i] * TEX_W;
+            var a = tA[ro + i0] * (1 - f) + tA[ro + i1] * f, b = tB[ro + i0] * (1 - f) + tB[ro + i1] * f;
+            var I = base[i] * (1 + amp * (a + (b - a) * evo) * tw[i]);
+            var o = idx[i];
+            data[o] = pr[i] * I; data[o + 1] = pg[i] * I; data[o + 2] = pb[i] * I; data[o + 3] = al[i] * 255;
+        }
+        sp.g.putImageData(sp.img, 0, 0);
+    }
+    // cells whose centre faces the viewer at the given spin angle (hook)
+    function visibleCells(angle) {
+        var sys = D.sys, inc = sys.incl * Math.PI / 180, n = 0;
+        for (var k = 0; k < CELL_LON.length; k++) {
+            var lon = CELL_LON[k] * Math.PI / 180 - angle, lat = CELL_LAT[k] * Math.PI / 180;
+            // viewer direction in star coordinates: equator-on rotated by the inclination
+            var mu = Math.cos(lat) * Math.cos(lon) * Math.sin(inc) + Math.sin(lat) * Math.cos(inc);
+            if (mu > 0.2) n++;
+        }
+        return n;
+    }
+
     function limbProfile(rs) {
         // the u-law itself: same code path, with the Alnilam fast-rotator model (oblateness, gravity darkening) off
         var sp = D.sphPlain || (D.sphPlain = buildSphere(D.sys, D.primaryNode, true));
@@ -454,7 +571,8 @@
         var data = sp.img.data, SR = sp.SR, u = D.sys.u, out = [];
         var cy = Math.floor(SPH / 2);
         var o0 = (cy * SPH + Math.floor(SPH / 2)) * 4;
-        var c0 = data[o0 + 2];
+        function L(o) { return 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2]; }
+        var c0 = L(o0);
         rs.forEach(function (r) {
             var px = Math.floor(SPH / 2 + r * SR);
             var o = (cy * SPH + px) * 4;
@@ -463,7 +581,7 @@
             var x0 = (Math.floor(SPH / 2) + 0.5 - SPH / 2) / SR, y0 = -(cy + 0.5 - SPH / 2) / SR;
             var rho0 = Math.sqrt(x0 * x0 + y0 * y0);
             var mu = Math.sqrt(Math.max(0, 1 - rho * rho)), mu0 = Math.sqrt(Math.max(0, 1 - rho0 * rho0));
-            out.push({ r: r, rho: rho, obs: data[o + 2] / c0, exp: (1 - u * (1 - mu)) / (1 - u * (1 - mu0)) });
+            out.push({ r: r, rho: rho, obs: L(o) / c0, exp: (1 - u * (1 - mu)) / (1 - u * (1 - mu0)) });
         });
         return out;
     }
@@ -560,16 +678,19 @@
 
     function compLines(n, mobile, pairPeriod) {
         var l1 = "<b>" + n.name + "</b> <span class='dim'>" + n.sp + "</span>";
-        if (mobile) return l1 + (pairPeriod ? "<br><span class='dim'>" + pairPeriod + "</span>" : "");
+        if (mobile) {
+            if (n.cand) l1 += "<br>" + tg(n.tags.join(" · ").replace(" · ", " ·<br>"));   // a candidate always carries its tag
+            return l1 + (pairPeriod ? "<br><span class='dim'>" + pairPeriod + "</span>" : "");
+        }
         var bits = [];
-        bits.push((n.Teffshow || fmtInt(n.teff)) + " K");
+        if (n.teff || n.Teffshow) bits.push((n.Teffshow || fmtInt(n.teff)) + " K");
         var l2 = bits.join(" · ");
         var rm = [];
         var Rs = n.Rshow !== undefined ? n.Rshow : (n.R ? String(n.R) : null);
         if (Rs) rm.push(Rs + " R☉");
         var Ms = n.Mshow || (n.M ? String(n.M) : null);
         if (Ms) rm.push(Ms + " M☉");
-        var html = l1 + "<br><span class='dim'>" + l2 + "</span>";
+        var html = l1 + (l2 ? "<br><span class='dim'>" + l2 + "</span>" : "");
         if (rm.length) html += "<br><span class='dim'>" + rm.join(" · ") + "</span>";
         if (n.tags && n.tags.length) html += "<br>" + tg(n.tags.join(" · "));
         return html;
@@ -595,16 +716,18 @@
     }
 
     function readoutHtml(sys, f, mobile) {
-        var w = (2 * Math.PI / sys.Pd) * f;
+        var w = (2 * Math.PI / (sys.Pyr || sys.Pd)) * f;
         var inc = sys.incl + "°" + (sys.inclTag === "illustrative" ? " " + tg("illustrative") : (sys.inclTag === "orbit" ? " <span class='dim'>(orbit)</span>" : " <span class='dim'>(" + sys.inclTag + ")</span>"));
         var lines = [];
         lines.push("<b>rotation</b> P " + sys.Prot + (mobile ? "" : " · i " + inc));
-        lines.push("<b>ω</b> " + w.toFixed(2) + " rad/d" + (mobile ? "" : " <span class='dim'>eased to rest</span>"));
+        lines.push("<b>ω</b> " + w.toFixed(2) + (sys.Pyr ? " rad/yr" : " rad/d") + (mobile ? "" : " <span class='dim'>eased to rest</span>"));
         var teff = D.primaryNode.teff;
         lines.push("<b>T<sub>eff</sub></b> " + fmtInt(teff) + " K · <b>u</b> " + sys.u.toFixed(2));
+        if (sys.cells) lines.push("<b>R</b> " + D.primaryNode.R + " R☉ · <b>M</b> " + D.primaryNode.Mshow + " M☉");
         if (!mobile) {
             if (sys.rotNote) lines.push(tg(sys.rotNote + (sys.oblate ? " · eq/polar ≈ 1.3 · equator ~20% darker" : "")));
-            lines.push("<span class='dim'>surface texture: " + "</span>" + tg("illustrative"));
+            lines.push(sys.cells ? "<span class='dim'>convection cells (3–6): </span>" + tg("pattern illustrative") : "<span class='dim'>surface texture: " + "</span>" + tg("illustrative"));
+            if (sys.fact) lines.push("<span class='dim'>" + sys.fact + "</span>");
         } else if (sys.rotNote) {
             lines.push(tg(sys.rotNote));
         }
@@ -758,7 +881,7 @@
         items.forEach(function (it) {
             var gap = "<div style='height:" + (mobile ? 3 : 6) + "px'></div>";
             var html = it.stars.map(function (n) { return "<div>" + compLines(n, mobile, null) + "</div>"; }).join(gap);
-            var short = it.stars.map(function (n) { return "<div><b>" + n.name + "</b> <span class='dim'>" + n.sp + "</span></div>"; }).join("");
+            var short = it.stars.map(function (n) { return "<div><b>" + n.name + "</b> <span class='dim'>" + n.sp + "</span>" + (n.cand ? "<br>" + tg("candidate") : "") + "</div>"; }).join("");
             var node = el("sd-tag", html);
             hud.root.appendChild(node);
             var pref = Math.atan2(it.cy - C.y, it.cx - C.x);
@@ -850,16 +973,38 @@
     // =====================================================================
     // START
     // =====================================================================
+    // The terminal overlay background (css/terminal.css), composited over the home backdrop.
+    function terminalRgb() {
+        var out = [8, 11, 20];
+        try {
+            var ov = document.getElementById("terminal-overlay");
+            var m = ov && getComputedStyle(ov).backgroundColor.match(/[\d.]+/g);
+            if (m && m.length >= 3) {
+                var al = m.length > 3 ? parseFloat(m[3]) : 1;
+                out = [0, 1, 2].map(function (i) { return Math.round(parseFloat(m[i]) * al + BG_HOME[i] * (1 - al)); });
+            }
+        } catch (e) { }
+        return out;
+    }
+
     function start(starIdx, xy, target, onDone) {
         var sys = SYS[starIdx];
         if (D || !sys) return false;
         var ST = window.SiteTransition;
-        var plan = ST.prepare({ star: sys.name, target: target, rgb: hexRgb(sys.hex) });
-        if (plan.reduced) {
-            // reduced motion: the existing 150 ms colour fade, then navigate
-            return ST.startDive({ star: sys.name, target: target, rgb: hexRgb(sys.hex), x: xy.x, y: xy.y });
+        var plan;
+        if (sys.terminal) {
+            // hand-off to the terminal on this page: no navigation, no arrival payload
+            if (reduced()) return false;     // the caller opens the terminal directly
+            var trgb = terminalRgb();
+            plan = { star: sys.name, target: null, rgb: hexRgb(sys.hex), finalRgb: trgb, bg: trgb, reduced: false };
+        } else {
+            plan = ST.prepare({ star: sys.name, target: target, rgb: hexRgb(sys.hex) });
+            if (plan.reduced) {
+                // reduced motion: the existing 150 ms colour fade, then navigate
+                return ST.startDive({ star: sys.name, target: target, rgb: hexRgb(sys.hex), x: xy.x, y: xy.y });
+            }
+            ST.prefetch(target);
         }
-        ST.prefetch(target);
         injectStyle();
         var W = window.innerWidth, H = window.innerHeight;
         var dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX);
@@ -916,6 +1061,9 @@
         testHook.droppedLabels = testHook.droppedLabels || [];
         testHook.mintakaPhase0 = sys.eclipse ? ephemerisPhase(jd) : null;
         testHook.system = sys.name;
+        testHook.cells = sys.cells || 0;
+        testHook.candidates = L.stars.filter(function (x) { return x.cand; }).map(function (x) { return x.id; });
+        testHook.handoff = null;
 
         wireInput();
         D.timer = setTimeout(function () { if (D && D.override === null) finish(); }, T_HARD_MAX - 250);
@@ -931,7 +1079,7 @@
         c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
         var g = c.getContext("2d");
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
-        var st = L.st, col = [150, 170, 230];
+        var st = L.st, col = sys.orbitRgb || [150, 170, 230];
         walk(sys.root, -L.cx, -L.cy, 0, st, function () { }, function (pair, bx, by) {
             var pp = pathPts(pair, st.k, L.rotAll, 120);
             var dash = pair.draw === "dashed", dotted = pair.draw === "dotted";
@@ -1108,6 +1256,19 @@
         ents.sort(function (p, q) { return p.z - q.z; });
         var drawn = [];
         var primAlphaApproach = smooth((t - 380) / 520);
+        if (sys.envelope) {
+            // faint dusty circumstellar envelope; the companion orbit lies inside it
+            var pe = ents.filter(function (x) { return x.n === D.primaryNode; })[0];
+            var ps = toScreen(pe.x, pe.y), rEnv = D.primaryNode._rpx * Z * 4.6;
+            var envA = primAlphaApproach * (1 - 0.55 * smooth(uc)) * 0.5;
+            if (envA > 0.003) {
+                ctx.save();
+                ctx.globalCompositeOperation = "lighter";
+                ctx.globalAlpha = envA;
+                ctx.drawImage(envelopeSprite(D), ps.x - rEnv, ps.y - rEnv, rEnv * 2, rEnv * 2);
+                ctx.restore();
+            }
+        }
         ents.forEach(function (en) {
             var n = en.n, isP = n === D.primaryNode;
             var sp = toScreen(en.x, en.y);
@@ -1183,6 +1344,26 @@
 
     function discList() {
         return (D.lastEnts || []).filter(function (e) { return e._al > 0.05; }).map(function (e) { return { id: e.n.id, x: e._sp.x, y: e._sp.y, r: e._r, R: e.n.R }; });
+    }
+
+    // dusty envelope, centred; sprite radius = 4.6 stellar radii. Slightly lumpy, never symmetric.
+    function envelopeSprite(D) {
+        if (D.envSprite) return D.envSprite;
+        var N = 256, c = document.createElement("canvas"); c.width = c.height = N;
+        var g = c.getContext("2d"), dust = [206, 104, 56], R = rng(1913), h = N / 2;
+        var gr = g.createRadialGradient(h, h, 0, h, h, h);
+        gr.addColorStop(0, rgba(dust, 0.22));
+        gr.addColorStop(0.2, rgba(dust, 0.15));
+        gr.addColorStop(0.45, rgba(dust, 0.07));
+        gr.addColorStop(0.75, rgba(dust, 0.025));
+        gr.addColorStop(1, rgba(dust, 0));
+        g.fillStyle = gr; g.fillRect(0, 0, N, N);
+        for (var i = 0; i < 6; i++) {
+            var an = R() * 6.283, d = 0.18 + R() * 0.3;
+            blob(g, h + Math.cos(an) * d * h, h + Math.sin(an) * d * h, h * (0.3 + R() * 0.3), dust, 0.05 + R() * 0.04);
+        }
+        D.envSprite = c;
+        return c;
     }
 
     function glowSprite(D, hex) {
@@ -1276,20 +1457,33 @@
         ctx.globalAlpha = clamp(en._al, 0, 1);
 
         if (isP && r > 40) {
-            renderSphere(D.sph, angleAt(t), TEX_AMP);
+            renderSphere(D.sph, angleAt(t), sys.cells ? sys.texAmp : TEX_AMP, clamp(t / T_TOTAL, 0, 1) * 0.45);
             var half = r * (SPH / 2) / D.sph.SR;
             ctx.drawImage(D.sph.cv, sp.x - half, sp.y - half, half * 2, half * 2);
             // thin corona hugging the limb
-            var cg = ctx.createRadialGradient(sp.x, sp.y, r * 0.985, sp.x, sp.y, r * 1.22);
-            var col = n.col;
-            cg.addColorStop(0, rgba(col, 0.22 * (0.6 + 0.4 * windK)));
-            cg.addColorStop(1, rgba(col, 0));
-            ctx.globalCompositeOperation = "lighter";
-            ctx.fillStyle = cg;
-            ctx.beginPath(); ctx.arc(sp.x, sp.y, r * 1.22, 0, 7); ctx.fill();
+            var col = n.col, cg;
+            if (sys.soft) {   // extended atmosphere: a wide, soft shoulder that begins inside the fading limb
+                var hc = sys.limbCol || col;
+                cg = ctx.createRadialGradient(sp.x, sp.y, r * 0.93, sp.x, sp.y, r * 1.5);
+                cg.addColorStop(0, rgba(hc, 0.0));
+                cg.addColorStop(0.1, rgba(hc, 0.17));
+                cg.addColorStop(0.35, rgba(hc, 0.06));
+                cg.addColorStop(1, rgba(hc, 0));
+                ctx.globalCompositeOperation = "lighter";
+                ctx.fillStyle = cg;
+                ctx.beginPath(); ctx.arc(sp.x, sp.y, r * 1.5, 0, 7); ctx.fill();
+            } else {
+                cg = ctx.createRadialGradient(sp.x, sp.y, r * 0.985, sp.x, sp.y, r * 1.22);
+                cg.addColorStop(0, rgba(col, 0.22 * (0.6 + 0.4 * windK)));
+                cg.addColorStop(1, rgba(col, 0));
+                ctx.globalCompositeOperation = "lighter";
+                ctx.fillStyle = cg;
+                ctx.beginPath(); ctx.arc(sp.x, sp.y, r * 1.22, 0, 7); ctx.fill();
+            }
         } else {
             var key = n.id + "|" + Math.round(n._rpx);
-            var spr = D.sprites[key] || (D.sprites[key] = discSprite(n.col, sys.u, n._rpx, D.dpr));
+            var nu = n.u !== undefined ? n.u : sys.u;
+            var spr = D.sprites[key] || (D.sprites[key] = discSprite(n.col, nu, n._rpx, D.dpr, isP && sys.soft, isP ? sys.limbCol : null));
             var hf = r * spr.half / spr.r;
             if (isP && sys.oblate) {
                 ctx.translate(sp.x, sp.y); ctx.rotate(0.35 * 0);
@@ -1397,9 +1591,16 @@
         D.done = true;
         if (D.raf) cancelAnimationFrame(D.raf);
         clearTimeout(D.timer);
-        var cb = D.onDone;
-        window.SiteTransition.commit(D.plan);
-        if (typeof cb === "function") { try { cb(D.plan); } catch (e) { } }
+        var cb = D.onDone, plan = D.plan;
+        if (D.sys.terminal) {
+            // the flood already equals the terminal background: drop the dive, then open the terminal
+            reset();
+            testHook.handoff = "terminal";
+            if (typeof cb === "function") { try { cb(plan); } catch (e) { } }
+            return;
+        }
+        window.SiteTransition.commit(plan);
+        if (typeof cb === "function") { try { cb(plan); } catch (e) { } }
     }
 
     function reset() {

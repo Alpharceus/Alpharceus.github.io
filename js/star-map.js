@@ -933,7 +933,23 @@ function keyPressed() {
 
 // ---- Star actions ----
 function handleStarClick(idx) {
-    if (idx === 0) { openTerminal(); return; }
+    if (idx === 0) {
+        // Betelgeuse: dive into the system, flood to the terminal background, then open the terminal here
+        // (reduced motion, or no dive available: open it directly)
+        if (window.StarDive) {
+            const p0 = orionStarScreenPos[0];
+            hoveredStar = null;
+            cursor(ARROW);
+            const opened = function () {
+                openTerminal();
+                hoveredStar = null;
+                if (typeof loop === "function") loop();   // the dive paused p5
+            };
+            if (StarDive.start(0, { x: p0.x, y: p0.y }, null, opened) && StarDive.isActive()) { noLoop(); return; }
+        }
+        openTerminal();
+        return;
+    }
     if (window.StarDive) {
         const p = orionStarScreenPos[idx];
         hoveredStar = null;
