@@ -43,6 +43,20 @@
     "status": "in-progress"
   },
   {
+    "id": "qd-photon-sim",
+    "title": "Quantum-Dot Single-Photon Device Simulator",
+    "short": "QD SIM",
+    "desc": "Simulator predicting single-photon purity and brightness of quantum-dot emitters versus temperature, and inverting a purity target into per-component requirements.",
+    "summary": "A simulation and inverse-design stack for electrically driven epitaxial quantum-dot single-photon devices, validated across three material systems. Every parameter carries a provenance tag (measured, derived, estimated or assumed) and every output inherits the widest tag in its input chain.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/qd-photon-sim",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
     "id": "snspd-fpga",
     "title": "SNSPD FPGA Readout Pipeline",
     "short": "FPGA READOUT",
@@ -54,6 +68,105 @@
       "poster": null
     },
     "note": "Conference paper citation forthcoming. Project code is institutional and not public.",
+    "status": "done"
+  },
+  {
+    "id": "fpga-monte-carlo",
+    "title": "FPGA Monte Carlo — Lattice Transport & Galton Board",
+    "short": "FPGA MC",
+    "desc": "Two VHDL Monte Carlo designs for the Nexys A7: a random walk on a 7×7 lattice and an LFSR-driven Galton board, each streaming a live histogram over UART.",
+    "summary": "The lattice design runs seven LFSR walkers with per-site reflection and transfer probabilities into absorbing detectors; the Galton board drops pseudo-random balls through seven stages into eight bins with an LED display. Both stream their results to a Python viewer over UART.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/tightbinding",
+      "paper": null,
+      "poster": null,
+      "code2": "https://github.com/Alpharceus/galton-board-fpga"
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
+    "id": "aurora",
+    "title": "Project Aurora — Wake-on-LAN Bridge",
+    "short": "AURORA",
+    "desc": "Wake-on-LAN bridge on a WT32-ETH01: a token-gated HTTP trigger over WiFi sends a magic packet out a point-to-point Ethernet link, OTA-updatable with no port forwarding and no PC-side software.",
+    "summary": "An ESP32 board with built-in Ethernet runs WiFi and Ethernet at once: the WiFi side serves authenticated HTTP endpoints and the Ethernet side is the only place the magic packet goes, so a sleeping NIC wakes in hardware. Arduino C++ firmware plus a printable enclosure.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/project-aurora",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
+    "id": "vga-game",
+    "title": "FPGA Lane-Crossing Game over VGA",
+    "short": "VGA GAME",
+    "desc": "FPGA lane-crossing game rendered over VGA (640×480) in VHDL, extended from a pong graphics template — a UNM digital design team project.",
+    "summary": "The player crosses a multi-lane road while managing a dynamic trust bar: reaching the far side wins, running the bar out loses. Built on the pong_graph_st VGA template with road stripes, lane geometry and win/lose regions, and it began as a C text-game prototype. Team project for a digital design course at UNM.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/VHDLgame",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
+    "id": "orion",
+    "title": "Project Orion — Local-First AI Assistant",
+    "short": "ORION",
+    "desc": "Voice-controlled offline assistant with gesture recognition, persistent memory, and smart-home delegation.",
+    "summary": "A Jarvis-style local-LLM assistant: 20/20/20 rule reminders, persistent memory, live browser queries, OpenCV gesture recognition, and planned TTS-synced animations — all running locally.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/project-orion",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "in-progress"
+  },
+  {
+    "id": "hermes",
+    "title": "Project Hermes — Point-to-Point File Transfer",
+    "short": "HERMES",
+    "desc": "Point-to-point file transfer between one person's devices, staged through a token-gated Raspberry Pi relay or sent directly over pinned mutual TLS.",
+    "summary": "Files move from exactly one device to exactly one other, with a SHA-256 receipt at the end. The staged path streams uploads to a small Raspberry Pi service over Tailscale with hash-verified acks and 72h/24h retention; when both ends are awake, a mutual-TLS direct path pinned to each peer's certificate is used, alongside a PySide6 tray app. The staging service is built and unit-tested, with Pi deployment in progress.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/project-hermes",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "in-progress"
+  },
+  {
+    "id": "gabriel",
+    "title": "Project Gabriel — Encrypted Group Chat for One",
+    "short": "GABRIEL",
+    "desc": "A group chat for one person's devices and agents, end-to-end encrypted over Firestore with FCM push.",
+    "summary": "Messages are AES-256-GCM encrypted on the sending device and decrypted on the receiving one, and Firestore stores ciphertext only. Built as a Python library and CLI, receiver daemons with SQLite mirrors and a push relay, and an installable PWA client that needs no native builds.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/Project-Gabriel",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
+    "id": "helios",
+    "title": "Project Helios — Temperature Overlay & RGB Heat Gauge",
+    "short": "HELIOS",
+    "desc": "Featherweight always-on-top CPU/GPU temperature, load and fan overlay for Windows that drives RGB as a four-level heat gauge via OpenRGB.",
+    "summary": "One C# source file, built with the compiler already inside Windows: no SDK, no runtime, about 0.1% CPU. OpenRGB is spawned only when the temperature crosses a band boundary, with hysteresis so the colour can't flap.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/project-helios",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
     "status": "done"
   },
   {
@@ -72,13 +185,55 @@
     "status": "done"
   },
   {
-    "id": "orion",
-    "title": "Project Orion — Local-First AI Assistant",
-    "short": "ORION",
-    "desc": "Voice-controlled offline assistant with gesture recognition, persistent memory, and smart-home delegation.",
-    "summary": "A Jarvis-style local-LLM assistant: 20/20/20 rule reminders, persistent memory, live browser queries, OpenCV gesture recognition, and planned TTS-synced animations — all running locally.",
+    "id": "hercules",
+    "title": "Project Hercules — Strength-Training Tracker",
+    "short": "HERCULES",
+    "desc": "Personal strength-training tracker: React Native/Expo and Firestore, an XP and rank engine in TypeScript and Python, and a Dash desktop dashboard.",
+    "summary": "Logs a set in two taps on a phone, scores consistency with an XP engine that drives a 21-tier Greek rank ladder, and lights up a muscle body map. The XP and rank engine is implemented in both TypeScript and Python against shared test vectors, and a Dash desktop dashboard charts the history.",
     "artifacts": {
-      "code": "https://github.com/Alpharceus/project-orion",
+      "code": "https://github.com/Alpharceus/project-hercules",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
+    "id": "project-umbra",
+    "title": "Project Umbra — Distributed Ambient Display",
+    "short": "UMBRA",
+    "desc": "A distributed LAN ambient-display system turning idle screens into a coordinated information surface.",
+    "summary": "Networked devices coordinate over the local network to render ambient scenes and glanceable information.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/project-umbra",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "in-progress"
+  },
+  {
+    "id": "atlas",
+    "title": "Project Atlas — Living Map Wallpapers",
+    "short": "ATLAS",
+    "desc": "Living map wallpapers across multiple monitors: true-vector OpenStreetMap posters animated in one HTML page with road traffic pulses, solar-driven palette drift and live Open-Meteo weather.",
+    "summary": "Five true-vector OpenStreetMap posters built from OpenFreeMap tiles are animated in a single HTML page: lights travel the real road geometry, the palette drifts with the sun, and live weather draws rain, snow, fog and dust. It deploys to Lively Wallpaper in span mode, crossfading between idle and active states inside the page.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/project-atlas",
+      "paper": null,
+      "poster": null
+    },
+    "note": "",
+    "status": "done"
+  },
+  {
+    "id": "star-map-site",
+    "title": "This Website — Orion Star-Map Portfolio",
+    "short": "THIS SITE",
+    "desc": "Interactive p5.js star-map homepage, terminal interface, and themed subpages — each star of Orion is one pillar of work.",
+    "summary": "Telescope-to-Orion intro animation, a working terminal (Betelgeuse), an animated microprocessor projects page, a quantum circuit simulator with Bloch sphere (Rigel), and static-HTML content underneath for machines.",
+    "artifacts": {
+      "code": "https://github.com/Alpharceus/Alpharceus.github.io",
       "paper": null,
       "poster": null
     },
@@ -100,20 +255,6 @@
     "status": "in-progress"
   },
   {
-    "id": "star-map-site",
-    "title": "This Website — Orion Star-Map Portfolio",
-    "short": "THIS SITE",
-    "desc": "Interactive p5.js star-map homepage, terminal interface, and themed subpages — each star of Orion is one pillar of work.",
-    "summary": "Telescope-to-Orion intro animation, a working terminal (Betelgeuse), an animated microprocessor projects page, a quantum circuit simulator with Bloch sphere (Rigel), and static-HTML content underneath for machines.",
-    "artifacts": {
-      "code": "https://github.com/Alpharceus/Alpharceus.github.io",
-      "paper": null,
-      "poster": null
-    },
-    "note": "",
-    "status": "in-progress"
-  },
-  {
     "id": "eons-survival",
     "title": "Chronos — Text-Based Geological Adventure",
     "short": "CHRONOS",
@@ -128,17 +269,17 @@
     "status": "done"
   },
   {
-    "id": "project-umbra",
-    "title": "Project Umbra — Distributed Ambient Display",
-    "short": "UMBRA",
-    "desc": "A distributed LAN ambient-display system turning idle screens into a coordinated information surface.",
-    "summary": "Networked devices coordinate over the local network to render ambient scenes and glanceable information.",
+    "id": "steam-agent",
+    "title": "Steam Achievement Agent",
+    "short": "STEAM AGENT",
+    "desc": "Streamlit app that pulls Steam achievements via the Web API and uses a local Llama 3 model to rank which locked achievements to chase next.",
+    "summary": "Shows achievement progress for every game, lets you assign custom priority weights, and uses a local Llama 3 model via Ollama for ranking, for privacy and speed. Wrapped in a dark, cosmic-themed Streamlit interface.",
     "artifacts": {
-      "code": "https://github.com/Alpharceus/project-umbra",
+      "code": "https://github.com/Alpharceus/steam-achievement-agent",
       "paper": null,
       "poster": null
     },
     "note": "",
-    "status": "in-progress"
+    "status": "done"
   }
 ]

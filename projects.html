@@ -144,11 +144,59 @@
   <details><summary>Show Summary</summary><div>A programmable Mach–Zehnder interferometer network forming a tunable photonic unitary, developed within the QCAP project.</div></details>
   <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/MZIMesh" data-title="Electrically Tuned MZI-Mesh Photonic Unitary">Code</a></div>
 </div>
+<div class="project" id="qd-photon-sim" data-short="QD SIM">
+  <h2>Quantum-Dot Single-Photon Device Simulator <span class="status-chip done">Done</span></h2>
+  <p>Simulator predicting single-photon purity and brightness of quantum-dot emitters versus temperature, and inverting a purity target into per-component requirements.</p>
+  <details><summary>Show Summary</summary><div>A simulation and inverse-design stack for electrically driven epitaxial quantum-dot single-photon devices, validated across three material systems. Every parameter carries a provenance tag (measured, derived, estimated or assumed) and every output inherits the widest tag in its input chain.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/qd-photon-sim" data-title="Quantum-Dot Single-Photon Device Simulator">Code</a></div>
+</div>
 <div class="project" id="snspd-fpga" data-short="FPGA READOUT">
   <h2>SNSPD FPGA Readout Pipeline <span class="status-chip done">Done</span></h2>
   <p>FPGA readout for superconducting nanowire single-photon detectors (SNSPDs).</p>
   <details><summary>Show Summary</summary><div>FPGA readout, developed from senior design into research work at UNM.</div></details>
   <p class="project-note">Conference paper citation forthcoming. Project code is institutional and not public.</p>
+</div>
+<div class="project" id="fpga-monte-carlo" data-short="FPGA MC">
+  <h2>FPGA Monte Carlo — Lattice Transport &amp; Galton Board <span class="status-chip done">Done</span></h2>
+  <p>Two VHDL Monte Carlo designs for the Nexys A7: a random walk on a 7×7 lattice and an LFSR-driven Galton board, each streaming a live histogram over UART.</p>
+  <details><summary>Show Summary</summary><div>The lattice design runs seven LFSR walkers with per-site reflection and transfer probabilities into absorbing detectors; the Galton board drops pseudo-random balls through seven stages into eight bins with an LED display. Both stream their results to a Python viewer over UART.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/tightbinding" data-title="FPGA Monte Carlo — Lattice Transport &amp; Galton Board">Code: Lattice</a><a class="artifact-badge" href="https://github.com/Alpharceus/galton-board-fpga" data-title="FPGA Monte Carlo — Lattice Transport &amp; Galton Board">Code: Galton</a></div>
+</div>
+<div class="project" id="aurora" data-short="AURORA">
+  <h2>Project Aurora — Wake-on-LAN Bridge <span class="status-chip done">Done</span></h2>
+  <p>Wake-on-LAN bridge on a WT32-ETH01: a token-gated HTTP trigger over WiFi sends a magic packet out a point-to-point Ethernet link, OTA-updatable with no port forwarding and no PC-side software.</p>
+  <details><summary>Show Summary</summary><div>An ESP32 board with built-in Ethernet runs WiFi and Ethernet at once: the WiFi side serves authenticated HTTP endpoints and the Ethernet side is the only place the magic packet goes, so a sleeping NIC wakes in hardware. Arduino C++ firmware plus a printable enclosure.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-aurora" data-title="Project Aurora — Wake-on-LAN Bridge">Code</a></div>
+</div>
+<div class="project" id="vga-game" data-short="VGA GAME">
+  <h2>FPGA Lane-Crossing Game over VGA <span class="status-chip done">Done</span></h2>
+  <p>FPGA lane-crossing game rendered over VGA (640×480) in VHDL, extended from a pong graphics template — a UNM digital design team project.</p>
+  <details><summary>Show Summary</summary><div>The player crosses a multi-lane road while managing a dynamic trust bar: reaching the far side wins, running the bar out loses. Built on the pong_graph_st VGA template with road stripes, lane geometry and win/lose regions, and it began as a C text-game prototype. Team project for a digital design course at UNM.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/VHDLgame" data-title="FPGA Lane-Crossing Game over VGA">Code</a></div>
+</div>
+<div class="project" id="orion" data-short="ORION">
+  <h2>Project Orion — Local-First AI Assistant <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Voice-controlled offline assistant with gesture recognition, persistent memory, and smart-home delegation.</p>
+  <details><summary>Show Summary</summary><div>A Jarvis-style local-LLM assistant: 20/20/20 rule reminders, persistent memory, live browser queries, OpenCV gesture recognition, and planned TTS-synced animations — all running locally.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-orion" data-title="Project Orion — Local-First AI Assistant">Code</a></div>
+</div>
+<div class="project" id="hermes" data-short="HERMES">
+  <h2>Project Hermes — Point-to-Point File Transfer <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Point-to-point file transfer between one person's devices, staged through a token-gated Raspberry Pi relay or sent directly over pinned mutual TLS.</p>
+  <details><summary>Show Summary</summary><div>Files move from exactly one device to exactly one other, with a SHA-256 receipt at the end. The staged path streams uploads to a small Raspberry Pi service over Tailscale with hash-verified acks and 72h/24h retention; when both ends are awake, a mutual-TLS direct path pinned to each peer's certificate is used, alongside a PySide6 tray app. The staging service is built and unit-tested, with Pi deployment in progress.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-hermes" data-title="Project Hermes — Point-to-Point File Transfer">Code</a></div>
+</div>
+<div class="project" id="gabriel" data-short="GABRIEL">
+  <h2>Project Gabriel — Encrypted Group Chat for One <span class="status-chip done">Done</span></h2>
+  <p>A group chat for one person's devices and agents, end-to-end encrypted over Firestore with FCM push.</p>
+  <details><summary>Show Summary</summary><div>Messages are AES-256-GCM encrypted on the sending device and decrypted on the receiving one, and Firestore stores ciphertext only. Built as a Python library and CLI, receiver daemons with SQLite mirrors and a push relay, and an installable PWA client that needs no native builds.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/Project-Gabriel" data-title="Project Gabriel — Encrypted Group Chat for One">Code</a></div>
+</div>
+<div class="project" id="helios" data-short="HELIOS">
+  <h2>Project Helios — Temperature Overlay &amp; RGB Heat Gauge <span class="status-chip done">Done</span></h2>
+  <p>Featherweight always-on-top CPU/GPU temperature, load and fan overlay for Windows that drives RGB as a four-level heat gauge via OpenRGB.</p>
+  <details><summary>Show Summary</summary><div>One C# source file, built with the compiler already inside Windows: no SDK, no runtime, about 0.1% CPU. OpenRGB is spawned only when the temperature crosses a band boundary, with hysteresis so the colour can't flap.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-helios" data-title="Project Helios — Temperature Overlay &amp; RGB Heat Gauge">Code</a></div>
 </div>
 <div class="project" id="unm-scheduler" data-short="SCHEDULER">
   <h2>UNM IT Scheduling Platform <span class="status-chip done">Done</span></h2>
@@ -157,17 +205,23 @@
   <p class="project-note">Code is institutional (UNM IT).</p>
   <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Scheduler-UNM" data-title="UNM IT Scheduling Platform">GitHub Org</a></div>
 </div>
-<div class="project" id="orion" data-short="ORION">
-  <h2>Project Orion — Local-First AI Assistant <span class="status-chip in-progress">In&nbsp;progress</span></h2>
-  <p>Voice-controlled offline assistant with gesture recognition, persistent memory, and smart-home delegation.</p>
-  <details><summary>Show Summary</summary><div>A Jarvis-style local-LLM assistant: 20/20/20 rule reminders, persistent memory, live browser queries, OpenCV gesture recognition, and planned TTS-synced animations — all running locally.</div></details>
-  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-orion" data-title="Project Orion — Local-First AI Assistant">Code</a></div>
+<div class="project" id="hercules" data-short="HERCULES">
+  <h2>Project Hercules — Strength-Training Tracker <span class="status-chip done">Done</span></h2>
+  <p>Personal strength-training tracker: React Native/Expo and Firestore, an XP and rank engine in TypeScript and Python, and a Dash desktop dashboard.</p>
+  <details><summary>Show Summary</summary><div>Logs a set in two taps on a phone, scores consistency with an XP engine that drives a 21-tier Greek rank ladder, and lights up a muscle body map. The XP and rank engine is implemented in both TypeScript and Python against shared test vectors, and a Dash desktop dashboard charts the history.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-hercules" data-title="Project Hercules — Strength-Training Tracker">Code</a></div>
 </div>
-<div class="project" id="agent-sim" data-short="TYPHON">
-  <h2>Project Typhon — 2D Evolution Simulator <span class="status-chip in-progress">In&nbsp;progress</span></h2>
-  <p>Agents evolve survival strategies against harsh climates, environments, and each other.</p>
-  <details><summary>Show Summary</summary><div>An emergent-systems sandbox: populations of agents adapt to shifting climates and competition, exploring evolution and survival dynamics.</div></details>
-  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-typhon" data-title="Project Typhon — 2D Evolution Simulator">Code</a></div>
+<div class="project" id="project-umbra" data-short="UMBRA">
+  <h2>Project Umbra — Distributed Ambient Display <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>A distributed LAN ambient-display system turning idle screens into a coordinated information surface.</p>
+  <details><summary>Show Summary</summary><div>Networked devices coordinate over the local network to render ambient scenes and glanceable information.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-umbra" data-title="Project Umbra — Distributed Ambient Display">Code</a></div>
+</div>
+<div class="project" id="atlas" data-short="ATLAS">
+  <h2>Project Atlas — Living Map Wallpapers <span class="status-chip done">Done</span></h2>
+  <p>Living map wallpapers across multiple monitors: true-vector OpenStreetMap posters animated in one HTML page with road traffic pulses, solar-driven palette drift and live Open-Meteo weather.</p>
+  <details><summary>Show Summary</summary><div>Five true-vector OpenStreetMap posters built from OpenFreeMap tiles are animated in a single HTML page: lights travel the real road geometry, the palette drifts with the sun, and live weather draws rain, snow, fog and dust. It deploys to Lively Wallpaper in span mode, crossfading between idle and active states inside the page.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-atlas" data-title="Project Atlas — Living Map Wallpapers">Code</a></div>
 </div>
 <div class="project" id="star-map-site" data-short="THIS SITE">
   <h2>This Website — Orion Star-Map Portfolio <span class="status-chip in-progress">In&nbsp;progress</span></h2>
@@ -175,17 +229,23 @@
   <details><summary>Show Summary</summary><div>Telescope-to-Orion intro animation, a working terminal (Betelgeuse), an animated microprocessor projects page, a quantum circuit simulator with Bloch sphere (Rigel), and static-HTML content underneath for machines.</div></details>
   <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/Alpharceus.github.io" data-title="This Website — Orion Star-Map Portfolio">Code</a></div>
 </div>
+<div class="project" id="agent-sim" data-short="TYPHON">
+  <h2>Project Typhon — 2D Evolution Simulator <span class="status-chip in-progress">In&nbsp;progress</span></h2>
+  <p>Agents evolve survival strategies against harsh climates, environments, and each other.</p>
+  <details><summary>Show Summary</summary><div>An emergent-systems sandbox: populations of agents adapt to shifting climates and competition, exploring evolution and survival dynamics.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-typhon" data-title="Project Typhon — 2D Evolution Simulator">Code</a></div>
+</div>
 <div class="project" id="eons-survival" data-short="CHRONOS">
   <h2>Chronos — Text-Based Geological Adventure <span class="status-chip done">Done</span></h2>
   <p>Procedural text adventure set across geological eras, inspired by PBS Eons.</p>
   <details><summary>Show Summary</summary><div>A dynamic narrative engine generating survival encounters with time-period-accurate biology and evolving environments.</div></details>
   <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/eons-survival" data-title="Chronos — Text-Based Geological Adventure">Code</a></div>
 </div>
-<div class="project" id="project-umbra" data-short="UMBRA">
-  <h2>Project Umbra — Distributed Ambient Display <span class="status-chip in-progress">In&nbsp;progress</span></h2>
-  <p>A distributed LAN ambient-display system turning idle screens into a coordinated information surface.</p>
-  <details><summary>Show Summary</summary><div>Networked devices coordinate over the local network to render ambient scenes and glanceable information.</div></details>
-  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/project-umbra" data-title="Project Umbra — Distributed Ambient Display">Code</a></div>
+<div class="project" id="steam-agent" data-short="STEAM AGENT">
+  <h2>Steam Achievement Agent <span class="status-chip done">Done</span></h2>
+  <p>Streamlit app that pulls Steam achievements via the Web API and uses a local Llama 3 model to rank which locked achievements to chase next.</p>
+  <details><summary>Show Summary</summary><div>Shows achievement progress for every game, lets you assign custom priority weights, and uses a local Llama 3 model via Ollama for ranking, for privacy and speed. Wrapped in a dark, cosmic-themed Streamlit interface.</div></details>
+  <div class="artifact-row"><a class="artifact-badge" href="https://github.com/Alpharceus/steam-achievement-agent" data-title="Steam Achievement Agent">Code</a></div>
 </div>
         <!-- projects:end -->
         </div>

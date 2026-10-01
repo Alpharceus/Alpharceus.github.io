@@ -720,12 +720,17 @@ function sitemapTemplate(posts) {
 
 // ---------- projects page cards ----------
 // Cards are static HTML (crawlers/LLMs don't run JS); js/projects.js only enhances them.
-const ARTIFACT_LABELS = { code: 'Code', paper: 'Paper', poster: 'Poster', nsf: 'NSF Award', org: 'GitHub Org' };
+const ARTIFACT_LABELS = { code: 'Code', code2: 'Code', paper: 'Paper', poster: 'Poster', nsf: 'NSF Award', org: 'GitHub Org' };
+// a card with two repos (artifacts.code + artifacts.code2) labels them individually
+const ARTIFACT_LABELS_TWO_CODE = { code: 'Code: Lattice', code2: 'Code: Galton' };
 
 function projectCardHtml(proj) {
   const badges = Object.entries(proj.artifacts || {})
     .filter(([, url]) => url)
-    .map(([key, url]) => `<a class="artifact-badge" href="${esc(url)}" data-title="${esc(proj.title)}">${ARTIFACT_LABELS[key] || esc(key)}</a>`)
+    .map(([key, url]) => {
+      const label = (proj.artifacts.code2 && ARTIFACT_LABELS_TWO_CODE[key]) || ARTIFACT_LABELS[key] || esc(key);
+      return `<a class="artifact-badge" href="${esc(url)}" data-title="${esc(proj.title)}">${label}</a>`;
+    })
     .join('');
   const status = proj.status === 'in-progress'
     ? '<span class="status-chip in-progress">In&nbsp;progress</span>'

@@ -10,8 +10,12 @@
 //   Layers: mask, traces, pads, silkscreen and package are drawn once per
 //           resize into an offscreen canvas. Only packets, glow and the core
 //           pulse are redrawn per frame (idle: <= IDLE_FPS, paused when hidden).
-//   Intro:  window.playIntro(mode, arrival), mode = 'arrival' | 'first' | 'skip'
-//           (see portfolio-motion-brief.md, "Projects (Bellatrix)").
+//   Intro:  window.playIntro(mode, arrival), mode = 'arrival' | 'first' | 'skip'.
+//           A camera starts zoomed in on the die (dark, then the core powers on),
+//           the traces draw outward along their routed paths bus by bus, the camera
+//           pulls back to the whole board, then idle takes over. The intro redraws the
+//           board from geometry every frame (vector, so the zoom stays crisp); idle
+//           blits the offscreen layer.
 //   QA:     window.__board exposes the computed geometry; window.__QA.static
 //           freezes ambient animation so screenshots are deterministic.
 // ========================================================
@@ -19,18 +23,23 @@
   "use strict";
 
   // ---- Intro timing (ms) — tune here ----
-  // core: [start, end] of the core power-on; cells: [first, last] die cell lit;
-  // launch: first module's packets leave; stagger: gap per module in distance order;
-  // travel: time the longest trace takes (fixes the packet speed for the intro).
-  const INTRO_ARRIVAL = { total: 2450, collapse: 560, core: [300, 700], cells: [420, 1200], launch: 700, stagger: 50, travel: 650 };
-  const INTRO_FIRST = { total: 3800, sweep: 1100, core: [1100, 1550], cells: [1350, 2150], launch: 1700, stagger: 75, travel: 800 };
+  // The owner asked for the cinematic version back, so first <= 5.0 s, arrival <= 3.0 s.
+  // collapse: arrival colour shrinks to the core; core: [start, end] of the core power-on;
+  // cells: [first, last] die cell lit; draw: traces start leaving at draw.start, one module
+  // every draw.stagger (nearest first), the longest trace takes draw.travel;
+  // zoom: [start, end] of the pull-back from INTRO_ZOOM to 1.
+  const INTRO_ZOOM = 2.8;
+  const INTRO_EDGE_FADE_PX = 120;  // zoomed scene fades out over this width at the board's right edge
+  const INTRO_FIRST = { total: 4600, core: [450, 1250], cells: [600, 1500], draw: { start: 1200, stagger: 90, travel: 900 }, zoom: [1100, 3900] };
+  const INTRO_ARRIVAL = { total: 2800, collapse: 420, core: [250, 650], cells: [350, 900], draw: { start: 650, stagger: 45, travel: 650 }, zoom: [450, 2300] };
   const TRACE_STAGGER_MS = 12;    // per trace inside one bus
   const CELL_RISE_MS = 80;
   const CELL_DECAY_MS = 500;      // lit die cell settles to its idle glow
   const MODULE_RISE_MS = 60;
   const MODULE_DECAY_MS = 500;    // module flash after a packet lands
   const CARD_FADE_MS = 300;       // card fades up as its module lights
-  const CARD_LEAD_MS = 80;
+  const CARD_LEAD_MS = 0;         // a card never shows before its module lights
+  const VIA_POP_MS = 140;         // via grows in once the trace reaches it
   const REDUCED_FADE_MS = 150;    // reduced motion: arrival colour fades, nothing else moves
   const CORE_BUMP_MS = 420;
 
@@ -48,17 +57,20 @@
 
   // ---- Layout ----
   const MOBILE_MAX_W = 900;       // below this the board is a backdrop behind one card column
+  const LABEL_MIN_PX = 9;         // desktop silkscreen label floor (the label font never scales below this)
+  const PKG_MARGIN_PINS = 12;     // package edge = (pins on the busiest side + this) * pitch
+  const CHIP_KEEPOUT = { x: 16, w: 244, h: 60, bottom: 18 };   // desktop: the pinned ENG MODE chip's corner, kept free of modules
   const EDGE_PX = 18;             // min gap between a module and the board edge
   const BUS_PITCH_MIN = 4.4, BUS_PITCH_MAX = 12;
   // module i -> side of the package, walking clockwise from the top-left
   const SIDE_PATTERN = {
-    desktop: ["T", "T", "T", "R", "R", "B", "B", "B", "L", "L"],
-    mobile: ["T", "T", "R", "R", "R", "B", "B", "L", "L", "L"]
+    desktop: ["T", "T", "T", "T", "T", "R", "R", "R", "R", "R", "B", "B", "B", "B", "B", "L", "L", "L", "L", "L"],
+    mobile: ["T", "T", "T", "T", "T", "R", "R", "R", "R", "R", "B", "B", "B", "B", "B", "L", "L", "L", "L", "L"]
   };
   // traces per bus (4-8) for module i
   const BUS_SIZES = {
-    desktop: [6, 5, 5, 8, 8, 5, 6, 5, 8, 8],
-    mobile: [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+    desktop: [6, 4, 5, 4, 6, 5, 4, 6, 4, 5, 6, 4, 5, 4, 6, 5, 4, 6, 4, 5],
+    mobile: [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
   };
   const SIDES = ["T", "R", "B", "L"];
 
@@ -278,8 +290,9 @@
   `;
   document.head.appendChild(styleTag);
   document.body.appendChild(engChipBtn);
-  // >= 900px: pinned over the board (lower left). Narrower: a static row under the
-  // "My Projects" heading so it never covers a card. Placement only; behaviour is unchanged.
+  // >= 900px: pinned over the board (lower left; the layout keeps a module out of that corner,
+  // see CHIP_KEEPOUT). Narrower: a static row under the "My Projects" heading so it never
+  // covers a card. Placement only; behaviour is unchanged.
   const engChipMq = window.matchMedia("(min-width: 900px)");
   function placeEngChip() {
     const h1 = document.querySelector("main h1");
@@ -455,9 +468,13 @@
   const QA = window.__QA || {};
   const reducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const canvas = document.getElementById("circuit-canvas");
-  const ctx = canvas.getContext("2d");
+  const mainCtx = canvas.getContext("2d");
+  let ctx = mainCtx;   // the dynamic layer draws through ctx; the intro points it at sceneCtx for a frame
   const staticCv = document.createElement("canvas");
   const sctx = staticCv.getContext("2d");
+  // intro only: the zoomed scene is drawn here, faded at the board's right edge, then composited
+  const sceneCv = document.createElement("canvas");
+  const sceneCtx = sceneCv.getContext("2d");
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
@@ -486,8 +503,9 @@
   // One attempt at a pitch. Returns { ok, board }.
   function tryLayout(o) {
     const { W, H, x0, x1, y0, y1, p, mobile } = o;
+    const keep = mobile ? null : { x: CHIP_KEEPOUT.x, y: H - CHIP_KEEPOUT.bottom - CHIP_KEEPOUT.h, w: CHIP_KEEPOUT.w, h: CHIP_KEEPOUT.h };
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    const font = clamp(p * 1.05, 7, 11);
+    const font = clamp(p * 1.05, mobile ? 7 : LABEL_MIN_PX, 11);
     const charW = font * 0.62;
     const pinLen = Math.max(6, p * 0.9), pinW = p * 0.5;
     const padLen = Math.max(5, p * 0.7), padW = p * 0.5;
@@ -507,7 +525,7 @@
       pinsPer[s] = bySide[s].reduce((a, m) => a + m.size, 0);
       maxPins = Math.max(maxPins, pinsPer[s]);
     });
-    const S = maxPins * p + 8 * p;
+    const S = maxPins * p + PKG_MARGIN_PINS * p;
     const frame = makeFrames(cx, cy, S);
     const board = {
       W, H, x0, x1, y0, y1, cx, cy, S, p, font, tw, viaR, mobile,
@@ -545,12 +563,21 @@
 
       const half = (k - 1) / 2;
       let D = Dmin;
-      if (horiz && k >= 2) {
+      if (horiz && k >= 2 && !(keep && side === "B")) {
         const hs = Math.min(cx - x0, x1 - cx) - EDGE_PX - maxTS / 2;
         D = Math.max(Dmin, (0.8 * hs - list[k - 1].pvc) / half);
       }
       // ranks: buses turning the same way fan out from the outside in
-      const dvOf = (j, d) => (k === 1 ? 0 : (j - half) * d);
+      // bottom row on desktop: slide it right until its leftmost module clears the chip keep-out
+      const keepR = keep && side === "B" ? keep.x + keep.w + 10 : null;
+      const symDv = (j, d) => (k === 1 ? 0 : (j - half) * d);
+      const shiftOf = (d) => {
+        if (keepR == null) return 0;
+        let left = Infinity;
+        list.forEach((m, j) => { left = Math.min(left, cx - (m.pvc + symDv(j, d)) - m.ts / 2); });
+        return Math.max(0, keepR - left);
+      };
+      const dvOf = (j, d) => symDv(j, d) - shiftOf(d);
       const stubs = (d) => list.map((m, j) => {
         const dv = dvOf(j, d);
         let rank = 0;
@@ -597,7 +624,8 @@
           const pinIdx = board.pins.push(Object.assign({ side, q }, pinRect)) - 1;
           const padIdx = board.pads.push(Object.assign({ module: m.id }, padRect)) - 1;
           const tr = { module: m.id, mod: m.i, pin: pinIdx, pad: padIdx, pts, layers, len, total: len[len.length - 1] };
-          for (let z = 1; z < layers.length; z++) if (layers[z] !== layers[z - 1]) board.vias.push({ x: pts[z].x, y: pts[z].y, r: viaR });
+          tr.vz = [];
+          for (let z = 1; z < layers.length; z++) if (layers[z] !== layers[z - 1]) { board.vias.push({ x: pts[z].x, y: pts[z].y, r: viaR }); tr.vz.push(z); }
           mod.bus.push(board.traces.push(tr) - 1);
         }
         board.modules[m.i] = mod;
@@ -606,6 +634,7 @@
     if (board.bad) return { ok: false };
     const mods = board.modules.filter(Boolean);
     for (let a = 0; a < mods.length; a++) for (let b = a + 1; b < mods.length; b++) if (rectsOverlap(mods[a], mods[b], 4)) return { ok: false };
+    if (keep && mods.some((m) => rectsOverlap(m, keep, 6))) return { ok: false };
     board.modules = mods;
     return { ok: true, board };
   }
@@ -667,10 +696,7 @@
     dieRect = { win, die, ax, ay, area, cell };
   }
 
-  function drawStatic(c, B) {
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.clearRect(0, 0, cssW, cssH);
-    // solder mask
+  function drawMask(c, B) {
     const g = c.createRadialGradient(B.cx, B.cy, 0, B.cx, B.cy, Math.max(cssW, cssH) * 0.75);
     g.addColorStop(0, "#0a1614");
     g.addColorStop(1, MASK_EDGE);
@@ -678,9 +704,10 @@
     c.fillRect(0, 0, cssW, cssH);
     c.fillStyle = g;
     c.fillRect(0, 0, cssW, cssH);
-    if (!B.S) return;
+  }
 
-    // board outline + mounting holes (silkscreen)
+  // board outline + mounting holes (silkscreen)
+  function drawBoardMarks(c, B) {
     const bo = 8;
     c.strokeStyle = SILK; c.lineWidth = 1; c.setLineDash([6, 4]);
     c.strokeRect(B.x0 + bo, B.y0 + bo, B.x1 - B.x0 - 2 * bo, B.y1 - B.y0 - 2 * bo);
@@ -689,54 +716,62 @@
       c.beginPath(); c.arc(h[0], h[1], 4, 0, Math.PI * 2); c.fillStyle = "#03070a"; c.fill();
       c.beginPath(); c.arc(h[0], h[1], 7, 0, Math.PI * 2); c.strokeStyle = SILK; c.stroke();
     });
+  }
 
-    // traces: top layer bright copper, inner layer muted
+  // copper of one trace from its pin up to upto px along it (top layer bright, inner layer muted)
+  function strokeCopper(c, B, tr, upto) {
     c.lineJoin = "miter"; c.miterLimit = 4; c.lineCap = "butt";
     c.lineWidth = B.tw;
-    for (const tr of B.traces) {
-      let z = 0;
-      while (z < tr.layers.length) {
-        let e = z;
-        while (e + 1 < tr.layers.length && tr.layers[e + 1] === tr.layers[z]) e++;
-        c.strokeStyle = tr.layers[z] === "t" ? COPPER_TOP : COPPER_INNER;
-        c.beginPath();
-        c.moveTo(tr.pts[z].x, tr.pts[z].y);
-        for (let q = z + 1; q <= e + 1; q++) c.lineTo(tr.pts[q].x, tr.pts[q].y);
-        c.stroke();
-        z = e + 1;
+    let z = 0;
+    while (z < tr.layers.length) {
+      let e = z;
+      while (e + 1 < tr.layers.length && tr.layers[e + 1] === tr.layers[z]) e++;
+      if (upto <= tr.len[z]) break;
+      c.strokeStyle = tr.layers[z] === "t" ? COPPER_TOP : COPPER_INNER;
+      c.beginPath();
+      c.moveTo(tr.pts[z].x, tr.pts[z].y);
+      for (let q = z + 1; q <= e + 1; q++) {
+        if (tr.len[q] <= upto) c.lineTo(tr.pts[q].x, tr.pts[q].y);
+        else {
+          const f = (upto - tr.len[q - 1]) / (tr.len[q] - tr.len[q - 1]);
+          c.lineTo(tr.pts[q - 1].x + (tr.pts[q].x - tr.pts[q - 1].x) * f, tr.pts[q - 1].y + (tr.pts[q].y - tr.pts[q - 1].y) * f);
+          break;
+        }
       }
+      c.stroke();
+      z = e + 1;
     }
-    // vias
-    for (const v of B.vias) {
-      c.beginPath(); c.arc(v.x, v.y, v.r, 0, Math.PI * 2); c.fillStyle = "rgba(214, 156, 96, 0.95)"; c.fill();
-      c.beginPath(); c.arc(v.x, v.y, v.r * 0.45, 0, Math.PI * 2); c.fillStyle = "#040908"; c.fill();
-    }
-    // pads + pins
-    c.fillStyle = PAD_FILL;
-    for (const d of B.pads) c.fillRect(d.x, d.y, d.w, d.h);
-    c.fillStyle = PIN_FILL;
-    for (const d of B.pins) c.fillRect(d.x, d.y, d.w, d.h);
+  }
 
-    // modules
+  function drawVia(c, v, k) {
+    const r = v.r * k;
+    c.beginPath(); c.arc(v.x, v.y, r, 0, Math.PI * 2); c.fillStyle = "rgba(214, 156, 96, 0.95)"; c.fill();
+    c.beginPath(); c.arc(v.x, v.y, r * 0.45, 0, Math.PI * 2); c.fillStyle = "#040908"; c.fill();
+  }
+
+  function drawModuleBody(c, B, m) {
+    chamfer(c, m.x, m.y, m.w, m.h, Math.min(6, m.h * 0.2));
+    c.fillStyle = "#0c1412"; c.fill();
+    c.strokeStyle = "rgba(120, 146, 154, 0.38)"; c.lineWidth = 1; c.stroke();
     c.font = "600 " + B.font + "px 'IBM Plex Mono', Consolas, monospace";
     c.textAlign = "center"; c.textBaseline = "middle";
-    for (const m of B.modules) {
-      chamfer(c, m.x, m.y, m.w, m.h, Math.min(6, m.h * 0.2));
-      c.fillStyle = "#0c1412"; c.fill();
-      c.strokeStyle = "rgba(120, 146, 154, 0.38)"; c.lineWidth = 1; c.stroke();
-      c.fillStyle = "rgba(186, 204, 212, 0.46)";
-      c.fillText(m.label, m.x + m.w / 2, m.y + m.h / 2);
-      if (B.p >= 8) {
-        c.font = "500 7px 'IBM Plex Mono', Consolas, monospace";
-        c.textAlign = "left"; c.textBaseline = "top";
-        c.fillStyle = SILK_TEXT;
-        c.fillText(m.ref, m.x + 4, m.y + 3);
-        c.font = "600 " + B.font + "px 'IBM Plex Mono', Consolas, monospace";
-        c.textAlign = "center"; c.textBaseline = "middle";
-      }
+    c.fillStyle = "rgba(186, 204, 212, 0.46)";
+    c.fillText(m.label, m.x + m.w / 2, m.y + m.h / 2);
+    if (B.p >= 8) {
+      c.font = "500 7px 'IBM Plex Mono', Consolas, monospace";
+      c.textAlign = "left"; c.textBaseline = "top";
+      c.fillStyle = SILK_TEXT;
+      c.fillText(m.ref, m.x + 4, m.y + 3);
     }
+  }
 
-    // package body, lid window, die
+  function drawPins(c, B) {
+    c.fillStyle = PIN_FILL;
+    for (const d of B.pins) c.fillRect(d.x, d.y, d.w, d.h);
+  }
+
+  // package body, lid window, die, die cells, marking
+  function drawPackage(c, B) {
     const P = B.pkg;
     c.beginPath(); c.roundRect(P.x, P.y, P.s, P.s, P.s * 0.04);
     c.fillStyle = PKG_BODY; c.fill(); c.strokeStyle = PKG_EDGE; c.lineWidth = 1.2; c.stroke();
@@ -761,6 +796,7 @@
     }
     // cores + cache banks
     c.strokeStyle = DIE_LINE; c.lineWidth = 0.6;
+    const ga = c.globalAlpha;
     for (const k of dieCells) {
       const gap = 0.9;
       if (k.core) c.strokeRect(k.x + gap, k.y + gap, k.w - 2 * gap, k.h - 2 * gap);
@@ -768,7 +804,7 @@
         c.strokeRect(k.x + gap, k.y + gap, k.w - 2 * gap, k.h - 2 * gap);
         c.beginPath();
         for (let ly = k.y + k.h / 4; ly < k.y + k.h - 1; ly += k.h / 4) { c.moveTo(k.x + gap, ly); c.lineTo(k.x + k.w - gap, ly); }
-        c.globalAlpha = 0.5; c.stroke(); c.globalAlpha = 1;
+        c.globalAlpha = ga * 0.5; c.stroke(); c.globalAlpha = ga;
       }
     }
     // marking
@@ -778,6 +814,21 @@
       c.fillStyle = SILK_TEXT;
       c.fillText("BELLATRIX  U1", P.x + P.s / 2, P.y + P.s - P.s * 0.065);
     }
+  }
+
+  function drawStatic(c, B) {
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    drawMask(c, B);
+    if (!B.S) return;
+    drawBoardMarks(c, B);
+    for (const tr of B.traces) strokeCopper(c, B, tr, Infinity);
+    for (const v of B.vias) drawVia(c, v, 1);
+    c.fillStyle = PAD_FILL;
+    for (const d of B.pads) c.fillRect(d.x, d.y, d.w, d.h);
+    drawPins(c, B);
+    for (const m of B.modules) drawModuleBody(c, B, m);
+    drawPackage(c, B);
   }
 
   // ============================================================
@@ -810,7 +861,7 @@
     board.mode = prev ? prev.mode : null;
     dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
     cssW = window.innerWidth; cssH = window.innerHeight;
-    for (const cv of [canvas, staticCv]) { cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr); }
+    for (const cv of [canvas, staticCv, sceneCv]) { cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr); }
     canvas.style.width = cssW + "px"; canvas.style.height = cssH + "px";
     buildDie(board);
     drawStatic(sctx, board);
@@ -911,14 +962,19 @@
     return Math.max(introG || 0, m.hoverG * 0.95, m.flash);
   }
 
-  function drawModuleGlow(m, g) {
+  // drawn(kk) -> px of trace kk that exist so far (intro); omitted = whole bus
+  function drawModuleGlow(m, g, drawn) {
     if (g < 0.01) return;
     // bus: copper lit up
     ctx.globalCompositeOperation = "lighter";
     ctx.lineJoin = "miter"; ctx.miterLimit = 4;
     ctx.lineWidth = board.tw * 1.5;
     ctx.strokeStyle = "rgba(255, 176, 96, " + (0.42 * g).toFixed(3) + ")";
-    for (const ti of m.bus) strokeTraceRange(board.traces[ti], 0, board.traces[ti].total);
+    m.bus.forEach((ti, kk) => {
+      const tr = board.traces[ti];
+      const upto = drawn ? Math.min(tr.total, drawn(kk)) : tr.total;
+      if (upto > 0) strokeTraceRange(tr, 0, upto);
+    });
     ctx.globalCompositeOperation = "source-over";
     // module body
     chamfer(ctx, m.x, m.y, m.w, m.h, Math.min(6, m.h * 0.2));
@@ -969,23 +1025,103 @@
     }
   }
 
-  function baseLayer(sweepY) {
-    if (sweepY == null) { ctx.drawImage(staticCv, 0, 0, cssW, cssH); return; }
-    ctx.fillStyle = MASK; ctx.fillRect(0, 0, cssW, cssH);
-    if (sweepY > 0) {
-      ctx.save();
-      ctx.beginPath(); ctx.rect(0, 0, cssW, sweepY); ctx.clip();
-      ctx.drawImage(staticCv, 0, 0, cssW, cssH);
-      ctx.restore();
-      if (sweepY < cssH) {
-        const g = ctx.createLinearGradient(0, sweepY - 70, 0, sweepY + 2);
-        g.addColorStop(0, "rgba(110, 225, 255, 0)");
-        g.addColorStop(1, "rgba(140, 235, 255, 0.28)");
-        ctx.fillStyle = g; ctx.fillRect(0, sweepY - 70, cssW, 72);
-        ctx.fillStyle = "rgba(200, 248, 255, 0.55)"; ctx.fillRect(0, sweepY, cssW, 1.5);
-      }
-    }
+  // ---- intro frame: redrawn from geometry under the camera ----
+  const easeOutBack = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+
+  function camScale(t, cfg) {
+    const k = easeInOut(clamp((t - cfg.zoom[0]) / (cfg.zoom[1] - cfg.zoom[0]), 0, 1));
+    return INTRO_ZOOM + (1 - INTRO_ZOOM) * k;
   }
+
+  // px of trace kk of module m drawn at time t
+  function drawnPx(m, kk, t) {
+    const meta = introMeta[m.i];
+    return clamp((t - meta.start - kk * TRACE_STAGGER_MS) * meta.speed / 1000, 0, board.traces[m.bus[kk]].total);
+  }
+
+  function renderIntro(t, cfg) {
+    const B = board, s = camScale(t, cfg), mods = B.modules;
+    mainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawMask(mainCtx, B);
+    ctx = sceneCtx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * B.cx * (1 - s), dpr * B.cy * (1 - s));
+    drawBoardMarks(ctx, B);
+    // 1. copper laying down, bus by bus
+    let drawnSum = 0, totalSum = 0;
+    for (const m of mods) {
+      m.bus.forEach((ti, kk) => {
+        const tr = B.traces[ti], d = drawnPx(m, kk, t);
+        drawnSum += d; totalSum += tr.total;
+        if (d > 0) strokeCopper(ctx, B, tr, d);
+      });
+    }
+    // 2. vias pop in as the copper reaches them; pads once their trace has landed
+    for (const m of mods) {
+      const meta = introMeta[m.i];
+      m.bus.forEach((ti, kk) => {
+        const tr = B.traces[ti], d = drawnPx(m, kk, t);
+        for (const z of tr.vz) {
+          if (d < tr.len[z]) continue;
+          const reach = meta.start + kk * TRACE_STAGGER_MS + tr.len[z] / meta.speed * 1000;
+          const via = B.vias.find((v) => Math.abs(v.x - tr.pts[z].x) < 1e-3 && Math.abs(v.y - tr.pts[z].y) < 1e-3);
+          if (via) drawVia(ctx, via, clamp(easeOutBack(clamp((t - reach) / VIA_POP_MS, 0, 1)), 0, 1.25));
+        }
+        if (d >= tr.total) { ctx.fillStyle = PAD_FILL; const pd = B.pads[tr.pad]; ctx.fillRect(pd.x, pd.y, pd.w, pd.h); }
+      });
+    }
+    // 3. modules light as their bus arrives (body + silkscreen label), the package fades up from the dark
+    for (const m of mods) {
+      const a = clamp((t - introMeta[m.i].arrive) / MODULE_RISE_MS, 0, 1);
+      if (a <= 0) continue;
+      ctx.globalAlpha = a; drawModuleBody(ctx, B, m); ctx.globalAlpha = 1;
+    }
+    ctx.globalAlpha = smooth(t / Math.max(1, cfg.core[0]));
+    drawPins(ctx, B);
+    drawPackage(ctx, B);
+    ctx.globalAlpha = 1;
+    // 4. die + core power on
+    const c0 = cfg.core[0], c1 = cfg.core[1];
+    const coreOn = smooth((t - c0) / (c1 - c0));
+    const bump = t >= c0 ? clamp(1 - (t - c0) / CORE_BUMP_MS, 0, 1) : 0;
+    drawDie((k) => {
+      const start = cfg.cells[0] + k.rank * (cfg.cells[1] - cfg.cells[0]);
+      const d = t - start;
+      if (d < 0) return 0;
+      if (d < CELL_RISE_MS) return PEAK_CELL_ALPHA * d / CELL_RISE_MS;
+      return IDLE_CELL_ALPHA + (PEAK_CELL_ALPHA - IDLE_CELL_ALPHA) * (1 - clamp((d - CELL_RISE_MS) / CELL_DECAY_MS, 0, 1));
+    }, coreOn * (0.5 + 0.5 * pulseValue()), bump);
+    // 5. module flash, and a bright head at the front of every trace still being drawn
+    const Lp = Math.max(10, B.p * 1.6);
+    for (const m of mods) {
+      const d = t - introMeta[m.i].arrive;
+      let g = 0;
+      if (d >= 0) g = d < MODULE_RISE_MS ? d / MODULE_RISE_MS : 1 - clamp((d - MODULE_RISE_MS) / MODULE_DECAY_MS, 0, 1);
+      drawModuleGlow(m, g, (kk) => drawnPx(m, kk, t));
+    }
+    for (const m of mods) {
+      m.bus.forEach((ti, kk) => {
+        const tr = B.traces[ti], d = drawnPx(m, kk, t);
+        if (d > 0 && d < tr.total + Lp) drawPacket(tr, d, 1);
+      });
+    }
+    // the zoomed package would spill under the card column: fade the scene out at the board's right edge
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const fw = INTRO_EDGE_FADE_PX * (s - 1) / (INTRO_ZOOM - 1);
+    if (B.x1 < cssW - 1 && fw >= 1) {
+      const g = ctx.createLinearGradient(B.x1 - fw, 0, B.x1, 0);
+      g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,1)");
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = g; ctx.fillRect(B.x1 - fw, 0, cssW - (B.x1 - fw), cssH);
+      ctx.globalCompositeOperation = "source-over";
+    }
+    ctx = mainCtx;
+    ctx.drawImage(sceneCv, 0, 0, cssW, cssH);
+    B.introState = { t, scale: s, share: totalSum ? drawnSum / totalSum : 1 };
+  }
+
+  function baseLayer() { ctx.drawImage(staticCv, 0, 0, cssW, cssH); }
 
   // ---- one full frame ----
   // intro: null (idle) or { t, cfg }
@@ -994,42 +1130,9 @@
     ctx.clearRect(0, 0, cssW, cssH);
     board.frames++;
     if (!board.S) return;
-    let sweepY = null;
-    if (intro && intro.cfg.sweep) sweepY = board.y0 + (board.H - board.y0) * easeInOut(clamp(intro.t / intro.cfg.sweep, 0, 1));
-    baseLayer(sweepY);
-
+    if (intro) { renderIntro(intro.t, intro.cfg); return; }
+    baseLayer();
     const mods = board.modules;
-    if (intro) {
-      const t = intro.t, cfg = intro.cfg;
-      // core + die
-      const c0 = cfg.core[0], c1 = cfg.core[1];
-      const coreOn = smooth((t - c0) / (c1 - c0));
-      const bump = t >= c0 ? clamp(1 - (t - c0) / CORE_BUMP_MS, 0, 1) : 0;
-      drawDie((k) => {
-        const start = cfg.cells[0] + k.rank * (cfg.cells[1] - cfg.cells[0]);
-        const d = t - start;
-        if (d < 0) return 0;
-        if (d < CELL_RISE_MS) return PEAK_CELL_ALPHA * d / CELL_RISE_MS;
-        return IDLE_CELL_ALPHA + (PEAK_CELL_ALPHA - IDLE_CELL_ALPHA) * (1 - clamp((d - CELL_RISE_MS) / CELL_DECAY_MS, 0, 1));
-      }, coreOn * (0.5 + 0.5 * pulseValue()), bump);
-      // modules + packets, from the time alone (seekable)
-      for (const m of mods) {
-        const meta = introMeta[m.i];
-        const d = t - meta.arrive;
-        let g = 0;
-        if (d >= 0) g = d < MODULE_RISE_MS ? d / MODULE_RISE_MS : 1 - clamp((d - MODULE_RISE_MS) / MODULE_DECAY_MS, 0, 1);
-        drawModuleGlow(m, moduleGlow(m, g));
-      }
-      for (const m of mods) {
-        const meta = introMeta[m.i];
-        m.bus.forEach((ti, kk) => {
-          const tr = board.traces[ti];
-          const s = (t - meta.launch - kk * TRACE_STAGGER_MS) * meta.speed / 1000;
-          if (s > 0 && s < tr.total + 14) drawPacket(tr, s, 1);
-        });
-      }
-      return;
-    }
 
     // idle
     const shimmer = QA.static || reducedMotion ? 0 : 1;
@@ -1137,15 +1240,18 @@
 
   function buildIntroMeta(cfg) {
     const maxLen = Math.max(1, ...board.traces.map((t) => t.total));
-    const speed = maxLen / (cfg.travel / 1000);   // px/s, same for every packet in the intro
+    const speed = maxLen / (cfg.draw.travel / 1000);   // px/s, one drawing speed for every trace
+    const Lp = Math.max(10, board.p * 1.6);
     introMeta = {};
     board.modules.forEach((m) => {
-      const launch = cfg.launch + m.rank * cfg.stagger;
-      const minLen = Math.min(...m.bus.map((ti) => board.traces[ti].total));
-      const maxLenM = Math.max(...m.bus.map((ti) => board.traces[ti].total));
-      const arrive = launch + minLen / speed * 1000;
-      const end = launch + (m.bus.length - 1) * TRACE_STAGGER_MS + (maxLenM + 14) / speed * 1000;
-      introMeta[m.i] = { launch, speed, arrive, settled: Math.max(end, arrive + MODULE_RISE_MS + MODULE_DECAY_MS) };
+      const start = cfg.draw.start + m.rank * cfg.draw.stagger;
+      let arrive = Infinity, end = 0;
+      m.bus.forEach((ti, kk) => {
+        const tr = board.traces[ti];
+        arrive = Math.min(arrive, start + kk * TRACE_STAGGER_MS + tr.total / speed * 1000);
+        end = Math.max(end, start + kk * TRACE_STAGGER_MS + (tr.total + Lp) / speed * 1000 + VIA_POP_MS);
+      });
+      introMeta[m.i] = { start, speed, arrive, settled: Math.max(end, arrive + MODULE_RISE_MS + MODULE_DECAY_MS) };
     });
     board.introMeta = introMeta;
   }
@@ -1174,6 +1280,8 @@
     cardEls.forEach((el) => el.style.removeProperty("opacity"));
     canvas.classList.add("board-dim"); // narrow screens: CSS dims the board once the intro is over
     board.introDone = true;
+    board.introT1 = performance.now();
+    board.introState = null;
     drawNow();
     startLoop();
   }
@@ -1183,6 +1291,7 @@
     if (introHandle) { introHandle.cancel(); if (introOff) introOff(); introHandle = null; introOff = null; }
     board.mode = mode;
     board.introMs = 0;
+    board.introT0 = performance.now();
     if (mode === "skip" || !T) { board.introDone = false; finishIntro(); return; }
     T.markSeen("projects");
     board.introDone = false;
