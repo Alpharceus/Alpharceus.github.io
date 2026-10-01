@@ -30,22 +30,21 @@
           root.classList.add('arriving');
           root.style.setProperty('--arrival-rgb', a.rgb.join(','));
           window.__arrival = a;
-          if (!reduced) root.classList.add('spec-cover');
+          if (!reduced) root.classList.add('bh-cover');
         } else if (!reduced && !sessionStorage.getItem('intro:papers')) {
-          root.classList.add('spec-cover');   // first visit this session: spectrograph intro
+          root.classList.add('bh-cover');   // first visit this session: black-hole intro
         }
         sessionStorage.removeItem('arrival');
       } catch (e) {}
       // failsafe: never leave the page covered if the intro script fails
-      setTimeout(function () { root.classList.remove('arriving', 'spec-cover'); }, 6000);
+      setTimeout(function () { root.classList.remove('arriving', 'bh-cover'); }, 9000);
     }());
     </script>
     <script src="js/transition.js"></script>
     <style>
-        /* ---- spectrograph intro (driven by js/papers.js) ---- */
-        #spectrum { display: block; width: 100%; height: 10px; position: relative; z-index: 61; flex: none; }
-        #spectrum-fx { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9995; pointer-events: none; }
-        /* arrival fill: the last frame of the star dive, collapses to the slit */
+        /* ---- black-hole intro (driven by js/papers.js) ---- */
+        #bh-fx { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9995; pointer-events: none; }
+        /* arrival fill: the last frame of the star dive; the intro canvas takes it over on its first frame */
         html.arriving body::before {
             content: "";
             position: fixed;
@@ -53,28 +52,30 @@
             z-index: 9999;
             pointer-events: none;
             background: rgb(var(--arrival-rgb, 7, 10, 16));
-            transform-origin: var(--slit-x, 8px) 50%;
-            transform: scale(var(--arrival-s, 1));
             opacity: var(--arrival-op, 1);
         }
-        /* dark veil the spectrum is drawn on; fades out as the band settles */
-        html.spec-cover::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            z-index: 9990;
-            pointer-events: none;
-            background: #070a10;
-            opacity: var(--spec-veil, 1);
+        /* page content stays in the DOM; the intro only drives its opacity */
+        html.bh-cover main,
+        html.bh-cover header.site-bar,
+        html.bh-cover footer { opacity: var(--bh-content, 0); }
+        /* HUD tags: the star-dive HUD voice, one fixed slot per beat so they never overlap */
+        #bh-hud {
+            position: fixed; left: max(16px, 4vw); bottom: 22px; z-index: 9996; pointer-events: none;
+            display: flex; flex-direction: column; gap: 12px; max-width: calc(100vw - 32px);
+            font-family: 'IBM Plex Mono', Menlo, Consolas, monospace; font-size: 11px; line-height: 1.4; letter-spacing: .01em;
+            color: rgba(176, 190, 235, .78); text-shadow: 0 0 6px rgba(5, 7, 16, .95), 0 0 2px rgba(5, 7, 16, .9);
+        }
+        #bh-hud .bh-tag { opacity: 0; align-self: flex-start; padding: 4px 9px; border-radius: 6px; background: rgba(5, 7, 12, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+        #bh-hud .bh-tag b { font-weight: 500; color: #eef2ff; letter-spacing: .02em; }
+        #bh-hud .bh-tag .ln { display: block; }
+        @media (max-width: 600px) {
+            #bh-hud { font-size: 10px; gap: 8px; }
+            #bh-hud .rest { display: none; }
         }
         /* main used to shrink-wrap its content, so it changed width when the list rendered (CLS) */
         main { width: 100%; box-sizing: border-box; max-width: 1060px; }
         /* keep the heading legible over the particle field */
         main h1 { text-shadow: 0 0 14px #070a10, 0 0 4px #070a10; }
-        .paper-card[data-line] { transition: box-shadow 0.2s ease; }
-        .paper-card[data-line].is-linked { box-shadow: 0 0 0 1px rgba(112, 232, 255, 0.5); }
-        @keyframes paper-drop { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: none; } }
-        .paper-card.dropping { animation: paper-drop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--drop-delay, 0ms); }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -84,9 +85,14 @@
     <script src="js/site.js" defer></script>
 </head>
 <body class="pg-title">
-    <canvas id="spectrum" aria-hidden="true"></canvas>
-    <canvas id="spectrum-fx" aria-hidden="true"></canvas>
     <canvas id="particles-bg"></canvas>
+    <canvas id="bh-fx" aria-hidden="true"></canvas>
+    <div id="bh-hud" aria-hidden="true">
+        <div class="bh-tag"><span class="ln"><b>core collapse</b><span class="rest"> &middot; ~30 M&#9737; supergiant &rarr; black hole (remnant ~10&ndash;20 M&#9737;, uncertain)</span></span><span class="ln rest">r_s &asymp; 3 km per M&#9737; &middot; shadow &asymp; 2.6 r_s</span></div>
+        <div class="bh-tag"><span class="ln"><b>Hawking evaporation</b><span class="rest"> &middot; T &asymp; 4&times;10&#8315;&#8313; K at 15 M&#9737; &middot; timescale compressed: ~10&#8311;&#8304; yr</span></span></div>
+        <div class="bh-tag"><span class="ln"><b>exposed singularity</b><span class="rest"> &middot; forbidden by cosmic censorship &middot; beyond known physics</span></span></div>
+        <div class="bh-tag"><span class="ln"><b>a black hole seeding a new universe</b><span class="rest"> &middot; speculative (Smolin; Pop&#322;awski)</span></span></div>
+    </div>
     <header class="site-bar">
         <a class="site-bar__home" href="index.html">Raman Pandey</a>
         <nav aria-label="Site">
