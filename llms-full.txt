@@ -1,0 +1,130 @@
+# Raman Pandey: full text
+
+> Raman Pandey is a graduate student in Electrical and Computer Engineering at the University of New Mexico (UNM) and a graduate research assistant at the Center for High Technology Materials (CHTM), advised by Prof. Marek Osinski. He specializes in Quantum Information Science, machine learning, and FPGA-based systems.
+
+The site is an interactive portfolio structured as the Orion constellation. Every page also serves its content as static HTML.
+
+Source: https://ramanpandey.com/about/
+
+## About (FAQ)
+
+### Who is Raman Pandey?
+
+Raman Pandey is a graduate student in Electrical and Computer Engineering at the University of New Mexico (UNM) and a graduate research assistant at the Center for High Technology Materials (CHTM), advised by Prof. Marek Osinski. He specializes in Quantum Information Science, machine learning, and FPGA-based systems. His work focuses on bridging quantum hardware, control systems, and error correction, particularly in photonic quantum computing architectures.
+
+### What is Raman Pandey known for?
+
+Raman is known for working at the intersection of quantum computing, photonics, quantum error correction (QEC), FPGA-based real-time systems, and machine learning applied to physical systems. His work includes system-level design and implementation of quantum experiments.
+
+### What are Raman Pandey’s research interests?
+
+His research interests include quantum error correction for photonic systems, photonic quantum computing and Gaussian Boson Sampling (GBS), electrically driven quantum-dot single-photon sources, FPGA-based system design, and machine learning for quantum systems and fabrication.
+
+### What projects has Raman Pandey worked on?
+
+Research projects (details and posters at ramanpandey.com/projects.html):
+- Systems-Level Engineering for QCAP (NSF NQVL) — control, timing, and readout for a Gaussian boson sampling architecture on integrated photonics, part of the UNM-led Quantum Computing Applications of Photonics project (NSF award #2531569). Poster: R. Pandey, J. Dusch, Y. Ngenzi, B. S. Sheelam, K. Pomorski, M. Osinski.
+- Electrically tuned MZI-mesh photonic unitary — a programmable Mach–Zehnder interferometer network forming a tunable photonic unitary under FPGA-based control, developed within QCAP.
+- Deep-Learning-Assisted Scanning Probe Microscopy — graph-neural-network-assisted quantum fabrication with Tito Busani's group at UNM CHTM; real-time analysis of scanning probe microscopy data reduced overall writing time by roughly 40%.
+- SNSPD FPGA readout pipeline — FPGA readout (institutional code, not public).
+- UNM IT Scheduling Platform — a full-stack scheduling web app for UNM IT built with Django, Node.js, and REST APIs.
+Personal and creative projects:
+- Project Orion — a local-first, voice-controlled AI assistant with gesture recognition, persistent memory, and smart-home delegation, running entirely on local hardware.
+- Project Typhon — an emergent-systems sandbox where agent populations evolve survival strategies against shifting climates and competition.
+- Chronos — a procedural text adventure across geological eras, inspired by PBS Eons.
+- Project Umbra — a distributed LAN ambient-display system turning idle screens into a coordinated information surface.
+- This website — an interactive p5.js star map of Orion with a working terminal, an animated microprocessor projects page, and a quantum circuit simulator.
+
+### What skills does Raman Pandey have?
+
+An interactive version of this list lives at ramanpandey.com/skills.html.
+Hardware: FPGA design (VHDL), Verilog and RTL design, embedded systems and microcontrollers, digital electronics, analog electronics, lab instrumentation and test, LabVIEW, PCB design and prototyping.
+Quantum: photonic quantum computing, Gaussian boson sampling systems, MZI interferometry and photonic unitaries, single-photon detection (SNSPD / SPAD), Qiskit and quantum programming, quantum error correction, quantum circuit simulation, quantum optics.
+Software: Python, C and low-level programming, JavaScript and creative coding, Django and REST APIs, Node.js, MATLAB, R and statistical computing, Linux and shell tooling.
+Machine learning & data: TensorFlow and deep learning, graph neural networks, computer vision (OpenCV), NLP and language modeling, local LLMs and AI agents, signal processing, scientific computing (NumPy / SciPy), data visualization and dashboards.
+
+### What technologies and tools does Raman Pandey use?
+
+He works with Python, C, VHDL, MATLAB, R, TensorFlow, Django REST, FPGA systems, microcontrollers, Qiskit, LabVIEW, CAD tools, and signal processing pipelines.
+
+### What is Raman Pandey currently working on?
+
+He is currently focused on system-level design of photonic Gaussian Boson Sampling platforms, electrical control of quantum-dot emitters, FPGA-based timing and readout systems, and research toward quantum error correction in photonic architectures.
+
+### What are Raman Pandey’s academic goals?
+
+Raman plans to pursue a PhD focused on quantum error correction, photonic quantum computing, and fault-tolerant quantum systems, with the goal of contributing to advanced quantum research and scalable architectures.
+
+### What makes Raman Pandey’s work unique?
+
+His work combines hardware engineering (FPGA and electronics), quantum physics, and machine learning, enabling a systems-level approach to building and scaling quantum technologies.
+
+### What is on ramanpandey.com?
+
+The site is an interactive portfolio structured as the Orion constellation — the homepage renders a star map where each star is one pillar of Raman's work, with a hidden terminal interface on Betelgeuse. Every page also serves its content as static HTML:
+- ramanpandey.com — the Orion star-map homepage.
+- /about/ — this FAQ.
+- /projects.html — all projects with posters and artifacts, rendered as an animated microprocessor.
+- /skills.html — 32 skills across hardware, quantum, software, and machine learning, rendered as an 8-mode Mach–Zehnder interferometer mesh.
+- /papers.html — journal publications (none yet; conference papers and posters live on the projects page).
+- /blogs.html — essays on physics, computing, AI, and science communication.
+- /now/ — what Raman is working on this quarter, as a mission-control console.
+- /rigel.html — an interactive quantum circuit simulator with a live Bloch sphere.
+
+### Where can I learn more about Raman Pandey?
+
+Website: ramanpandey.com
+GitHub: github.com/Alpharceus
+LinkedIn: linkedin.com/in/alpha-arceus
+
+## Blog articles
+
+### The Quantum Hype Problem
+
+https://ramanpandey.com/articles/quantum-hype.html (2026-07-14)
+
+I work in quantum tech, and I'm asking you to be more skeptical of it. On marketing adjectives, timeline inflation, and why honesty is a survival strategy for the field.
+
+### Does the Machine Understand?
+
+https://ramanpandey.com/articles/does-the-machine-understand.html (2026-07-05)
+
+Large language models write essays, prove lemmas, and pass exams. Whether they "understand" anything is a different question — and probably the wrong one.
+
+### Shut Up and Calculate?
+
+https://ramanpandey.com/articles/shut-up-and-calculate.html (2026-06-20)
+
+Physicists are told not to worry about what quantum mechanics means. But the history of the field suggests that worrying about it is exactly how progress gets made.
+
+### The Great Silence Is Data
+
+https://ramanpandey.com/articles/great-silence.html (2026-05-30)
+
+The Fermi paradox is better read as an observation than a paradox, and maybe the most important null result in science. On filters, boring explanations, and how seriously to take the silence.
+
+### The Media Skeptic's Guide to Health BS
+
+https://ramanpandey.com/articles/media-skeptics-guide.html (2026-04-03)
+
+How to spot myths, misinformation, and marketing fluff in modern wellness culture — twelve persistent health myths, debunked.
+
+### Why Ethics Matters in Astrophysics
+
+https://ramanpandey.com/articles/astro-ethics.html (2025-06-01)
+
+The universe is a vast laboratory — but does that mean anything goes? On satellite constellations, sacred land, planetary protection, and who astronomy is for.
+
+### Is the Universe a Simulation?
+
+https://ramanpandey.com/articles/simulated-universe.html (2025-05-11)
+
+From Nick Bostrom's simulation argument to the limits of physical law — could reality be code?
+
+## Contact
+
+Email: info@ramanpandey.com
+Résumé: https://ramanpandey.com/assets/resume.pdf
+LinkedIn: https://linkedin.com/in/alpha-arceus
+GitHub: https://github.com/Alpharceus
+X: https://x.com/alpha_arceus

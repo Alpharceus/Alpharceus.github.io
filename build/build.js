@@ -16,11 +16,17 @@
  *   blogs.html           — static card index page (Alnitak)
  *   projects.html        — project cards rendered from assets/projects.json between
  *                          <!-- projects:start --> and <!-- projects:end --> markers
- *   sitemap.xml          — regenerated with all pages + posts
+ *   sitemap.xml          — regenerated with all pages + posts (lastmod = last git commit
+ *                          date of each page's source file; mtime if git is unavailable)
+ *   llms.txt             — llmstxt.org-style index for LLM clients (existing site wording only)
+ *   llms-full.txt        — About FAQ + article summaries as plain text
+ *   about/index.html     — FAQPage JSON-LD between <!-- faq-jsonld:start/end --> markers,
+ *                          generated from the visible FAQ so the two can never drift
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const MarkdownIt = require('markdown-it');
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
@@ -28,6 +34,49 @@ const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
 const ROOT = path.join(__dirname, '..');
 const SITE = 'https://ramanpandey.com';
 const ARTICLES_DIR = path.join(ROOT, 'articles');
+const PERSON_ID = `${SITE}/#person`;
+const OG_IMAGE = `${SITE}/assets/og-card.png`;
+const CONTACT = {
+  email: 'info@ramanpandey.com',
+  resume: `${SITE}/assets/resume.pdf`,
+  linkedin: 'https://linkedin.com/in/alpha-arceus',
+  github: 'https://github.com/Alpharceus',
+  x: 'https://x.com/alpha_arceus',
+};
+
+// ---------- git dates ----------
+// Last commit date (YYYY-MM-DD) of a repo-relative file. Falls back to the file's mtime
+// when git is unavailable, the checkout is not a repo, or the file is untracked.
+function gitDate(rel) {
+  try {
+    const out = execFileSync('git', ['log', '-1', '--format=%cs', '--', rel], {
+      cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString().trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(out)) return out;
+  } catch (e) { /* fall through */ }
+  return fs.statSync(path.join(ROOT, rel)).mtime.toISOString().slice(0, 10);
+}
+
+// Meta descriptions stay <= 160 chars: trim at a word boundary and add an ellipsis.
+function metaDesc(s) {
+  const t = String(s).replace(/\s+/g, ' ').trim();
+  if (t.length <= 160) return t;
+  return t.slice(0, 159).replace(/\s+\S*$/, '').replace(/[\s,;:.—-]+$/, '') + '…';
+}
+
+// Open Graph + Twitter tags (every page shares the same card image).
+function socialTags({ type, title, desc, url }) {
+  return [
+    `  <meta property="og:type" content="${type}">`,
+    `  <meta property="og:site_name" content="Raman Pandey">`,
+    `  <meta property="og:title" content="${esc(title)}">`,
+    `  <meta property="og:description" content="${esc(desc)}">`,
+    `  <meta property="og:url" content="${url}">`,
+    `  <meta property="og:image" content="${OG_IMAGE}">`,
+    `  <meta name="twitter:card" content="summary_large_image">`,
+    `  <meta name="twitter:image" content="${OG_IMAGE}">`,
+  ].join('\n');
+}
 
 // ---------- front matter ----------
 function parseFrontMatter(raw) {
@@ -55,21 +104,27 @@ function formatDate(iso) {
 }
 
 // ---------- article page template ----------
-function articleTemplate({ id, title, date, summary, about, html }) {
+function articleTemplate({ id, title, date, summary, about, modified, html }) {
   const url = `${SITE}/articles/${id}.html`;
+  const desc = metaDesc(summary);
   const jsonld = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: title,
     datePublished: date,
+    dateModified: modified > date ? modified : date,
     description: summary,
     ...(about ? { about } : {}),
     url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    image: OG_IMAGE,
     author: {
       '@type': 'Person',
+      '@id': PERSON_ID,
       name: 'Raman Pandey',
-      url: `${SITE}/about/`,
+      url: `${SITE}/`,
     },
+    publisher: { '@id': PERSON_ID },
   };
   return `<!DOCTYPE html>
 <html lang="en">
@@ -77,17 +132,13 @@ function articleTemplate({ id, title, date, summary, about, html }) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${esc(title)} | Raman Pandey</title>
-  <meta name="description" content="${esc(summary)}">
+  <meta name="description" content="${esc(desc)}">
   <link rel="canonical" href="${url}">
   <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <meta property="og:type" content="article">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(summary)}">
-  <meta property="og:url" content="${url}">
-  <meta name="twitter:card" content="summary">
+${socialTags({ type: 'article', title, desc, url })}
   <script type="application/ld+json">
 ${JSON.stringify(jsonld, null, 2)}
   </script>
@@ -118,7 +169,7 @@ ${JSON.stringify(jsonld, null, 2)}
 </head>
 <body class="pg-title">
   <header class="site-bar">
-    <a class="site-bar__home" href="../index.html">Raman Pandey</a>
+    <a class="site-bar__home" href="/">Raman Pandey</a>
     <nav aria-label="Site">
       <a href="../projects.html">Projects</a>
       <a href="../skills.html">Skills</a>
@@ -130,7 +181,7 @@ ${JSON.stringify(jsonld, null, 2)}
     </nav>
   </header>
   <article>
-    <nav class="back-nav"><a href="../blogs.html">&larr; All posts</a> &nbsp;&middot;&nbsp; <a href="../index.html">ramanpandey.com</a></nav>
+    <nav class="back-nav"><a href="../blogs.html">&larr; All posts</a> &nbsp;&middot;&nbsp; <a href="/">ramanpandey.com</a></nav>
     <h1>${esc(title)}</h1>
     <p class="post-meta">By <a href="../about/">Raman Pandey</a> &middot; <time datetime="${esc(date)}">${esc(formatDate(date))}</time></p>
 ${html}
@@ -171,8 +222,9 @@ function blogsIndexTemplate(posts, quotes) {
       'Essays on science, skepticism, and philosophy — the science-communication pillar of the portfolio, rendered as cards over a deep-field starscape.',
     about: 'Philosophy and science communication',
     isPartOf: { '@type': 'WebSite', name: 'Raman Pandey — Portfolio', url: `${SITE}/` },
-    author: { '@type': 'Person', name: 'Raman Pandey', url: `${SITE}/about/` },
+    author: { '@type': 'Person', '@id': PERSON_ID, name: 'Raman Pandey', url: `${SITE}/` },
   };
+  const blogDesc = 'Essays on science, skepticism, and philosophy by Raman Pandey — quantum computing researcher and science-communication enthusiast.';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -180,8 +232,9 @@ function blogsIndexTemplate(posts, quotes) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Blog | Raman Pandey</title>
-  <meta name="description" content="Essays on science, skepticism, and philosophy by Raman Pandey — quantum computing researcher and science-communication enthusiast.">
+  <meta name="description" content="${esc(blogDesc)}">
   <link rel="canonical" href="${SITE}/blogs.html">
+${socialTags({ type: 'website', title: 'Blog | Raman Pandey', desc: blogDesc, url: `${SITE}/blogs.html` })}
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -519,7 +572,7 @@ ${JSON.stringify(jsonld, null, 2)}
   <div id="quote-right" class="idle-quote" aria-hidden="true"></div>
 
   <header class="site-bar">
-    <a class="site-bar__home" href="index.html">Raman Pandey</a>
+    <a class="site-bar__home" href="/">Raman Pandey</a>
     <nav aria-label="Site">
       <a href="projects.html">Projects</a>
       <a href="skills.html">Skills</a>
@@ -694,28 +747,164 @@ ${cards}
 }
 
 // ---------- sitemap ----------
+// src = repo-relative source file whose last commit date becomes <lastmod>
 const STATIC_PAGES = [
-  { loc: `${SITE}/`, priority: '1.0' },
-  { loc: `${SITE}/about/`, priority: '0.9' },
-  { loc: `${SITE}/projects.html`, priority: '0.8' },
-  { loc: `${SITE}/rigel.html`, priority: '0.8' },
-  { loc: `${SITE}/skills.html`, priority: '0.7' },
-  { loc: `${SITE}/now/`, priority: '0.7' },
-  { loc: `${SITE}/papers.html`, priority: '0.6' },
-  { loc: `${SITE}/blogs.html`, priority: '0.6' },
+  { loc: `${SITE}/`, src: 'index.html', priority: '1.0' },
+  { loc: `${SITE}/about/`, src: 'about/index.html', priority: '0.9' },
+  { loc: `${SITE}/projects.html`, src: 'projects.html', priority: '0.8' },
+  { loc: `${SITE}/rigel.html`, src: 'rigel.html', priority: '0.8' },
+  { loc: `${SITE}/skills.html`, src: 'skills.html', priority: '0.7' },
+  { loc: `${SITE}/now/`, src: 'now/index.html', priority: '0.7' },
+  { loc: `${SITE}/papers.html`, src: 'papers.html', priority: '0.6' },
+  { loc: `${SITE}/blogs.html`, src: 'blogs.html', priority: '0.6' },
 ];
 
 function sitemapTemplate(posts) {
-  const today = new Date().toISOString().slice(0, 10);
   const urls = [
     ...STATIC_PAGES.map(
-      (p) => `  <url>\n    <loc>${p.loc}</loc>\n    <lastmod>${today}</lastmod>\n    <priority>${p.priority}</priority>\n  </url>`
+      (p) => `  <url>\n    <loc>${p.loc}</loc>\n    <lastmod>${gitDate(p.src)}</lastmod>\n    <priority>${p.priority}</priority>\n  </url>`
     ),
     ...posts.map(
       (p) => `  <url>\n    <loc>${SITE}/articles/${p.id}.html</loc>\n    <lastmod>${p.date}</lastmod>\n    <priority>0.6</priority>\n  </url>`
     ),
   ];
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+}
+
+// ---------- About FAQ -> FAQPage JSON-LD, llms.txt, llms-full.txt ----------
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '\u2013', mdash: '\u2014', rarr: '\u2192', larr: '\u2190', middot: '\u00B7' };
+function decodeEntities(s) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === '#') return String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
+    return ENTITIES[e.toLowerCase()] !== undefined ? ENTITIES[e.toLowerCase()] : m;
+  });
+}
+// visible text, whitespace collapsed (what a reader sees, minus layout)
+function htmlText(s) {
+  // block-level tags separate words; inline tags (a, strong, em) must not add spaces
+  const t = s.replace(/<\/?(p|ul|ol|li|div|br|h[1-6]|section)[^>]*>/gi, ' ').replace(/<[^>]+>/g, '');
+  return decodeEntities(t).replace(/\s+/g, ' ').trim();
+}
+// plain text keeping line structure (list items, paragraphs, <br>)
+function htmlPlain(s) {
+  const t = s
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n- ')
+    .replace(/<\/(p|ul|ol|div)>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+  return decodeEntities(t)
+    .split('\n').map((l) => l.replace(/[ \t]+/g, ' ').trim()).filter(Boolean).join('\n');
+}
+
+function parseFaq() {
+  const html = fs.readFileSync(path.join(ROOT, 'about', 'index.html'), 'utf8');
+  const out = [];
+  const re = /<section>\s*<h2>([\s\S]*?)<\/h2>([\s\S]*?)<\/section>/g;
+  let m;
+  while ((m = re.exec(html))) {
+    const q = htmlText(m[1]);
+    if (!q.endsWith('?')) continue; // only real FAQ entries (the Contact section is not one)
+    out.push({ q, a: htmlText(m[2]), plain: htmlPlain(m[2]) });
+  }
+  return out;
+}
+
+function buildFaqJsonLd(faq) {
+  const file = path.join(ROOT, 'about', 'index.html');
+  const html = fs.readFileSync(file, 'utf8');
+  const re = /(<!-- faq-jsonld:start[^>]*-->)[\s\S]*?(<!-- faq-jsonld:end -->)/;
+  if (!re.test(html)) throw new Error('about/index.html is missing the faq-jsonld:start / faq-jsonld:end markers');
+  const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  };
+  const json = JSON.stringify(ld, null, 2).replace(/</g, '\\u003c').split('\n').map((l) => '    ' + l).join('\n');
+  const next = html.replace(re, (m, a, b) => `${a}\n    <script type="application/ld+json">\n${json}\n    </script>\n    ${b}`);
+  if (next !== html) fs.writeFileSync(file, next);
+  console.log(`built FAQPage JSON-LD (${faq.length} questions)`);
+}
+
+// Wording below is copied from the About page; nothing new is introduced here.
+const LLMS_SUMMARY =
+  'Raman Pandey is a graduate student in Electrical and Computer Engineering at the University of New Mexico (UNM) and a graduate research assistant at the Center for High Technology Materials (CHTM), advised by Prof. Marek Osinski. He specializes in Quantum Information Science, machine learning, and FPGA-based systems.';
+const LLMS_SITE_LINE =
+  'The site is an interactive portfolio structured as the Orion constellation. Every page also serves its content as static HTML.';
+
+function llmsTxt(posts) {
+  const pages = [
+    ['Home', `${SITE}/`, 'the Orion star-map homepage.'],
+    ['About', `${SITE}/about/`, 'who Raman is, research interests, projects, skills, tools, and academic goals, as an FAQ.'],
+    ['Projects (Bellatrix)', `${SITE}/projects.html`, 'all projects with posters and artifacts, rendered as an animated microprocessor.'],
+    ['Skills (Mintaka)', `${SITE}/skills.html`, '32 skills across hardware, quantum, software, and machine learning, rendered as an 8-mode Mach\u2013Zehnder interferometer mesh.'],
+    ['Papers (Alnilam)', `${SITE}/papers.html`, 'journal publications (none yet; conference papers and posters live on the projects page).'],
+    ['Blog (Alnitak)', `${SITE}/blogs.html`, 'essays on physics, computing, AI, and science communication.'],
+    ['Now (Saiph)', `${SITE}/now/`, 'what Raman is working on this quarter, as a mission-control console.'],
+    ['Rigel', `${SITE}/rigel.html`, 'an interactive quantum circuit simulator with a live Bloch sphere per qubit.'],
+  ];
+  const lines = [
+    '# Raman Pandey',
+    '',
+    `> ${LLMS_SUMMARY}`,
+    '',
+    LLMS_SITE_LINE,
+    '',
+    '## Pages',
+    '',
+    ...pages.map(([n, u, d]) => `- [${n}](${u}): ${d}`),
+    '',
+    '## Blog articles',
+    '',
+    ...posts.map((p) => `- [${p.title}](${SITE}/articles/${p.id}.html): ${p.summary} (${p.date})`),
+    '',
+    '## Contact',
+    '',
+    `- [Email](mailto:${CONTACT.email}): ${CONTACT.email}`,
+    `- [R\u00E9sum\u00E9 (PDF)](${CONTACT.resume})`,
+    `- [LinkedIn](${CONTACT.linkedin})`,
+    `- [GitHub](${CONTACT.github})`,
+    `- [X](${CONTACT.x})`,
+    '',
+    '## Optional',
+    '',
+    `- [Sitemap](${SITE}/sitemap.xml): every page and article with last-modified dates.`,
+    `- [Full text](${SITE}/llms-full.txt): the About FAQ and article summaries as plain text.`,
+    '',
+  ];
+  return lines.join('\n');
+}
+
+function llmsFullTxt(posts, faq) {
+  const lines = [
+    '# Raman Pandey: full text',
+    '',
+    `> ${LLMS_SUMMARY}`,
+    '',
+    LLMS_SITE_LINE,
+    '',
+    `Source: ${SITE}/about/`,
+    '',
+    '## About (FAQ)',
+    '',
+  ];
+  for (const f of faq) lines.push(`### ${f.q}`, '', f.plain, '');
+  lines.push('## Blog articles', '');
+  for (const p of posts) lines.push(`### ${p.title}`, '', `${SITE}/articles/${p.id}.html (${p.date})`, '', p.summary, '');
+  lines.push(
+    '## Contact',
+    '',
+    `Email: ${CONTACT.email}`,
+    `R\u00E9sum\u00E9: ${CONTACT.resume}`,
+    `LinkedIn: ${CONTACT.linkedin}`,
+    `GitHub: ${CONTACT.github}`,
+    `X: ${CONTACT.x}`,
+    ''
+  );
+  return lines.join('\n');
 }
 
 // ---------- projects page cards ----------
@@ -737,7 +926,7 @@ function projectCardHtml(proj) {
     : '<span class="status-chip done">Done</span>';
   const lines = [
     `<div class="project" id="${esc(proj.id)}"${proj.short ? ` data-short="${esc(proj.short)}"` : ''}>`,
-    `  <h2>${esc(proj.title)} ${status}</h2>`,
+    `  <div class="project-head"><h2>${esc(proj.title)}</h2> ${status}</div>`,
     `  <p>${esc(proj.desc || '')}</p>`,
   ];
   if (proj.summary) lines.push(`  <details><summary>Show Summary</summary><div>${esc(proj.summary)}</div></details>`);
@@ -776,7 +965,8 @@ function main() {
     const post = { id, title: meta.title, date: meta.date, summary: meta.summary || '', about: meta.about || '' };
     posts.push(post);
     const html = md.render(body);
-    fs.writeFileSync(path.join(ARTICLES_DIR, `${id}.html`), articleTemplate({ ...post, html }));
+    const modified = gitDate(`articles/${file}`);
+    fs.writeFileSync(path.join(ARTICLES_DIR, `${id}.html`), articleTemplate({ ...post, modified, html }));
     console.log(`built articles/${id}.html`);
   }
 
@@ -804,8 +994,16 @@ function main() {
 
   buildProjectsPage();
 
+  const faq = parseFaq();
+  buildFaqJsonLd(faq);
+
   fs.writeFileSync(path.join(ROOT, 'sitemap.xml'), sitemapTemplate(posts));
   console.log('built sitemap.xml');
+
+  fs.writeFileSync(path.join(ROOT, 'llms.txt'), llmsTxt(posts));
+  console.log('built llms.txt');
+  fs.writeFileSync(path.join(ROOT, 'llms-full.txt'), llmsFullTxt(posts, faq));
+  console.log('built llms-full.txt');
 }
 
 main();

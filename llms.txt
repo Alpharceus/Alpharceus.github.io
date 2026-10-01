@@ -1,0 +1,39 @@
+# Raman Pandey
+
+> Raman Pandey is a graduate student in Electrical and Computer Engineering at the University of New Mexico (UNM) and a graduate research assistant at the Center for High Technology Materials (CHTM), advised by Prof. Marek Osinski. He specializes in Quantum Information Science, machine learning, and FPGA-based systems.
+
+The site is an interactive portfolio structured as the Orion constellation. Every page also serves its content as static HTML.
+
+## Pages
+
+- [Home](https://ramanpandey.com/): the Orion star-map homepage.
+- [About](https://ramanpandey.com/about/): who Raman is, research interests, projects, skills, tools, and academic goals, as an FAQ.
+- [Projects (Bellatrix)](https://ramanpandey.com/projects.html): all projects with posters and artifacts, rendered as an animated microprocessor.
+- [Skills (Mintaka)](https://ramanpandey.com/skills.html): 32 skills across hardware, quantum, software, and machine learning, rendered as an 8-mode Mach–Zehnder interferometer mesh.
+- [Papers (Alnilam)](https://ramanpandey.com/papers.html): journal publications (none yet; conference papers and posters live on the projects page).
+- [Blog (Alnitak)](https://ramanpandey.com/blogs.html): essays on physics, computing, AI, and science communication.
+- [Now (Saiph)](https://ramanpandey.com/now/): what Raman is working on this quarter, as a mission-control console.
+- [Rigel](https://ramanpandey.com/rigel.html): an interactive quantum circuit simulator with a live Bloch sphere per qubit.
+
+## Blog articles
+
+- [The Quantum Hype Problem](https://ramanpandey.com/articles/quantum-hype.html): I work in quantum tech, and I'm asking you to be more skeptical of it. On marketing adjectives, timeline inflation, and why honesty is a survival strategy for the field. (2026-07-14)
+- [Does the Machine Understand?](https://ramanpandey.com/articles/does-the-machine-understand.html): Large language models write essays, prove lemmas, and pass exams. Whether they "understand" anything is a different question — and probably the wrong one. (2026-07-05)
+- [Shut Up and Calculate?](https://ramanpandey.com/articles/shut-up-and-calculate.html): Physicists are told not to worry about what quantum mechanics means. But the history of the field suggests that worrying about it is exactly how progress gets made. (2026-06-20)
+- [The Great Silence Is Data](https://ramanpandey.com/articles/great-silence.html): The Fermi paradox is better read as an observation than a paradox, and maybe the most important null result in science. On filters, boring explanations, and how seriously to take the silence. (2026-05-30)
+- [The Media Skeptic's Guide to Health BS](https://ramanpandey.com/articles/media-skeptics-guide.html): How to spot myths, misinformation, and marketing fluff in modern wellness culture — twelve persistent health myths, debunked. (2026-04-03)
+- [Why Ethics Matters in Astrophysics](https://ramanpandey.com/articles/astro-ethics.html): The universe is a vast laboratory — but does that mean anything goes? On satellite constellations, sacred land, planetary protection, and who astronomy is for. (2025-06-01)
+- [Is the Universe a Simulation?](https://ramanpandey.com/articles/simulated-universe.html): From Nick Bostrom's simulation argument to the limits of physical law — could reality be code? (2025-05-11)
+
+## Contact
+
+- [Email](mailto:info@ramanpandey.com): info@ramanpandey.com
+- [Résumé (PDF)](https://ramanpandey.com/assets/resume.pdf)
+- [LinkedIn](https://linkedin.com/in/alpha-arceus)
+- [GitHub](https://github.com/Alpharceus)
+- [X](https://x.com/alpha_arceus)
+
+## Optional
+
+- [Sitemap](https://ramanpandey.com/sitemap.xml): every page and article with last-modified dates.
+- [Full text](https://ramanpandey.com/llms-full.txt): the About FAQ and article summaries as plain text.

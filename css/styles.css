@@ -84,15 +84,16 @@ ul.site-nav a:hover {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.78rem;
     color: rgba(180, 190, 220, 0.55);
-    opacity: 0;
     transition: opacity 0.9s ease;
 }
 
-body.intro-done .site-footer {
-    opacity: 1;
+/* Visible by default (no-JS readers see it). The inline <head> script adds html.js,
+   and only then is the footer held back until the intro finishes. */
+html.js body:not(.intro-done) .site-footer {
+    opacity: 0;
 }
 
-body:not(.intro-done) .site-footer .social-links {
+html.js body:not(.intro-done) .site-footer .social-links {
     pointer-events: none;
 }
 

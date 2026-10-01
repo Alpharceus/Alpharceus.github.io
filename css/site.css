@@ -173,3 +173,19 @@ main.projects-main h1 {
     font-weight: 600;
     letter-spacing: -0.01em;
 }
+
+/* ---- project cards: status chip sits beside the title, not inside the <h2> ----
+   (keeps the heading text clean for crawlers; the layout matches the old h2 + chip row) */
+.project .project-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
+    margin: 0 0 0.75em 0;
+    font-size: 1.27em;
+    line-height: 1.25;
+}
+
+.project .project-head h2 {
+    margin: 0;
+    font-size: 1em;
+}
