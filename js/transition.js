@@ -4,7 +4,8 @@
 // Shared by the home star map (dive out) and every star page (arrive).
 // Plain script, one global: SiteTransition. See portfolio-motion-brief.md.
 //
-//   Home:  SiteTransition.startDive({...}) / diveFrame() / onReset(fn)
+//   Home:  js/star-dive.js runs the dive and calls prepare()/commit() here;
+//          startDive({...}) / diveFrame() remain for the reduced-motion colour fade; onReset(fn)
 //   Pages: SiteTransition.getMode(page) -> 'arrival' | 'first' | 'skip'
 //          SiteTransition.run(ms, onFrame, onDone) / wireSkip(fn)
 // ========================================================
@@ -12,13 +13,7 @@
     "use strict";
 
     // ---- Timing (ms) — tune here ----
-    var DIVE_ZOOM_MS = 750;          // camera zoom, 0 -> here
-    var DIVE_FLOOD_START_MS = 600;   // halo turns into a flat fill
-    var DIVE_FLOOD_FULL_MS = 750;    // fill fully opaque
-    var DIVE_BLEND_MS = 100;         // last stretch: fill blends toward destination bg
     var DIVE_BG_BLEND = 0.3;         // how far toward the bg it ends (0 = star colour, 1 = bg)
-    var DIVE_NAVIGATE_MS = 850;      // location.href
-    var DIVE_MAX_SCALE = 35;
     var REDUCED_FADE_MS = 150;       // reduced motion: colour fade, then navigate
     var ARRIVAL_MAX_AGE_MS = 4000;   // arrival payload is stale after this
 
@@ -131,51 +126,53 @@
 
     function isDiving() { return !!dive; }
 
-    // opts: { star, target, rgb:[r,g,b], x, y }  (x,y = star screen position)
-    function startDive(opts) {
-        if (dive) return false;
+    // Resolve the dive's colours. arrival.rgb is exactly the dive's last flood colour,
+    // so the seam is invisible; starRgb is the pure star colour.
+    // opts: { star, target, rgb:[r,g,b] }
+    function prepare(opts) {
         var rgb = opts.rgb.map(function (v) { return Math.round(v); });
         var reduced = reducedMotion();
         var bg = DEST_BG[opts.target] || DEFAULT_BG;
-        // arrival.rgb is exactly the dive's last flood colour, so the seam is invisible
         var finalRgb = reduced ? rgb : rgb.map(function (v, i) { return Math.round(lerp(v, bg[i], DIVE_BG_BLEND)); });
+        return { star: opts.star, target: opts.target, rgb: rgb, finalRgb: finalRgb, bg: bg, reduced: reduced };
+    }
+
+    // Write the arrival payload and navigate. ts is stamped now (navigation time), so a
+    // dive of any length still falls inside the ARRIVAL_MAX_AGE_MS window on the other side.
+    function commit(plan) {
         try {
-            sessionStorage.setItem("arrival", JSON.stringify({ star: opts.star, rgb: finalRgb, starRgb: rgb, ts: Date.now() }));
+            sessionStorage.setItem("arrival", JSON.stringify({ star: plan.star, rgb: plan.finalRgb, starRgb: plan.rgb, ts: Date.now() }));
         } catch (e) { }
+        window.location.href = plan.target;
+    }
+
+    // Reduced-motion path (and fallback if star-dive.js is missing): colour fade, then navigate.
+    // opts: { star, target, rgb:[r,g,b], x, y }  (x,y = star screen position)
+    function startDive(opts) {
+        if (dive) return false;
+        var plan = prepare(opts);
         prefetch(opts.target);
         dive = {
             t0: performance.now(),
             target: opts.target,
-            rgb: rgb,
+            rgb: plan.rgb,
             x: opts.x,
             y: opts.y,
-            bg: bg,
-            reduced: reduced,
-            timer: setTimeout(function () { window.location.href = opts.target; },
-                reduced ? REDUCED_FADE_MS : DIVE_NAVIGATE_MS)
+            bg: plan.bg,
+            reduced: true,
+            timer: setTimeout(function () { commit(plan); }, REDUCED_FADE_MS)
         };
         return true;
     }
 
-    // Per-frame state of the dive, or null when idle.
-    //   scale: camera scale about (x,y); flood: 0..1 fill opacity;
-    //   blend: 0..1 fill colour -> destination bg; t: 0..1 of the whole dive
+    // Per-frame state of the reduced-motion fade, or null when idle.
+    //   flood: 0..1 fill opacity; blend: 0 (the fill stays the pure star colour)
     function diveFrame() {
         if (!dive) return null;
         var ms = performance.now() - dive.t0;
-        var f = { x: dive.x, y: dive.y, rgb: dive.rgb, bg: dive.bg, ms: ms };
-        if (dive.reduced) {
-            f.t = clamp(ms / REDUCED_FADE_MS, 0, 1);
-            f.scale = 1;
-            f.flood = f.t;
-            f.blend = 0;
-            return f;
-        }
-        f.t = clamp(ms / DIVE_NAVIGATE_MS, 0, 1);
-        f.zoom = clamp(ms / DIVE_ZOOM_MS, 0, 1);
-        f.scale = lerp(1, DIVE_MAX_SCALE, easeInCubic(f.zoom));
-        f.flood = easeOutCubic(clamp((ms - DIVE_FLOOD_START_MS) / (DIVE_FLOOD_FULL_MS - DIVE_FLOOD_START_MS), 0, 1));
-        f.blend = clamp((ms - (DIVE_NAVIGATE_MS - DIVE_BLEND_MS)) / DIVE_BLEND_MS, 0, 1) * DIVE_BG_BLEND;
+        var f = { x: dive.x, y: dive.y, rgb: dive.rgb, bg: dive.bg, ms: ms, scale: 1, zoom: 0, blend: 0 };
+        f.t = clamp(ms / REDUCED_FADE_MS, 0, 1);
+        f.flood = f.t;
         return f;
     }
 
@@ -216,6 +213,9 @@
         run: run,
         wireSkip: wireSkip,
         prefetch: prefetch,
+        DIVE_BG_BLEND: DIVE_BG_BLEND,
+        prepare: prepare,
+        commit: commit,
         startDive: startDive,
         isDiving: isDiving,
         diveFrame: diveFrame,

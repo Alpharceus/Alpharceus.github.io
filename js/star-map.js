@@ -20,9 +20,8 @@ const ZOOM_DURATION = 2200;
 const DRAW_DURATION = 3000;
 const CTA_TYPING_SPEED = 55;
 
-// ---- Star dive (timings live in js/transition.js) ----
+// ---- Star dive (the dive itself lives in js/star-dive.js; colours/arrival in js/transition.js) ----
 const DIVE_TARGETS = [null, "projects.html", "papers.html", "skills.html", "blogs.html", "now/", "rigel.html"];
-const DIVE_STREAK_ALPHA = 0.9;   // peak opacity of the radial streaks
 
 // ---- Projection ----
 const SKY = window.ORION_SKY;
@@ -357,14 +356,8 @@ function draw() {
     background(14, 16, 31);
     introTimer = millis() - introStartTime;
 
-    // Star dive: the whole sky scales about the clicked star
+    // Reduced-motion dive: only a colour fade (the full dive runs on its own canvas)
     const dv = window.SiteTransition ? SiteTransition.diveFrame() : null;
-    if (dv) {
-        drawingContext.save();
-        drawingContext.translate(dv.x, dv.y);
-        drawingContext.scale(dv.scale, dv.scale);
-        drawingContext.translate(-dv.x, -dv.y);
-    }
 
     switch (introState) {
         case "telescope":
@@ -381,19 +374,16 @@ function draw() {
             break;
     }
 
-    if (dv) drawingContext.restore();
-
     // Cosmic dust always on
     drawCosmicDust();
 
     if (dv) drawDiveOverlay(dv);
 }
 
-// Radial streaks from the star, then the flat colour flood
+// Reduced motion: flat colour fade over the sky
 function drawDiveOverlay(dv) {
-    const ctx = drawingContext;
-    if (dv.scale > 1) drawWarpStreaks(dv.zoom, dv.x, dv.y, DIVE_STREAK_ALPHA);
     if (dv.flood > 0) {
+        const ctx = drawingContext;
         ctx.save();
         ctx.fillStyle = rgba(SiteTransition.diveColor(dv), dv.flood);
         ctx.fillRect(0, 0, width, height);
@@ -570,7 +560,9 @@ function drawLink(ctx, A, B, ga, gb, p, a) {
 
 function hitRadius(i) { return Math.max(26, coreD(i) * 1.2); }
 
-function diving() { return !!(window.SiteTransition && SiteTransition.isDiving()); }
+function diving() {
+    return !!((window.SiteTransition && SiteTransition.isDiving()) || (window.StarDive && StarDive.isActive()));
+}
 
 function interactive() {
     return !diving() && (introState === "idle" || (introState === "draw" && ctaVisible));
@@ -942,6 +934,14 @@ function keyPressed() {
 // ---- Star actions ----
 function handleStarClick(idx) {
     if (idx === 0) { openTerminal(); return; }
+    if (window.StarDive) {
+        const p = orionStarScreenPos[idx];
+        hoveredStar = null;
+        cursor(ARROW);
+        // the dive snapshots this canvas, then owns the screen; pause p5 while it runs
+        if (StarDive.start(idx, { x: p.x, y: p.y }, DIVE_TARGETS[idx], null) && StarDive.isActive()) noLoop();
+        return;
+    }
     if (window.SiteTransition) {
         const p = orionStarScreenPos[idx];
         hoveredStar = null;
@@ -964,6 +964,7 @@ if (window.SiteTransition) {
     SiteTransition.onReset(function () {
         hoveredStar = null;
         if (typeof cursor === "function") cursor(ARROW);
+        if (typeof loop === "function") loop();   // the dive pauses p5
     });
 }
 
