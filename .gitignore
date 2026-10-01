@@ -15,3 +15,10 @@ portfolio-motion-brief.md
 # steps 1-2 patch archive (applied)
 portfolio-changed-files.zip
 portfolio-steps-4-5-brief.md
+
+# any private plan / brief docs
+*-brief.md
+*-plan.md
+
+# AI-assistant rules: local only, never deploy
+CLAUDE.md
